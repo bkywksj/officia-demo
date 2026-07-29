@@ -13,10 +13,43 @@ demo 依赖 `officia-*:1.0.0`。联网环境直接在 officia 目录 `mvn instal
 
 ## 跑起来
 
+### 方式一：可视化测试台（推荐）
+
+```bash
+mvn -o package                                  # 产出可执行 jar
+java -jar target/officia-demo-1.0.0.jar         # 启动后控制台打印访问链接，并自动打开浏览器
+java -jar target/officia-demo-1.0.0.jar 9090 --no-open   # 指定端口 / 不自动开浏览器
+```
+
+浏览器里可**直接上传 doc/docx/xlsx/pptx/pdf/图片/eml 实测**：转换、模板填充、PDF 工具箱、图像滤镜、
+条码生成、邮件归档、授权门控对比、一键批量回归——每步都显示页数/耗时/体积、内嵌预览、可下载。
+
+> 服务用 JDK 内置 `com.sun.net.httpserver.HttpServer`，**demo 自身同样零第三方依赖**；
+> 上传文件只存内存、重启即清，不落盘不入库。
+
+### 方式二：命令行 / 单测
+
 ```bash
 mvn -o test                 # 示例测试全绿（授权演示在未放 officia.lic 时自动跳过）
 mvn -o exec:java -Dexec.mainClass=plus.ruoyi.officia.demo.Demo   # 或直接 run Demo.main
 ```
+
+## 测试台面板
+
+| 面板 | 可实测的能力 |
+|---|---|
+| Words · DOC/DOCX | 上传 .doc（CFB）/.docx（OOXML）→ PDF，自动识别格式；字节 / 流式两种输出 |
+| 模板填充 · 邮件合并 | 模板 + JSON → 单条 / 合并一份 / 每条一份 / 只填 docx |
+| Cells · XLSX/CSV | XLSX→PDF、XLSX→CSV、CSV→PDF、CSV 解析、单元格公式求值、整表重算 |
+| Slides · PPTX | PPTX→PDF，标准 / 版式保真双模式 |
+| PDF 工具箱 | 合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图片·RC4-128·AES-256·信息 |
+| Imaging · 图像 | 15 种滤镜/变换 + 格式转换 + 图片→PDF，处理前后并排对比 |
+| BarCode · 条码 | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR（4 档纠错）+ 全码制一键预览 |
+| Email · EML | EML 解析（主题/收发件/附件/正文）、邮件归档 → PDF |
+| 授权门控与对比 | 加载 .lic、模块门控矩阵、**同一份数据在门控开/关下的页数与水印并排对比** |
+| 批量回归 | 用 officia 自造输入跑全能力并断言（%PDF- 头 / 页数 / PNG 魔数 / 往返一致） |
+
+> 中文 PDF 水印需 TTF：服务端自动探测系统字体，也可在界面上传自己的 .ttf。
 
 ## 示例清单
 

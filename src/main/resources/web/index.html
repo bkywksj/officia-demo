@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Officia 能力测试台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82F6',accent:'#0891B2'}}}}
+</script>
+<style>
+ body{font-family:Inter,system-ui,'Microsoft YaHei',sans-serif}
+ .panel{display:none}.panel.active{display:block}
+ .navitem.active{background:rgb(30 64 175/.06);color:#1E40AF;border-right:2px solid #1E40AF}
+ .dropzone{border:2px dashed #CBD5E1;transition:all .2s}.dropzone:hover{border-color:#1E40AF;background:rgb(30 64 175/.03)}
+ .dropzone.over{border-color:#1E40AF;background:rgb(30 64 175/.06)}
+ .spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+<nav class="fixed left-0 top-0 h-screen w-60 bg-white border-r border-slate-200 flex flex-col z-20">
+  <div class="h-16 flex items-center px-5 border-b border-slate-100">
+    <i data-lucide="layers" class="w-6 h-6 text-primary mr-2"></i>
+    <div><div class="font-bold text-base leading-tight">Officia</div><div class="text-xs text-slate-400">能力测试台</div></div>
+  </div>
+  <div class="flex-1 overflow-y-auto py-3" id="nav">
+    <div class="px-5 py-1.5 text-xs font-medium text-slate-400">总览</div>
+    <a data-p="dash" class="navitem active flex items-center px-5 py-2.5 text-sm cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="layout-dashboard" class="w-4 h-4 mr-3"></i>能力总览</a>
+    <div class="px-5 py-1.5 mt-2 text-xs font-medium text-slate-400">文档转换</div>
+    <a data-p="words" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="file-text" class="w-4 h-4 mr-3"></i>Words · DOC/DOCX</a>
+    <a data-p="tpl" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="file-input" class="w-4 h-4 mr-3"></i>模板填充 · 邮件合并</a>
+    <a data-p="cells" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="table-2" class="w-4 h-4 mr-3"></i>Cells · XLSX/CSV</a>
+    <a data-p="slides" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="presentation" class="w-4 h-4 mr-3"></i>Slides · PPTX</a>
+    <a data-p="email" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="mail" class="w-4 h-4 mr-3"></i>Email · EML</a>
+    <div class="px-5 py-1.5 mt-2 text-xs font-medium text-slate-400">处理与生成</div>
+    <a data-p="pdf" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="file-cog" class="w-4 h-4 mr-3"></i>PDF 工具箱</a>
+    <a data-p="img" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="image" class="w-4 h-4 mr-3"></i>Imaging · 图像</a>
+    <a data-p="bar" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="scan-barcode" class="w-4 h-4 mr-3"></i>BarCode · 条码</a>
+    <div class="px-5 py-1.5 mt-2 text-xs font-medium text-slate-400">商业授权</div>
+    <a data-p="lic" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="shield-check" class="w-4 h-4 mr-3"></i>授权门控与对比</a>
+    <a data-p="batch" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="list-checks" class="w-4 h-4 mr-3"></i>批量回归</a>
+  </div>
+  <div class="border-t border-slate-100 p-3 text-xs text-slate-400">
+    <div class="flex items-center gap-1.5"><i data-lucide="package" class="w-3.5 h-3.5"></i>officia-all 1.0.0</div>
+    <div class="flex items-center gap-1.5 mt-1"><i data-lucide="shield-off" class="w-3.5 h-3.5"></i>运行时零第三方依赖</div>
+  </div>
+</nav>
+
+<div class="ml-60 flex flex-col min-h-screen">
+  <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-10">
+    <nav class="flex items-center text-sm text-slate-500"><span>测试台</span>
+      <i data-lucide="chevron-right" class="w-4 h-4 mx-1"></i><span class="text-slate-900 font-medium" id="crumb">能力总览</span></nav>
+    <div class="flex items-center gap-3">
+      <span id="licBadge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+        <i data-lucide="loader" class="w-3.5 h-3.5"></i>读取授权状态…</span>
+      <button onclick="go('lic')" class="border border-slate-300 px-3 py-1.5 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer flex items-center gap-1.5">
+        <i data-lucide="key-round" class="w-4 h-4"></i>加载 officia.lic</button>
+    </div>
+  </header>
+
+  <main class="flex-1 p-6">
+
+  <!-- 总览 -->
+  <section id="dash" class="panel active">
+    <div class="grid grid-cols-4 gap-4 mb-5">
+      <div class="bg-white rounded-lg border border-slate-200 p-4"><div class="flex items-center justify-between"><span class="text-sm text-slate-500">已覆盖能力</span><i data-lucide="boxes" class="w-4 h-4 text-primary"></i></div>
+        <div class="text-2xl font-bold mt-2">7 <span class="text-sm font-normal text-slate-400">大模块</span></div><div class="text-xs text-slate-400 mt-1">Words/Cells/Slides/Pdf/Email/Imaging/BarCode</div></div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4"><div class="flex items-center justify-between"><span class="text-sm text-slate-500">本次会话任务</span><i data-lucide="activity" class="w-4 h-4 text-accent"></i></div>
+        <div class="text-2xl font-bold mt-2" id="mTasks">0 <span class="text-sm font-normal text-slate-400">次</span></div><div class="text-xs text-slate-400 mt-1" id="mTaskSub">尚无任务</div></div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4"><div class="flex items-center justify-between"><span class="text-sm text-slate-500">最近耗时</span><i data-lucide="timer" class="w-4 h-4 text-accent"></i></div>
+        <div class="text-2xl font-bold mt-2" id="mMs">— <span class="text-sm font-normal text-slate-400">ms</span></div><div class="text-xs text-slate-400 mt-1" id="mMsSub">—</div></div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4"><div class="flex items-center justify-between"><span class="text-sm text-slate-500">授权状态</span><i data-lucide="shield-alert" class="w-4 h-4 text-amber-500"></i></div>
+        <div class="text-2xl font-bold mt-2" id="mLic">—</div><div class="text-xs text-slate-400 mt-1" id="mLicSub">—</div></div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 mb-5">
+      <div class="px-4 py-3 border-b border-slate-100 font-medium text-sm flex items-center justify-between">
+        <span class="flex items-center gap-2"><i data-lucide="grid-3x3" class="w-4 h-4 text-primary"></i>能力矩阵（点卡片直达）</span>
+        <button onclick="loadSamples()" class="text-xs border border-slate-300 px-2.5 py-1 rounded hover:border-primary hover:text-primary cursor-pointer transition">生成内置样本</button></div>
+      <div class="grid grid-cols-4 gap-3 p-4">
+        <div onclick="go('words')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="file-text" class="w-4 h-4 text-primary"></i>Officia.Words</div><div class="text-xs text-slate-500 mt-1.5">DOC / DOCX → PDF（自动识别）<br>模板填充 · 邮件合并 · 流式</div></div>
+        <div onclick="go('cells')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="table-2" class="w-4 h-4 text-primary"></i>Officia.Cells</div><div class="text-xs text-slate-500 mt-1.5">XLSX → PDF / CSV<br>公式求值 · 整表重算</div></div>
+        <div onclick="go('slides')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="presentation" class="w-4 h-4 text-primary"></i>Officia.Slides</div><div class="text-xs text-slate-500 mt-1.5">PPTX → PDF<br>版式保真模式</div></div>
+        <div onclick="go('pdf')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="file-cog" class="w-4 h-4 text-primary"></i>Officia.Pdf</div><div class="text-xs text-slate-500 mt-1.5">合并/拆分/抽页/旋转/水印<br>抽文字图片 · RC4 & AES-256</div></div>
+        <div onclick="go('img')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="image" class="w-4 h-4 text-primary"></i>Officia.Imaging</div><div class="text-xs text-slate-500 mt-1.5">格式转换 · 16 种滤镜/变换<br>文字&图片水印 · 图片→PDF</div></div>
+        <div onclick="go('bar')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="scan-barcode" class="w-4 h-4 text-primary"></i>Officia.BarCode</div><div class="text-xs text-slate-500 mt-1.5">Code128/39/93 · EAN · UPC-A · ITF-14<br>QR 全 40 版本 · 4 档纠错</div></div>
+        <div onclick="go('email')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="mail" class="w-4 h-4 text-primary"></i>Officia.Email</div><div class="text-xs text-slate-500 mt-1.5">EML 解析 / 生成<br>邮件归档 → PDF</div></div>
+        <div onclick="go('lic')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="shield-check" class="w-4 h-4 text-primary"></i>License 门控</div><div class="text-xs text-slate-500 mt-1.5">加载 .lic · 模块授权查询<br>授权前后效果对比</div></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200">
+      <div class="px-4 py-3 border-b border-slate-100 font-medium text-sm flex items-center gap-2"><i data-lucide="history" class="w-4 h-4 text-primary"></i>最近任务</div>
+      <table class="w-full text-sm"><thead><tr class="bg-slate-50 text-slate-500">
+        <th class="px-4 py-2.5 text-left font-medium">时间</th><th class="px-4 py-2.5 text-left font-medium">能力</th>
+        <th class="px-4 py-2.5 text-left font-medium">输出</th><th class="px-4 py-2.5 text-left font-medium">耗时</th>
+        <th class="px-4 py-2.5 text-left font-medium">状态</th><th class="px-4 py-2.5 text-left font-medium">操作</th></tr></thead>
+        <tbody class="divide-y divide-slate-100" id="taskRows"><tr><td colspan="6" class="px-4 py-8 text-center text-slate-400 text-sm">还没有任务，去左侧选个能力试试</td></tr></tbody></table>
+    </div>
+  </section>
+
+  <!-- Words -->
+  <section id="words" class="panel">
+    <div class="grid grid-cols-3 gap-5">
+      <div class="col-span-1 space-y-4">
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="upload" class="w-4 h-4 text-primary"></i>1 · 选择文档</div>
+          <div class="dropzone rounded-lg p-6 text-center cursor-pointer" onclick="pick('wordsFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'words')">
+            <i data-lucide="file-up" class="w-8 h-8 text-slate-400 mx-auto"></i>
+            <div class="text-sm mt-2 text-slate-600">拖入或点击上传</div>
+            <div class="text-xs text-slate-400 mt-1">支持 .docx（OOXML）、.doc（CFB 二进制）</div></div>
+          <input type="file" id="wordsFile" class="hidden" accept=".doc,.docx" onchange="upload(this.files[0],'words')">
+          <div id="wordsInfo" class="mt-3 text-xs text-slate-400">尚未选择文件</div>
+        </div>
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="sliders-horizontal" class="w-4 h-4 text-primary"></i>2 · 转换方式</div>
+          <select id="wordsMode" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm cursor-pointer mb-3">
+            <option value="bytes">字节数组 toPdf(byte[])</option><option value="stream">流式直写 toPdf(in,out) — 大文档省内存</option></select>
+          <button onclick="wordsRun()" class="w-full bg-primary text-white py-2.5 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i>开始转换</button>
+        </div>
+      </div>
+      <div class="col-span-2 space-y-4" id="wordsOut"></div>
+    </div>
+  </section>
+
+  <!-- 模板 -->
+  <section id="tpl" class="panel">
+    <div class="grid grid-cols-2 gap-5">
+      <div class="space-y-4">
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="file-input" class="w-4 h-4 text-primary"></i>模板 docx（含 {{占位符}}）</div>
+          <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('tplFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'tpl')">
+            <i data-lucide="file-up" class="w-7 h-7 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">上传模板 .docx</div></div>
+          <input type="file" id="tplFile" class="hidden" accept=".docx" onchange="upload(this.files[0],'tpl')">
+          <div id="tplInfo" class="mt-3 text-xs text-slate-400">尚未选择模板</div>
+        </div>
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="braces" class="w-4 h-4 text-primary"></i>数据（JSON）</div>
+          <textarea id="tplJson" class="w-full h-56 border border-slate-300 rounded-md p-3 text-xs font-mono outline-none focus:border-primary" spellcheck="false">[
+  {"name":"张三","amount":128000,"date":"2026-07-29"},
+  {"name":"李四","amount":56000,"date":"2026-07-30"}
+]</textarea>
+          <div class="text-xs text-slate-400 mt-2">单条模式请用对象 <span class="font-mono">{...}</span>；合并/每条模式用数组 <span class="font-mono">[...]</span></div>
+        </div>
+      </div>
+      <div class="space-y-4">
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="settings-2" class="w-4 h-4 text-primary"></i>填充模式</div>
+          <div class="space-y-2">
+            <label class="flex items-start gap-2.5 border border-slate-200 rounded-md p-3 cursor-pointer hover:border-primary transition"><input type="radio" name="tm" value="single" class="mt-0.5 cursor-pointer"><div><div class="text-sm font-medium">单条填充 → PDF</div><div class="text-xs text-slate-500 mt-0.5">fillTemplateToPdf(tpl, json)</div></div></label>
+            <label class="flex items-start gap-2.5 border border-slate-200 rounded-md p-3 cursor-pointer hover:border-primary transition"><input type="radio" name="tm" value="merged" checked class="mt-0.5 cursor-pointer"><div><div class="text-sm font-medium">邮件合并 · 合并为一份</div><div class="text-xs text-slate-500 mt-0.5">fillTemplateMergedToPdf(tpl, list)</div></div></label>
+            <label class="flex items-start gap-2.5 border border-slate-200 rounded-md p-3 cursor-pointer hover:border-primary transition"><input type="radio" name="tm" value="each" class="mt-0.5 cursor-pointer"><div><div class="text-sm font-medium">邮件合并 · 每条一份</div><div class="text-xs text-slate-500 mt-0.5">fillTemplateEachToPdf(tpl, list) — 返回 N 份</div></div></label>
+            <label class="flex items-start gap-2.5 border border-slate-200 rounded-md p-3 cursor-pointer hover:border-primary transition"><input type="radio" name="tm" value="docx" class="mt-0.5 cursor-pointer"><div><div class="text-sm font-medium">只填充不转换 → docx</div><div class="text-xs text-slate-500 mt-0.5">fillTemplate(tpl, json)</div></div></label>
+          </div>
+          <button onclick="tplRun()" class="w-full mt-4 bg-primary text-white py-2.5 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i>执行填充</button>
+        </div>
+        <div id="tplOut"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cells -->
+  <section id="cells" class="panel">
+    <div class="grid grid-cols-3 gap-5">
+      <div class="space-y-4">
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="upload" class="w-4 h-4 text-primary"></i>XLSX 输入</div>
+          <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('cellsFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'cells')">
+            <i data-lucide="table-2" class="w-7 h-7 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">上传 .xlsx</div></div>
+          <input type="file" id="cellsFile" class="hidden" accept=".xlsx" onchange="upload(this.files[0],'cells')">
+          <div id="cellsInfo" class="mt-3 text-xs text-slate-400">尚未选择文件</div>
+          <div class="mt-3 grid grid-cols-2 gap-1.5">
+            <button onclick="cellsRun('topdf')" class="border border-slate-200 rounded px-2 py-1.5 text-xs hover:border-primary hover:text-primary transition cursor-pointer">XLSX→PDF</button>
+            <button onclick="cellsRun('tocsv')" class="border border-slate-200 rounded px-2 py-1.5 text-xs hover:border-primary hover:text-primary transition cursor-pointer">XLSX→CSV</button>
+            <button onclick="cellsRun('recalc')" class="border border-slate-200 rounded px-2 py-1.5 text-xs hover:border-primary hover:text-primary transition cursor-pointer">整表重算</button>
+            <button onclick="cellsFormula()" class="border border-slate-200 rounded px-2 py-1.5 text-xs hover:border-primary hover:text-primary transition cursor-pointer">单元格求值</button>
+          </div>
+          <input id="cellsCell" placeholder="单元格如 E12" class="w-full mt-2 border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary">
+        </div>
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-2 flex items-center gap-2"><i data-lucide="file-spreadsheet" class="w-4 h-4 text-primary"></i>CSV 直接测</div>
+          <textarea id="csvText" class="w-full h-28 border border-slate-300 rounded-md p-2 text-xs font-mono outline-none focus:border-primary" spellcheck="false">编号,姓名,部门,城市,金额
+1,张三,研发部,深圳,12800
+2,李四,产品部,广州,9600
+3,王五,研发部,北京,15200</textarea>
+          <div class="grid grid-cols-2 gap-1.5 mt-2">
+            <button onclick="csvToPdf()" class="bg-primary text-white rounded px-2 py-1.5 text-xs hover:opacity-90 transition cursor-pointer">CSV→PDF</button>
+            <button onclick="csvParse()" class="border border-slate-200 rounded px-2 py-1.5 text-xs hover:border-primary hover:text-primary transition cursor-pointer">解析预览</button></div>
+        </div>
+      </div>
+      <div class="col-span-2 space-y-4" id="cellsOut"></div>
+    </div>
+  </section>
+
+  <!-- Slides -->
+  <section id="slides" class="panel">
+    <div class="grid grid-cols-3 gap-5">
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="presentation" class="w-4 h-4 text-primary"></i>PPTX → PDF</div>
+        <div class="dropzone rounded-lg p-6 text-center cursor-pointer" onclick="pick('slidesFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'slides')">
+          <i data-lucide="file-up" class="w-8 h-8 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">上传 .pptx</div></div>
+        <input type="file" id="slidesFile" class="hidden" accept=".pptx" onchange="upload(this.files[0],'slides')">
+        <div id="slidesInfo" class="mt-3 text-xs text-slate-400">尚未选择文件</div>
+        <div class="mt-4 space-y-2">
+          <label class="flex items-start gap-2.5 border border-slate-200 rounded-md p-3 cursor-pointer hover:border-primary transition"><input type="radio" name="sm" value="false" checked class="mt-0.5 cursor-pointer"><div><div class="text-sm font-medium">标准模式</div><div class="text-xs text-slate-500 mt-0.5">toPdf — 内容提取</div></div></label>
+          <label class="flex items-start gap-2.5 border border-slate-200 rounded-md p-3 cursor-pointer hover:border-primary transition"><input type="radio" name="sm" value="true" class="mt-0.5 cursor-pointer"><div><div class="text-sm font-medium">版式保真</div><div class="text-xs text-slate-500 mt-0.5">toPdfLayoutAware</div></div></label>
+        </div>
+        <button onclick="slidesRun()" class="w-full mt-4 bg-primary text-white py-2.5 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i>转换</button>
+      </div>
+      <div class="col-span-2" id="slidesOut"></div>
+    </div>
+  </section>
+
+  <!-- PDF -->
+  <section id="pdf" class="panel">
+    <div class="grid grid-cols-4 gap-4 mb-5">
+      <div class="col-span-1 bg-white rounded-lg border border-slate-200 p-4">
+        <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="files" class="w-4 h-4 text-primary"></i>PDF 输入（可多个）</div>
+        <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('pdfFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'pdf')">
+          <i data-lucide="file-up" class="w-7 h-7 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">上传 PDF</div></div>
+        <input type="file" id="pdfFile" class="hidden" accept=".pdf" multiple onchange="uploadMulti(this.files,'pdf')">
+        <div id="pdfList" class="mt-3 space-y-1.5 text-xs text-slate-400">尚未选择文件</div>
+        <div id="pdfInfo" class="mt-3 pt-3 border-t border-slate-100 text-xs space-y-1 hidden"></div>
+      </div>
+      <div class="col-span-3 bg-white rounded-lg border border-slate-200 p-4">
+        <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="wrench" class="w-4 h-4 text-primary"></i>操作</div>
+        <div class="grid grid-cols-4 gap-2.5">
+          <button onclick="pdfOp('merge')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="combine" class="w-4 h-4"></i>合并</button>
+          <button onclick="pdfOp('split')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="split" class="w-4 h-4"></i>拆分</button>
+          <button onclick="pdfOp('extract')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-output" class="w-4 h-4"></i>抽页</button>
+          <button onclick="pdfOp('remove')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-minus" class="w-4 h-4"></i>删页</button>
+          <button onclick="pdfOp('rotate')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="rotate-cw" class="w-4 h-4"></i>旋转</button>
+          <button onclick="pdfOp('watermark')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="droplets" class="w-4 h-4"></i>水印</button>
+          <button onclick="pdfOp('pagenumbers')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="hash" class="w-4 h-4"></i>页码</button>
+          <button onclick="pdfOp('text')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="type" class="w-4 h-4"></i>抽文字</button>
+          <button onclick="pdfOp('images')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="image-down" class="w-4 h-4"></i>抽图片</button>
+          <button onclick="pdfOp('rc4')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="lock" class="w-4 h-4"></i>RC4-128</button>
+          <button onclick="pdfOp('aes')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="shield" class="w-4 h-4"></i>AES-256</button>
+          <button onclick="pdfOp('info')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="info" class="w-4 h-4"></i>信息</button>
+        </div>
+        <div class="mt-4 grid grid-cols-3 gap-3 bg-slate-50 rounded-md p-3">
+          <div><label class="block text-xs text-slate-500 mb-1">水印文字</label><input id="pdfWmText" value="机密 · 仅供内部" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
+          <div><label class="block text-xs text-slate-500 mb-1">页码格式</label><input id="pdfPnFmt" value="第 {page} 页 / 共 {total} 页" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
+          <div><label class="block text-xs text-slate-500 mb-1">页码索引（抽/删，从0起）</label><input id="pdfPages" value="0,1" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
+        </div>
+        <div class="mt-2 text-xs text-slate-400">中文水印需 TTF：服务端已自动探测系统字体；也可
+          <button onclick="pick('fontFile')" class="text-primary hover:underline cursor-pointer">上传 TTF</button>
+          <input type="file" id="fontFile" class="hidden" accept=".ttf" onchange="upload(this.files[0],'font')">
+          <span id="fontInfo"></span></div>
+      </div>
+    </div>
+    <div id="pdfOut"></div>
+  </section>
+
+  <!-- Imaging -->
+  <section id="img" class="panel">
+    <div class="grid grid-cols-3 gap-5">
+      <div class="space-y-4">
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="image-plus" class="w-4 h-4 text-primary"></i>图片输入</div>
+          <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('imgFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'img')">
+            <i data-lucide="image-up" class="w-7 h-7 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">上传图片（可多选）</div><div class="text-xs text-slate-400 mt-1">PNG / JPEG / BMP / GIF</div></div>
+          <input type="file" id="imgFile" class="hidden" accept="image/*" multiple onchange="uploadMulti(this.files,'img')">
+          <div id="imgInfo" class="mt-3 text-xs text-slate-400">尚未选择文件</div>
+        </div>
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3">滤镜与变换</div>
+          <div class="grid grid-cols-2 gap-1.5 text-xs" id="imgOps"></div>
+          <div class="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-1.5 text-xs">
+            <button onclick="imgOp('convert')" class="border border-slate-200 rounded px-2 py-1.5 hover:border-primary hover:text-primary transition cursor-pointer">转 JPG</button>
+            <button onclick="imgToPdf()" class="border border-slate-200 rounded px-2 py-1.5 hover:border-primary hover:text-primary transition cursor-pointer">图片 → PDF</button></div>
+        </div>
+      </div>
+      <div class="col-span-2" id="imgOut"></div>
+    </div>
+  </section>
+
+  <!-- BarCode -->
+  <section id="bar" class="panel">
+    <div class="grid grid-cols-3 gap-5">
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="scan-barcode" class="w-4 h-4 text-primary"></i>参数</div>
+        <label class="block text-xs text-slate-500 mb-1">码制</label>
+        <select id="barType" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm cursor-pointer mb-3" onchange="barPreset()">
+          <option value="qr">QR Code（全 40 版本）</option><option value="code128">Code 128</option><option value="code39">Code 39</option>
+          <option value="code93">Code 93</option><option value="ean13">EAN-13</option><option value="ean8">EAN-8</option>
+          <option value="upca">UPC-A</option><option value="itf14">ITF-14</option></select>
+        <label class="block text-xs text-slate-500 mb-1">内容</label>
+        <input id="barText" value="https://ruoyi.plus" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-3 outline-none focus:border-primary">
+        <label class="block text-xs text-slate-500 mb-1">纠错等级（QR）</label>
+        <div class="grid grid-cols-4 gap-1.5 mb-3" id="eccBtns"></div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div><label class="block text-xs text-slate-500 mb-1">模块尺寸</label><input id="barMod" type="number" value="8" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-primary"></div>
+          <div><label class="block text-xs text-slate-500 mb-1">静区</label><input id="barQuiet" type="number" value="4" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-primary"></div></div>
+        <label class="flex items-center gap-2 text-sm cursor-pointer mb-3"><input type="checkbox" id="barWithText" class="rounded cursor-pointer">条码下方显示文字</label>
+        <button onclick="barRun()" class="w-full bg-primary text-white py-2.5 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i>生成</button>
+        <button onclick="barAll()" class="w-full mt-2 border border-slate-300 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer">全码制一键预览</button>
+      </div>
+      <div class="col-span-2" id="barOut"></div>
+    </div>
+  </section>
+
+  <!-- Email -->
+  <section id="email" class="panel">
+    <div class="grid grid-cols-3 gap-5">
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="mail" class="w-4 h-4 text-primary"></i>EML 输入</div>
+        <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('emlFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'eml')">
+          <i data-lucide="file-up" class="w-7 h-7 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">上传 .eml</div></div>
+        <input type="file" id="emlFile" class="hidden" accept=".eml" onchange="upload(this.files[0],'eml')">
+        <div id="emlInfo" class="mt-3 text-xs text-slate-400">尚未选择文件（或点"生成内置样本"）</div>
+        <div class="mt-3 space-y-1.5 text-sm">
+          <button onclick="emlRun('parse')" class="w-full text-left px-3 py-2 rounded-md border border-slate-200 hover:border-primary hover:text-primary transition cursor-pointer">解析 parseEml</button>
+          <button onclick="emlRun('topdf')" class="w-full text-left px-3 py-2 rounded-md border border-slate-200 hover:border-primary hover:text-primary transition cursor-pointer">归档 → PDF</button></div>
+      </div>
+      <div class="col-span-2" id="emlOut"></div>
+    </div>
+  </section>
+
+  <!-- License -->
+  <section id="lic" class="panel">
+    <div class="grid grid-cols-3 gap-5 mb-5">
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="key-round" class="w-4 h-4 text-primary"></i>加载 License</div>
+        <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('licFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="dropLic(event)">
+          <i data-lucide="file-key" class="w-7 h-7 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">拖入 officia.lic</div></div>
+        <input type="file" id="licFile" class="hidden" accept=".lic,.txt" onchange="licFromFile(this.files[0])">
+        <textarea id="licText" placeholder="或粘贴令牌文本…" class="w-full h-20 mt-3 border border-slate-300 rounded-md p-2 text-xs font-mono outline-none focus:border-primary"></textarea>
+        <div class="mt-3 text-xs text-slate-500 bg-slate-50 rounded p-2.5">实际集成<b>零代码</b>：放到 classpath / 工作目录 / 环境变量即自动加载，此处仅测试台手动切换。</div>
+        <div class="mt-3 flex gap-2">
+          <button onclick="licSet()" class="flex-1 bg-primary text-white py-2 rounded-md text-sm hover:opacity-90 transition cursor-pointer">加载并解锁</button>
+          <button onclick="licReset()" class="border border-slate-300 px-3 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer">复位</button></div>
+        <label class="flex items-center gap-2 text-sm cursor-pointer mt-3"><input type="checkbox" id="enforceChk" onchange="licEnforce(this.checked)" class="rounded cursor-pointer">开启强制门控（未授权即降级）</label>
+      </div>
+      <div class="col-span-2 bg-white rounded-lg border border-slate-200 p-4">
+        <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4 text-primary"></i>当前授权状态</div>
+        <div class="grid grid-cols-3 gap-4 mb-4" id="licMeta"></div>
+        <div class="text-xs text-slate-400 mb-2">模块门控（hasModule）</div>
+        <div class="grid grid-cols-4 gap-2" id="licMods"></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200">
+      <div class="px-4 py-3 border-b border-slate-100 font-medium text-sm flex items-center justify-between">
+        <span class="flex items-center gap-2"><i data-lucide="columns-2" class="w-4 h-4 text-primary"></i>授权前后效果对比（同一份 150 行数据）</span>
+        <button onclick="licCompare()" class="text-xs bg-primary text-white px-3 py-1.5 rounded hover:opacity-90 cursor-pointer transition">开始对比</button></div>
+      <div id="licCmp" class="p-4 text-sm text-slate-400">点「开始对比」：先在强制门控下生成一次（评估降级），再按当前授权态生成一次，并排比较页数与水印。</div>
+    </div>
+  </section>
+
+  <!-- 批量回归 -->
+  <section id="batch" class="panel">
+    <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4 flex items-center gap-4">
+      <div class="text-sm text-slate-600">用 officia 自造输入跑一遍全能力，并对结构性事实断言（%PDF- 头 / 页数 / PNG 魔数 / 往返一致）</div>
+      <div class="ml-auto flex gap-2">
+        <button onclick="batchRun()" class="bg-primary text-white px-4 py-2 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center gap-1.5"><i data-lucide="play" class="w-4 h-4"></i>开始回归</button></div>
+    </div>
+    <div id="batchOut" class="bg-white rounded-lg border border-slate-200 p-8 text-center text-slate-400 text-sm">尚未运行</div>
+  </section>
+
+  </main>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 z-50 space-y-2"></div>
+
+<script>
+const T={dash:'能力总览',words:'Words · DOC/DOCX',tpl:'模板填充 · 邮件合并',cells:'Cells · XLSX/CSV',slides:'Slides · PPTX',
+ email:'Email · EML',pdf:'PDF 工具箱',img:'Imaging · 图像',bar:'BarCode · 条码',lic:'授权门控与对比',batch:'批量回归'};
+const S={};              // 各面板选中的文件 id
+let tasks=[];            // 最近任务
+let ecc='M';
+
+function go(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active',n.dataset.p===id));
+  document.getElementById('crumb').textContent=T[id]||'';
+  window.scrollTo(0,0);lucide.createIcons();
+}
+document.getElementById('nav').addEventListener('click',e=>{const a=e.target.closest('.navitem');if(a)go(a.dataset.p)});
+
+function toast(msg,ok=true){
+  const d=document.createElement('div');
+  d.className='px-4 py-2.5 rounded-lg shadow-lg text-sm text-white '+(ok?'bg-emerald-600':'bg-red-600');
+  d.textContent=msg;document.getElementById('toast').appendChild(d);
+  setTimeout(()=>d.remove(),3200);
+}
+function pick(id){document.getElementById(id).click()}
+function dz(e,on){e.preventDefault();e.currentTarget.classList.toggle('over',!!on)}
+function drop(e,key){e.preventDefault();e.currentTarget.classList.remove('over');
+  const f=e.dataTransfer.files;if(!f.length)return;
+  if(key==='pdf'||key==='img')uploadMulti(f,key);else upload(f[0],key)}
+function fmt(n){return n>1048576?(n/1048576).toFixed(1)+' MB':n>1024?(n/1024).toFixed(0)+' KB':n+' B'}
+
+async function api(path,opt){
+  const r=await fetch(path,opt);
+  const ct=r.headers.get('content-type')||'';
+  if(!ct.includes('json')){if(!r.ok)throw new Error('HTTP '+r.status);return {}}
+  const j=await r.json();
+  if(!r.ok||j.error)throw new Error(j.message||('HTTP '+r.status));
+  return j;
+}
+async function upload(file,key){
+  if(!file)return;
+  try{
+    const j=await api('/api/upload?name='+encodeURIComponent(file.name),{method:'POST',body:file});
+    S[key]=j.id;
+    const el=document.getElementById(key+'Info')||document.getElementById(key==='font'?'fontInfo':key+'Info');
+    if(el)el.innerHTML='<span class="text-slate-700">'+j.name+'</span> · '+fmt(j.size)+(j.pages?' · '+j.pages+' 页':'');
+    toast('已上传 '+j.name);
+  }catch(e){toast(e.message,false)}
+}
+async function uploadMulti(files,key){
+  S[key+'s']=S[key+'s']||[];
+  for(const f of files){
+    try{const j=await api('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:f});
+      S[key+'s'].push(j);S[key]=j.id;}catch(e){toast(e.message,false)}
+  }
+  renderList(key);
+}
+function renderList(key){
+  const box=document.getElementById(key==='pdf'?'pdfList':'imgInfo');if(!box)return;
+  const arr=S[key+'s']||[];
+  box.innerHTML=arr.length?arr.map(b=>'<div class="flex items-center justify-between bg-slate-50 rounded px-2.5 py-1.5"><span>'+b.name+'</span><span class="text-slate-400">'+(b.pages?b.pages+' 页':fmt(b.size))+'</span></div>').join(''):'尚未选择文件';
+  toast('共 '+arr.length+' 个文件');
+}
+function need(key,msg){if(!S[key]){toast(msg||'请先上传文件',false);return false}return true}
+
+// —— 结果卡片 ——
+function card(title,j,extra){
+  const deg=j.evaluation&&j.enforced;
+  return '<div class="bg-white rounded-lg border border-slate-200">'+
+   '<div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">'+
+    '<span class="font-medium text-sm flex items-center gap-2"><i data-lucide="file-check-2" class="w-4 h-4 text-emerald-600"></i>'+title+'</span>'+
+    '<div class="flex gap-2">'+
+     '<a href="/api/result/'+j.id+'?download=1" class="border border-slate-300 px-3 py-1.5 rounded-md text-xs hover:border-primary hover:text-primary transition cursor-pointer flex items-center gap-1"><i data-lucide="download" class="w-3.5 h-3.5"></i>下载</a>'+
+     '<a href="/api/result/'+j.id+'" target="_blank" class="border border-slate-300 px-3 py-1.5 rounded-md text-xs hover:border-primary hover:text-primary transition cursor-pointer flex items-center gap-1"><i data-lucide="external-link" class="w-3.5 h-3.5"></i>新窗口</a>'+
+    '</div></div>'+
+   '<div class="grid grid-cols-4 divide-x divide-slate-100 border-b border-slate-100">'+
+    '<div class="p-3 text-center"><div class="text-xs text-slate-400">页数</div><div class="text-lg font-semibold">'+(j.pages!==undefined?j.pages:'—')+'</div></div>'+
+    '<div class="p-3 text-center"><div class="text-xs text-slate-400">耗时</div><div class="text-lg font-semibold">'+(j.ms||0)+' ms</div></div>'+
+    '<div class="p-3 text-center"><div class="text-xs text-slate-400">体积</div><div class="text-lg font-semibold">'+fmt(j.size)+'</div></div>'+
+    '<div class="p-3 text-center"><div class="text-xs text-slate-400">授权态</div><div class="text-lg font-semibold '+(deg?'text-amber-600':'text-emerald-600')+'">'+(deg?'评估降级':(j.evaluation?'未授权':'已授权'))+'</div></div>'+
+   '</div>'+preview(j)+(extra||'')+'</div>';
+}
+function preview(j){
+  if(j.mime==='application/pdf')return '<iframe src="/api/result/'+j.id+'" class="w-full h-[520px] bg-slate-100"></iframe>';
+  if((j.mime||'').startsWith('image/'))return '<div class="p-4 bg-slate-50 flex justify-center"><img src="/api/result/'+j.id+'" class="max-h-96 rounded border border-slate-200"></div>';
+  return '';
+}
+function show(target,html){document.getElementById(target).innerHTML=html;lucide.createIcons()}
+function logTask(mod,j,ok=true){
+  tasks.unshift({t:new Date().toLocaleTimeString('zh-CN',{hour12:false}),mod,name:j.name||'-',ms:j.ms||0,pages:j.pages,ok,eval:j.evaluation&&j.enforced});
+  tasks=tasks.slice(0,8);
+  document.getElementById('mTasks').innerHTML=tasks.length+' <span class="text-sm font-normal text-slate-400">次</span>';
+  document.getElementById('mTaskSub').textContent='成功 '+tasks.filter(x=>x.ok).length+' · 失败 '+tasks.filter(x=>!x.ok).length;
+  document.getElementById('mMs').innerHTML=(j.ms||0)+' <span class="text-sm font-normal text-slate-400">ms</span>';
+  document.getElementById('mMsSub').textContent=mod+' · '+(j.name||'');
+  document.getElementById('taskRows').innerHTML=tasks.map(x=>
+    '<tr class="hover:bg-slate-50 transition-colors"><td class="px-4 py-2.5 text-slate-500">'+x.t+'</td><td class="px-4 py-2.5">'+x.mod+'</td>'+
+    '<td class="px-4 py-2.5">'+x.name+(x.pages!==undefined&&x.pages>=0?' · '+x.pages+' 页':'')+'</td><td class="px-4 py-2.5">'+x.ms+' ms</td>'+
+    '<td class="px-4 py-2.5"><span class="inline-flex px-2 py-0.5 rounded-full text-xs '+(x.eval?'bg-amber-50 text-amber-700':'bg-emerald-50 text-emerald-700')+'">'+(x.eval?'评估降级':'成功')+'</span></td>'+
+    '<td class="px-4 py-2.5">—</td></tr>').join('');
+}
+function busy(target,text){show(target,'<div class="bg-white rounded-lg border border-slate-200 p-10 text-center text-slate-500 text-sm"><i data-lucide="loader-2" class="w-6 h-6 mx-auto spin text-primary"></i><div class="mt-2">'+(text||'处理中…')+'</div></div>')}
+
+// —— Words ——
+async function wordsRun(){
+  if(!need('words','请先上传 .doc / .docx'))return;
+  busy('wordsOut','转换中…');
+  try{const j=await api('/api/words/topdf?id='+S.words+'&mode='+document.getElementById('wordsMode').value,{method:'POST'});
+    show('wordsOut',card('转换结果',j));logTask('Words',j);toast('转换完成，'+j.pages+' 页');
+  }catch(e){show('wordsOut','');toast(e.message,false)}
+}
+// —— 模板 ——
+async function tplRun(){
+  if(!need('tpl','请先上传模板 .docx'))return;
+  const mode=document.querySelector('input[name=tm]:checked').value;
+  busy('tplOut','填充中…');
+  try{const j=await api('/api/words/template?tplId='+S.tpl+'&mode='+mode,{method:'POST',body:document.getElementById('tplJson').value});
+    if(j.multi){show('tplOut','<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm">生成结果（'+j.files.length+' 份）</div>'+
+      j.files.map(f=>'<div class="px-4 py-2.5 border-b border-slate-50 flex items-center justify-between text-sm"><span>'+f.name+'</span><span class="text-xs text-slate-400">'+(f.pages>=0?f.pages+' 页 · ':'')+fmt(f.size)+'</span>'+
+      '<a href="/api/result/'+f.id+'?download=1" class="text-primary text-sm cursor-pointer hover:opacity-70">下载</a></div>').join('')+'</div>');
+      logTask('Words模板',{name:j.files.length+' 份',ms:0});
+    }else{show('tplOut',card('填充结果',j));logTask('Words模板',j)}
+    toast('填充完成');
+  }catch(e){show('tplOut','');toast(e.message,false)}
+}
+// —— Cells ——
+async function cellsRun(op){
+  if(!need('cells','请先上传 .xlsx'))return;
+  busy('cellsOut','处理中…');
+  try{
+    if(op==='topdf'){const j=await api('/api/cells/topdf?id='+S.cells,{method:'POST'});show('cellsOut',card('XLSX → PDF',j));logTask('Cells',j)}
+    else if(op==='tocsv'){const j=await api('/api/cells/tocsv?id='+S.cells,{method:'POST'});
+      show('cellsOut',card('XLSX → CSV',j,'<div class="p-4"><pre class="bg-slate-50 rounded p-3 text-xs overflow-auto max-h-72">'+esc(j.text||'')+'</pre></div>'));logTask('Cells',j)}
+    else if(op==='recalc'){const j=await api('/api/cells/recalc?id='+S.cells,{method:'POST'});
+      show('cellsOut','<div class="bg-white rounded-lg border border-slate-200 p-4"><div class="font-medium text-sm mb-2">整表重算：共 '+j.count+' 个单元格</div><pre class="bg-slate-50 rounded p-3 text-xs overflow-auto max-h-96">'+esc(JSON.stringify(j.cells,null,1))+'</pre></div>')}
+    toast('完成');
+  }catch(e){show('cellsOut','');toast(e.message,false)}
+}
+async function cellsFormula(){
+  if(!need('cells','请先上传 .xlsx'))return;
+  const cell=document.getElementById('cellsCell').value.trim()||'A1';
+  try{const j=await api('/api/cells/formula?id='+S.cells+'&cell='+encodeURIComponent(cell),{method:'POST'});
+    show('cellsOut','<div class="bg-white rounded-lg border border-slate-200 p-4"><div class="font-medium text-sm mb-3">公式求值</div>'+
+      '<div class="bg-slate-50 rounded p-4 flex items-center justify-between"><span class="font-mono text-sm text-slate-500">'+esc(cell)+'</span><span class="text-xl font-semibold text-emerald-700">'+esc(j.value)+'</span></div></div>');
+    toast('求值完成');
+  }catch(e){toast(e.message,false)}
+}
+async function csvToPdf(){
+  busy('cellsOut','转换中…');
+  try{const j=await api('/api/cells/csvtopdf',{method:'POST',body:document.getElementById('csvText').value});
+    show('cellsOut',card('CSV → PDF',j));logTask('Cells',j);toast('完成');
+  }catch(e){show('cellsOut','');toast(e.message,false)}
+}
+async function csvParse(){
+  try{const j=await api('/api/cells/parsecsv',{method:'POST',body:document.getElementById('csvText').value});
+    const rows=j.rows||[];const head=rows[0]||[];
+    show('cellsOut','<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm">解析预览（'+rows.length+' 行）</div>'+
+      '<table class="w-full text-sm"><thead><tr class="bg-slate-50 text-slate-500">'+head.map(h=>'<th class="px-4 py-2 text-left font-medium">'+esc(h)+'</th>').join('')+'</tr></thead>'+
+      '<tbody class="divide-y divide-slate-100">'+rows.slice(1,21).map(r=>'<tr class="hover:bg-slate-50">'+r.map(c=>'<td class="px-4 py-2">'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>');
+  }catch(e){toast(e.message,false)}
+}
+// —— Slides ——
+async function slidesRun(){
+  if(!need('slides','请先上传 .pptx'))return;
+  busy('slidesOut','转换中…');
+  try{const j=await api('/api/slides/topdf?id='+S.slides+'&layout='+document.querySelector('input[name=sm]:checked').value,{method:'POST'});
+    show('slidesOut',card('PPTX → PDF',j));logTask('Slides',j);toast('完成，'+j.pages+' 页');
+  }catch(e){show('slidesOut','');toast(e.message,false)}
+}
+// —— PDF ——
+async function pdfOp(op){
+  const ids=(S.pdfs||[]).map(b=>b.id);
+  if(!ids.length){toast('请先上传 PDF',false);return}
+  busy('pdfOut','处理中…');
+  const id=ids[ids.length-1];const font=S.font?'&fontId='+S.font:'';
+  try{
+    let j;
+    if(op==='merge'){if(ids.length<2){toast('合并需要至少 2 个 PDF',false);show('pdfOut','');return}
+      j=await api('/api/pdf/merge?ids='+ids.join(','),{method:'POST'});show('pdfOut',card('合并结果',j))}
+    else if(op==='split'){j=await api('/api/pdf/split?id='+id,{method:'POST'});
+      show('pdfOut','<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm">拆分为 '+j.files.length+' 份</div><div class="grid grid-cols-4 gap-3 p-4">'+
+       j.files.map(f=>'<a href="/api/result/'+f.id+'" target="_blank" class="border border-slate-200 rounded p-3 text-center text-sm hover:border-primary transition cursor-pointer">'+f.name+'<div class="text-xs text-slate-400 mt-1">'+fmt(f.size)+'</div></a>').join('')+'</div></div>');return}
+    else if(op==='extract'||op==='remove'){j=await api('/api/pdf/pages?id='+id+'&op='+(op==='remove'?'remove':'extract')+'&pages='+encodeURIComponent(document.getElementById('pdfPages').value),{method:'POST'});show('pdfOut',card(op==='remove'?'删页结果':'抽页结果',j))}
+    else if(op==='rotate'){j=await api('/api/pdf/rotate?id='+id+'&deg=90',{method:'POST'});show('pdfOut',card('旋转 90°',j))}
+    else if(op==='watermark'){j=await api('/api/pdf/watermark?id='+id+'&text='+encodeURIComponent(document.getElementById('pdfWmText').value)+font,{method:'POST'});show('pdfOut',card('水印结果',j))}
+    else if(op==='pagenumbers'){j=await api('/api/pdf/pagenumbers?id='+id+'&format='+encodeURIComponent(document.getElementById('pdfPnFmt').value)+font,{method:'POST'});show('pdfOut',card('页码结果',j))}
+    else if(op==='rc4'){j=await api('/api/pdf/encrypt?id='+id+'&bits=128&user=open&owner=owner',{method:'POST'});show('pdfOut',card('RC4-128 加密',j))}
+    else if(op==='aes'){j=await api('/api/pdf/encrypt?id='+id+'&bits=256&user=open&owner=owner',{method:'POST'});show('pdfOut',card('AES-256 加密',j))}
+    else if(op==='text'){j=await api('/api/pdf/text?id='+id,{method:'POST'});
+      show('pdfOut','<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm">文本抽取（'+j.pages+' 页）</div><div class="p-4 space-y-3 max-h-[520px] overflow-auto">'+
+       j.text.map((t,i)=>'<div><div class="text-xs text-slate-400 mb-1">第 '+(i+1)+' 页</div><pre class="bg-slate-50 rounded p-3 text-xs whitespace-pre-wrap">'+esc(t)+'</pre></div>').join('')+'</div></div>');return}
+    else if(op==='images'){j=await api('/api/pdf/images?id='+id,{method:'POST'});
+      show('pdfOut','<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm">抽取图片（'+j.files.length+' 张）</div><div class="grid grid-cols-5 gap-3 p-4">'+
+       (j.files.length?j.files.map(f=>'<a href="/api/result/'+f.id+'" target="_blank"><img src="/api/result/'+f.id+'" class="w-full rounded border border-slate-200 hover:border-primary transition"></a>').join(''):'<div class="col-span-5 text-center text-slate-400 text-sm py-6">该 PDF 无内嵌图片</div>')+'</div></div>');return}
+    else if(op==='info'){j=await api('/api/pdf/info?id='+id,{method:'POST'});
+      const box=document.getElementById('pdfInfo');box.classList.remove('hidden');
+      box.innerHTML='<div class="flex justify-between"><span class="text-slate-500">页数</span><span>'+j.pages+'</span></div>'+
+        '<div class="flex justify-between"><span class="text-slate-500">是否加密</span><span class="'+(j.encrypted?'text-amber-600':'text-emerald-600')+'">'+(j.encrypted?'是':'否')+'</span></div>'+
+        '<div class="flex justify-between"><span class="text-slate-500">首页尺寸</span><span>'+j.firstPageSize+'</span></div>';
+      show('pdfOut','');toast('已读取信息');return}
+    logTask('Pdf',j);toast('完成');
+  }catch(e){show('pdfOut','');toast(e.message,false)}
+}
+// —— Imaging ——
+const IMG_OPS=[['grayscale','灰度'],['sepia','棕褐'],['invert','反色'],['binarize','二值化'],['blur','模糊'],['sharpen','锐化'],
+ ['brightness','亮度'],['contrast','对比度'],['posterize','色阶'],['resize','缩放'],['crop','裁剪'],['rotate','旋转'],['flipH','水平翻转'],['flipV','垂直翻转'],['textmark','文字水印']];
+document.getElementById('imgOps').innerHTML=IMG_OPS.map(([k,n])=>'<button onclick="imgOp(\''+k+'\')" class="border border-slate-200 rounded px-2 py-1.5 hover:border-primary hover:text-primary transition cursor-pointer">'+n+'</button>').join('');
+async function imgOp(op){
+  if(!need('img','请先上传图片'))return;
+  busy('imgOut','处理中…');
+  try{const j=await api('/api/imaging/op?id='+S.img+'&op='+op+(op==='convert'?'&format=jpg':''),{method:'POST'});
+    show('imgOut','<div class="grid grid-cols-2 gap-4"><div class="bg-white rounded-lg border border-slate-200 p-4"><div class="text-xs text-slate-400 mb-2">原图</div><img src="/api/result/'+S.img+'" class="w-full rounded"></div>'+
+      '<div class="bg-white rounded-lg border border-slate-200 p-4"><div class="text-xs text-slate-400 mb-2">处理后 · '+fmt(j.size)+' · '+j.ms+' ms</div><img src="/api/result/'+j.id+'" class="w-full rounded">'+
+      '<a href="/api/result/'+j.id+'?download=1" class="mt-3 inline-flex items-center gap-1 text-primary text-sm cursor-pointer hover:opacity-70"><i data-lucide="download" class="w-3.5 h-3.5"></i>下载</a></div></div>');
+    logTask('Imaging',j);toast('完成');
+  }catch(e){show('imgOut','');toast(e.message,false)}
+}
+async function imgToPdf(){
+  const ids=(S.imgs||[]).map(b=>b.id);
+  if(!ids.length){toast('请先上传图片',false);return}
+  busy('imgOut','生成中…');
+  try{const j=await api('/api/imaging/topdf?ids='+ids.join(','),{method:'POST'});show('imgOut',card('图片 → PDF',j));logTask('Imaging',j);toast('完成')}
+  catch(e){show('imgOut','');toast(e.message,false)}
+}
+// —— BarCode ——
+document.getElementById('eccBtns').innerHTML=['L','M','Q','H'].map(x=>'<button onclick="setEcc(\''+x+'\')" data-e="'+x+'" class="eccb border rounded py-1.5 text-xs cursor-pointer transition '+(x==='M'?'border-primary bg-primary/5 text-primary':'border-slate-200 hover:border-primary')+'">'+x+'</button>').join('');
+function setEcc(x){ecc=x;document.querySelectorAll('.eccb').forEach(b=>{const on=b.dataset.e===x;b.className='eccb border rounded py-1.5 text-xs cursor-pointer transition '+(on?'border-primary bg-primary/5 text-primary':'border-slate-200 hover:border-primary')})}
+function barPreset(){
+  const t=document.getElementById('barType').value;const el=document.getElementById('barText');
+  const p={qr:'https://ruoyi.plus',code128:'OFFICIA-2026',code39:'OFFICIA',code93:'OFFICIA',ean13:'6901234567892',ean8:'69012341',upca:'036000291452',itf14:'15400141288763'};
+  el.value=p[t]||el.value;
+}
+async function barRun(){
+  const q='type='+document.getElementById('barType').value+'&text='+encodeURIComponent(document.getElementById('barText').value)+
+    '&ecc='+ecc+'&module='+document.getElementById('barMod').value+'&quiet='+document.getElementById('barQuiet').value+
+    '&withText='+document.getElementById('barWithText').checked;
+  busy('barOut','生成中…');
+  try{const j=await api('/api/barcode?'+q,{method:'POST'});
+    show('barOut','<div class="bg-white rounded-lg border border-slate-200 p-4"><div class="font-medium text-sm mb-3 flex items-center justify-between"><span>生成结果</span>'+
+      '<a href="/api/result/'+j.id+'?download=1" class="text-xs border border-slate-300 px-2.5 py-1 rounded hover:border-primary hover:text-primary cursor-pointer transition">下载 PNG</a></div>'+
+      '<div class="bg-slate-50 rounded-lg p-6 flex items-center justify-center"><img src="/api/result/'+j.id+'" class="max-h-72"></div>'+
+      '<div class="mt-3 grid grid-cols-3 text-center text-xs"><div><div class="text-slate-400">体积</div><div class="font-medium mt-0.5">'+fmt(j.size)+'</div></div>'+
+      '<div><div class="text-slate-400">耗时</div><div class="font-medium mt-0.5">'+j.ms+' ms</div></div>'+
+      '<div><div class="text-slate-400">纠错</div><div class="font-medium mt-0.5">'+ecc+'</div></div></div></div>');
+    logTask('BarCode',j);toast('生成完成');
+  }catch(e){show('barOut','');toast(e.message,false)}
+}
+async function barAll(){
+  const list=[['qr','https://ruoyi.plus'],['code128','OFFICIA-2026'],['code39','OFFICIA'],['code93','OFFICIA'],
+    ['ean13','6901234567892'],['ean8','69012341'],['upca','036000291452'],['itf14','15400141288763']];
+  busy('barOut','生成全码制…');
+  const out=[];
+  for(const [t,v] of list){
+    try{const j=await api('/api/barcode?type='+t+'&text='+encodeURIComponent(v),{method:'POST'});
+      out.push('<div class="text-center"><div class="bg-slate-50 rounded p-2 flex items-center justify-center h-24"><img src="/api/result/'+j.id+'" class="max-h-20"></div><div class="text-xs mt-1 font-medium">'+t+'</div><div class="text-xs text-slate-400">'+v+'</div></div>')}
+    catch(e){out.push('<div class="text-center"><div class="bg-red-50 rounded p-2 h-24 flex items-center justify-center text-xs text-red-500">失败</div><div class="text-xs mt-1">'+t+'</div></div>')}
+  }
+  show('barOut','<div class="bg-white rounded-lg border border-slate-200 p-4"><div class="font-medium text-sm mb-3">全码制预览</div><div class="grid grid-cols-4 gap-4">'+out.join('')+'</div></div>');
+}
+// —— Email ——
+async function emlRun(op){
+  if(!need('eml','请先上传 .eml（或在总览点"生成内置样本"）'))return;
+  busy('emlOut','处理中…');
+  try{
+    if(op==='topdf'){const j=await api('/api/email/topdf?id='+S.eml,{method:'POST'});show('emlOut',card('邮件归档 PDF',j));logTask('Email',j)}
+    else{const j=await api('/api/email/parse?id='+S.eml,{method:'POST'});
+      show('emlOut','<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm">解析结果（EmailMessage）</div><div class="p-4 space-y-2.5 text-sm">'+
+       row('主题',j.subject)+row('发件人',j.from)+row('收件人',j.to)+row('日期',j.date)+
+       '<div class="flex"><span class="w-20 text-slate-400 text-xs pt-0.5">附件</span><span class="flex-1">'+((j.attachments||[]).length?j.attachments.map(a=>'<span class="inline-flex items-center gap-1 bg-slate-100 rounded px-2 py-0.5 text-xs mr-2">'+esc(a.name)+' ('+fmt(a.size)+')</span>').join(''):'<span class="text-slate-400 text-xs">无</span>')+'</span></div>'+
+       '<div class="pt-2 border-t border-slate-100"><span class="text-slate-400 text-xs">正文</span><div class="mt-2 bg-slate-50 rounded p-3 text-sm max-h-72 overflow-auto">'+esc(j.body||'')+'</div></div></div></div>')}
+    toast('完成');
+  }catch(e){show('emlOut','');toast(e.message,false)}
+}
+function row(k,v){return '<div class="flex"><span class="w-20 text-slate-400 text-xs pt-0.5">'+k+'</span><span class="flex-1">'+esc(v||'—')+'</span></div>'}
+// —— License ——
+async function refreshLic(){
+  try{const j=await api('/api/license/status');
+    const badge=document.getElementById('licBadge');
+    if(j.licensed){badge.className='inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
+      badge.innerHTML='<i data-lucide="shield-check" class="w-3.5 h-3.5"></i>已授权 · '+(j.licensee||'')+' · '+(j.edition||'');}
+    else{badge.className='inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200';
+      badge.innerHTML='<i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>评估版 · 未授权'+(j.enforced?'（水印 + 限 3 页）':'（门控未开）');}
+    document.getElementById('mLic').textContent=j.licensed?'已授权':'评估版';
+    document.getElementById('mLic').className='text-2xl font-bold mt-2 '+(j.licensed?'text-emerald-600':'text-amber-600');
+    document.getElementById('mLicSub').textContent=j.enforced?'强制门控：开':'强制门控：关';
+    document.getElementById('enforceChk').checked=!!j.enforced;
+    document.getElementById('licMeta').innerHTML=
+      metaBox('授权对象 licensee',j.licensee||'—（未加载）')+metaBox('档位 edition',j.edition||'—')+metaBox('到期 expires',j.expires||'—');
+    document.getElementById('licMods').innerHTML=(j.modules||[]).map(m=>
+      '<div class="border border-slate-200 rounded px-2.5 py-2 text-xs flex items-center justify-between"><span>'+m.code+'</span>'+
+      (m.granted?'<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-500"></i>':'<i data-lucide="x" class="w-3.5 h-3.5 text-red-400"></i>')+'</div>').join('');
+    lucide.createIcons();
+  }catch(e){}
+}
+function metaBox(k,v){return '<div class="bg-slate-50 rounded-md p-3"><div class="text-xs text-slate-400">'+k+'</div><div class="text-sm font-medium mt-1 break-all">'+esc(v)+'</div></div>'}
+async function licSet(){
+  const t=document.getElementById('licText').value.trim();
+  if(!t){toast('请粘贴令牌或拖入 .lic',false);return}
+  try{await api('/api/license/set',{method:'POST',body:t});await refreshLic();toast('License 已加载，全模块解锁')}
+  catch(e){toast(e.message,false)}
+}
+function licFromFile(f){if(!f)return;const r=new FileReader();r.onload=()=>{document.getElementById('licText').value=r.result.trim();licSet()};r.readAsText(f)}
+function dropLic(e){e.preventDefault();e.currentTarget.classList.remove('over');if(e.dataTransfer.files[0])licFromFile(e.dataTransfer.files[0])}
+async function licReset(){try{await api('/api/license/reset',{method:'POST'});document.getElementById('licText').value='';await refreshLic();toast('已复位为评估态')}catch(e){toast(e.message,false)}}
+async function licEnforce(on){try{await api('/api/license/enforce?on='+on,{method:'POST'});await refreshLic();toast('强制门控：'+(on?'开':'关'))}catch(e){toast(e.message,false)}}
+async function licCompare(){
+  document.getElementById('licCmp').innerHTML='<div class="text-center py-8 text-slate-500"><i data-lucide="loader-2" class="w-6 h-6 mx-auto spin text-primary"></i><div class="mt-2 text-sm">对比中…</div></div>';lucide.createIcons();
+  let csv='编号,姓名,部门,城市,金额\n';for(let i=1;i<=150;i++)csv+=i+',员工'+i+',研发部,深圳,'+(1000+i*7)+'\n';
+  try{
+    const st=await api('/api/license/status');
+    await api('/api/license/enforce?on=true',{method:'POST'});
+    const a=await api('/api/cells/csvtopdf',{method:'POST',body:csv});
+    await api('/api/license/enforce?on=false',{method:'POST'});
+    const b=await api('/api/cells/csvtopdf',{method:'POST',body:csv});
+    await api('/api/license/enforce?on='+!!st.enforced,{method:'POST'});
+    document.getElementById('licCmp').innerHTML='<div class="grid grid-cols-2 gap-4">'+
+      cmpBox('强制门控开 · '+(st.licensed?'已授权':'未授权'),a,st.licensed?'emerald':'amber')+
+      cmpBox('门控关（对照完整输出）',b,'emerald')+'</div>';
+    lucide.createIcons();toast('对比完成：'+a.pages+' 页 vs '+b.pages+' 页');
+  }catch(e){document.getElementById('licCmp').innerHTML='<div class="text-red-500 text-sm p-4">'+esc(e.message)+'</div>'}
+}
+function cmpBox(title,j,color){
+  return '<div class="border border-slate-200 rounded-lg p-4"><div class="flex items-center gap-2 mb-2"><span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-'+color+'-50 text-'+color+'-700 border border-'+color+'-200">'+title+'</span></div>'+
+   '<iframe src="/api/result/'+j.id+'" class="w-full h-72 bg-slate-100 rounded"></iframe>'+
+   '<div class="mt-3 grid grid-cols-3 text-center text-xs"><div><div class="text-slate-400">页数</div><div class="font-semibold mt-0.5">'+j.pages+'</div></div>'+
+   '<div><div class="text-slate-400">体积</div><div class="font-semibold mt-0.5">'+fmt(j.size)+'</div></div>'+
+   '<div><div class="text-slate-400">耗时</div><div class="font-semibold mt-0.5">'+j.ms+' ms</div></div></div>'+
+   '<a href="/api/result/'+j.id+'?download=1" class="mt-2 inline-block text-primary text-xs cursor-pointer hover:opacity-70">下载查看水印</a></div>';
+}
+// —— 批量回归 ——
+async function batchRun(){
+  document.getElementById('batchOut').innerHTML='<div class="p-10 text-center text-slate-500"><i data-lucide="loader-2" class="w-6 h-6 mx-auto spin text-primary"></i><div class="mt-2 text-sm">回归中…</div></div>';lucide.createIcons();
+  try{const j=await api('/api/batch/run',{method:'POST'});
+    document.getElementById('batchOut').className='bg-white rounded-lg border border-slate-200';
+    document.getElementById('batchOut').innerHTML='<table class="w-full text-sm"><thead><tr class="bg-slate-50 text-slate-500">'+
+      '<th class="px-4 py-2.5 text-left font-medium">模块</th><th class="px-4 py-2.5 text-left font-medium">用例</th>'+
+      '<th class="px-4 py-2.5 text-left font-medium">断言/详情</th><th class="px-4 py-2.5 text-left font-medium">耗时</th><th class="px-4 py-2.5 text-left font-medium">状态</th></tr></thead>'+
+      '<tbody class="divide-y divide-slate-100">'+j.rows.map(r=>'<tr class="hover:bg-slate-50"><td class="px-4 py-2.5">'+r.module+'</td><td class="px-4 py-2.5">'+esc(r.name)+'</td>'+
+      '<td class="px-4 py-2.5 text-xs '+(r.ok?'text-slate-500':'text-red-600')+'">'+esc(r.detail||'')+'</td><td class="px-4 py-2.5">'+r.ms+' ms</td>'+
+      '<td class="px-4 py-2.5"><span class="inline-flex px-2 py-0.5 rounded-full text-xs '+(r.ok?'bg-emerald-50 text-emerald-700':'bg-red-50 text-red-700')+'">'+(r.ok?'通过':'失败')+'</span></td></tr>').join('')+'</tbody></table>'+
+      '<div class="px-4 py-3 border-t border-slate-100 text-sm text-slate-500">共 '+j.total+' 条 · 通过 '+j.pass+' · 失败 '+j.fail+' · 总耗时 '+j.totalMs+' ms</div>';
+    toast(j.fail?('回归完成，失败 '+j.fail+' 条'):'回归全部通过',!j.fail);
+  }catch(e){document.getElementById('batchOut').innerHTML='<div class="p-6 text-red-500 text-sm">'+esc(e.message)+'</div>'}
+}
+// —— 内置样本 ——
+async function loadSamples(){
+  try{const j=await api('/api/samples');
+    j.samples.forEach(s=>{
+      if(s.name.endsWith('.csv'))S.csvSample=s.id;
+      if(s.name.endsWith('.pdf')){S.pdfs=S.pdfs||[];S.pdfs.push(s);S.pdf=s.id;renderList('pdf')}
+      if(s.name.endsWith('.png')){S.imgs=S.imgs||[];S.imgs.push(s);S.img=s.id;renderList('img')}
+      if(s.name.endsWith('.eml')){S.eml=s.id;document.getElementById('emlInfo').innerHTML='<span class="text-slate-700">'+s.name+'</span> · '+fmt(s.size)}
+    });
+    toast('内置样本已生成（PDF/图片/EML 已就位）');
+  }catch(e){toast(e.message,false)}
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+lucide.createIcons();refreshLic();
+</script>
+</body>
+</html>
