@@ -48,6 +48,11 @@ public final class DemoServer {
         }
         int port = freePortFrom(wanted);
 
+        // 默认打开强制门控，让测试台的"开箱行为"与真实发布版一致：
+        // 未授权即降级（水印 + 限页）。想看完整输出，在「授权门控与对比」面板取消勾选即可。
+        // （发布版 jar 里该开关恒开且关不掉，见 BuildFlags.ENFORCED_BY_DEFAULT）
+        OfficiaLicense.enableEnforcement(true);
+
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.createContext("/", DemoServer::handle);
         // 用线程池，支持并发上传/转换（大文档转换较慢，避免串行阻塞界面）
