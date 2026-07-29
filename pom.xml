@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- officia-demo：独立消费方项目。模拟真实客户，通过 Maven 坐标引入已发布的 officia 依赖，
+     写示例演示各能力使用 + JUnit 验证。不属于 officia reactor（同级独立目录）。 -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>plus.ruoyi.demo</groupId>
+    <artifactId>officia-demo</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>Officia Demo</name>
+    <description>officia 依赖消费示例：引入 officia-all + officia-license，演示各能力使用与授权门控</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <!-- 全家桶：一次引入即得全部能力模块（words/cells/slides/pdf/email/imaging/barcode） -->
+        <dependency>
+            <groupId>plus.ruoyi</groupId>
+            <artifactId>officia-all</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <!-- 授权客户端（内嵌验签公钥 + OfficiaLicense 门面） -->
+        <dependency>
+            <groupId>plus.ruoyi</groupId>
+            <artifactId>officia-license</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
+        <!-- 测试 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.25.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <!-- 固定已缓存版本，保证离线可跑（与 officia 父 pom 一致） -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.2.5</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
