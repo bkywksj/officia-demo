@@ -2,6 +2,7 @@ package plus.ruoyi.officia.demo.web;
 
 import com.sun.net.httpserver.HttpExchange;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -19,6 +20,33 @@ import java.util.Map;
  * @author officia-demo
  */
 final class Http {
+
+    /** 单次请求体上限（100 MB）：防止误传超大文件把测试台 JVM 撑爆。 */
+    static final int MAX_BODY_BYTES = 100 * 1024 * 1024;
+
+    /** 扩展名 → MIME 静态表（比一长串 if 可读、可扩展）。 */
+    private static final Map<String, String> MIME = new LinkedHashMap<>();
+
+    static {
+        MIME.put(".pdf", "application/pdf");
+        MIME.put(".html", "text/html; charset=utf-8");
+        MIME.put(".js", "application/javascript; charset=utf-8");
+        MIME.put(".css", "text/css; charset=utf-8");
+        MIME.put(".png", "image/png");
+        MIME.put(".jpg", "image/jpeg");
+        MIME.put(".jpeg", "image/jpeg");
+        MIME.put(".gif", "image/gif");
+        MIME.put(".bmp", "image/bmp");
+        MIME.put(".csv", "text/csv; charset=utf-8");
+        MIME.put(".txt", "text/plain; charset=utf-8");
+        MIME.put(".eml", "message/rfc822");
+        MIME.put(".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        MIME.put(".doc", "application/msword");
+        MIME.put(".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        MIME.put(".pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+        MIME.put(".ttf", "font/ttf");
+        MIME.put(".ttc", "font/ttf");
+    }
 
     private Http() {
     }
@@ -44,10 +72,35 @@ final class Http {
         return URLDecoder.decode(s, StandardCharsets.UTF_8);
     }
 
-    /** 读完请求体字节。 */
+    /**
+     * 读完请求体字节，超过 {@link #MAX_BODY_BYTES} 即中止。
+     *
+     * <p>边读边计数而非先 readAllBytes 再判断——否则超大请求在判断之前就已经把内存吃掉了。</p>
+     *
+     * @throws PayloadTooLargeException 体积超限（上层转 413）
+     */
     static byte[] body(HttpExchange ex) throws IOException {
         try (InputStream in = ex.getRequestBody()) {
-            return in.readAllBytes();
+            ByteArrayOutputStream out = new ByteArrayOutputStream(8192);
+            byte[] buf = new byte[8192];
+            int n;
+            int total = 0;
+            while ((n = in.read(buf)) > 0) {
+                total += n;
+                if (total > MAX_BODY_BYTES) {
+                    throw new PayloadTooLargeException(
+                        "请求体超过上限 " + (MAX_BODY_BYTES / 1024 / 1024) + " MB");
+                }
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        }
+    }
+
+    /** 请求体超限（映射为 HTTP 413）。 */
+    static final class PayloadTooLargeException extends RuntimeException {
+        PayloadTooLargeException(String message) {
+            super(message);
         }
     }
 
@@ -72,25 +125,16 @@ final class Http {
         }
     }
 
-    /** 按扩展名推断 MIME（供上传件与静态资源共用）。 */
+    /** 按扩展名推断 MIME（供上传件与静态资源共用）；未知返回二进制流。 */
     static String mimeOf(String name) {
         String n = name.toLowerCase();
-        if (n.endsWith(".pdf")) return "application/pdf";
-        if (n.endsWith(".html")) return "text/html; charset=utf-8";
-        if (n.endsWith(".js")) return "application/javascript; charset=utf-8";
-        if (n.endsWith(".css")) return "text/css; charset=utf-8";
-        if (n.endsWith(".png")) return "image/png";
-        if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
-        if (n.endsWith(".gif")) return "image/gif";
-        if (n.endsWith(".bmp")) return "image/bmp";
-        if (n.endsWith(".csv")) return "text/csv; charset=utf-8";
-        if (n.endsWith(".txt")) return "text/plain; charset=utf-8";
-        if (n.endsWith(".eml")) return "message/rfc822";
-        if (n.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-        if (n.endsWith(".doc")) return "application/msword";
-        if (n.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        if (n.endsWith(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-        if (n.endsWith(".ttf") || n.endsWith(".ttc")) return "font/ttf";
+        int dot = n.lastIndexOf('.');
+        if (dot >= 0) {
+            String mime = MIME.get(n.substring(dot));
+            if (mime != null) {
+                return mime;
+            }
+        }
         return "application/octet-stream";
     }
 }

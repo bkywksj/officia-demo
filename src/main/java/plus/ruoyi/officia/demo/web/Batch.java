@@ -29,12 +29,10 @@ final class Batch {
     private Batch() {
     }
 
-    /** 跑完整回归，返回逐条结果 + 汇总。 */
+    /** 跑完整回归，返回逐条结果 + 汇总（全部为局部状态，可并发调用）。 */
     static Json run() {
-        List<Object> rows = new ArrayList<>();
+        List<Case> cases = new ArrayList<>();
         long t0all = System.nanoTime();
-        int pass = 0;
-        int fail = 0;
 
         // 造数据
         StringBuilder csv = new StringBuilder("编号,姓名,部门,城市,金额\n");
@@ -44,25 +42,24 @@ final class Batch {
         String csvText = csv.toString();
 
         // 1) CSV → PDF
-        Case c1 = run("Cells", "CSV(150行) → PDF", () -> {
+        cases.add(run("Cells", "CSV(150行) → PDF", () -> {
             byte[] pdf = OfficiaCells.csvToPdf(csvText);
             assertPdf(pdf);
             int pages = OfficiaPdf.pageCount(pdf);
             return "PDF " + pages + " 页 / " + pdf.length + " B";
-        });
-        rows.add(c1.json());
+        }));
 
         // 2) CSV 解析（RFC4180）
-        rows.add(run("Cells", "CSV 解析 parseCsv", () -> {
+        cases.add(run("Cells", "CSV 解析 parseCsv", () -> {
             List<List<String>> rs = OfficiaCells.parseCsv(csvText);
             if (rs.size() != 151) {
                 throw new AssertionError("期望 151 行(含表头)，实际 " + rs.size());
             }
             return rs.size() + " 行 × " + rs.get(0).size() + " 列";
-        }).json());
+        }));
 
         // 3) PDF 合并
-        rows.add(run("Pdf", "两份 PDF 合并 merge", () -> {
+        cases.add(run("Pdf", "两份 PDF 合并 merge", () -> {
             byte[] a = OfficiaCells.csvToPdf("A,B\n1,2");
             byte[] b = OfficiaCells.csvToPdf("C,D\n3,4");
             byte[] m = OfficiaPdf.merge(List.of(a, b));
@@ -72,20 +69,20 @@ final class Batch {
                 throw new AssertionError("合并后页数应 ≥2，实际 " + p);
             }
             return "合并 " + p + " 页";
-        }).json());
+        }));
 
         // 4) PDF 文本抽取（生成→读取闭环）
-        rows.add(run("Pdf", "文本抽取 extractText", () -> {
+        cases.add(run("Pdf", "文本抽取 extractText", () -> {
             byte[] pdf = OfficiaCells.csvToPdf("标题,数值\n合计,12800");
             String text = OfficiaPdf.extractText(pdf);
             if (text == null || !text.contains("12800")) {
                 throw new AssertionError("抽取文本未包含 12800");
             }
             return "命中关键字，长度 " + text.length();
-        }).json());
+        }));
 
         // 5) AES-256 加密
-        rows.add(run("Pdf", "AES-256 加密 encryptAes256", () -> {
+        cases.add(run("Pdf", "AES-256 加密 encryptAes256", () -> {
             byte[] pdf = OfficiaCells.csvToPdf("Secret,Value\nkey,42");
             byte[] enc = OfficiaPdf.encryptAes256(pdf, "openpwd", "ownerpwd");
             assertPdf(enc);
@@ -93,28 +90,28 @@ final class Batch {
                 throw new AssertionError("加密后 isEncrypted 应为 true");
             }
             return "加密 " + enc.length + " B，isEncrypted=true";
-        }).json());
+        }));
 
         // 6) 条码 Code128 + QR
-        rows.add(run("BarCode", "Code128 / QR → PNG", () -> {
+        cases.add(run("BarCode", "Code128 / QR → PNG", () -> {
             assertPng(OfficiaBarCode.code128Png("OFFICIA-2026"));
             byte[] qr = OfficiaBarCode.qrPng("https://ruoyi.plus");
             assertPng(qr);
             return "Code128 ✓ / QR " + qr.length + " B";
-        }).json());
+        }));
 
         // 7) 图像滤镜 + 图片→PDF
-        rows.add(run("Imaging", "灰度滤镜 + 图片→PDF", () -> {
+        cases.add(run("Imaging", "灰度滤镜 + 图片→PDF", () -> {
             byte[] png = samplePng();
             byte[] gray = OfficiaImaging.grayscale(png);
             assertPng(gray);
             byte[] pdf = OfficiaImaging.toPdf(gray);
             assertPdf(pdf);
             return "灰度 ✓ / 图片PDF " + OfficiaPdf.pageCount(pdf) + " 页";
-        }).json());
+        }));
 
         // 8) EML 生成 → 解析往返
-        rows.add(run("Email", "EML 生成 → 解析往返", () -> {
+        cases.add(run("Email", "EML 生成 → 解析往返", () -> {
             EmailMessage m = new EmailMessage().setSubject("Officia 回归测试")
                 .setFrom("demo@ruoyi.plus").addTo("user@example.com").setTextBody("正文内容");
             byte[] eml = OfficiaEmail.writeEml(m);
@@ -123,19 +120,19 @@ final class Batch {
                 throw new AssertionError("往返主题不一致：" + back.getSubject());
             }
             return "主题往返一致";
-        }).json());
+        }));
 
         // 9) EML → PDF 归档
-        rows.add(run("Email", "EML → PDF 归档", () -> {
+        cases.add(run("Email", "EML → PDF 归档", () -> {
             EmailMessage m = new EmailMessage().setSubject("归档邮件")
                 .setFrom("demo@ruoyi.plus").addTo("user@example.com").setTextBody("这是一封归档测试邮件。");
             byte[] pdf = OfficiaEmail.toPdf(OfficiaEmail.writeEml(m));
             assertPdf(pdf);
             return "PDF " + OfficiaPdf.pageCount(pdf) + " 页";
-        }).json());
+        }));
 
         // 10) 授权门控：评估 vs 授权（同一份数据的页数差）
-        rows.add(run("License", "门控：评估降级 vs 完整", () -> {
+        cases.add(run("License", "门控：评估降级 vs 完整", () -> {
             boolean wasEnforced = OfficiaLicense.isEnforced();
             OfficiaLicense.enableEnforcement(true);
             int evalPages = OfficiaPdf.pageCount(OfficiaCells.csvToPdf(csvText));
@@ -143,15 +140,19 @@ final class Batch {
             int fullPages = OfficiaPdf.pageCount(OfficiaCells.csvToPdf(csvText));
             return "强制执行下 " + evalPages + " 页 / 当前态 " + fullPages + " 页"
                 + (OfficiaLicense.isLicensed() ? "（已授权）" : "（未授权）");
-        }).json());
+        }));
 
-        pass = Case.PASS;
-        fail = Case.FAIL;
-        Case.PASS = 0;
-        Case.FAIL = 0;
-
+        // 汇总：直接由结果列表统计，无共享可变状态
+        int pass = 0;
+        List<Object> rows = new ArrayList<>(cases.size());
+        for (Case c : cases) {
+            if (c.ok) {
+                pass++;
+            }
+            rows.add(c.json());
+        }
         long totalMs = (System.nanoTime() - t0all) / 1_000_000;
-        return Json.obj().put("total", rows.size()).put("pass", pass).put("fail", fail)
+        return Json.obj().put("total", cases.size()).put("pass", pass).put("fail", cases.size() - pass)
             .put("totalMs", totalMs).put("rows", rows);
     }
 
@@ -161,18 +162,20 @@ final class Batch {
         String run() throws Exception;
     }
 
+    /** 单条用例结果（不可变快照，无共享状态 → 并发调用互不干扰）。 */
     private static final class Case {
-        static int PASS;
-        static int FAIL;
         final String module;
         final String name;
-        boolean ok;
-        String detail;
-        long ms;
+        final boolean ok;
+        final String detail;
+        final long ms;
 
-        Case(String module, String name) {
+        Case(String module, String name, boolean ok, String detail, long ms) {
             this.module = module;
             this.name = name;
+            this.ok = ok;
+            this.detail = detail;
+            this.ms = ms;
         }
 
         Json json() {
@@ -182,19 +185,17 @@ final class Batch {
     }
 
     private static Case run(String module, String name, Body body) {
-        Case c = new Case(module, name);
         long t0 = System.nanoTime();
+        boolean ok;
+        String detail;
         try {
-            c.detail = body.run();
-            c.ok = true;
-            Case.PASS++;
+            detail = body.run();
+            ok = true;
         } catch (Throwable t) {
-            c.ok = false;
-            c.detail = t.getClass().getSimpleName() + ": " + t.getMessage();
-            Case.FAIL++;
+            ok = false;
+            detail = t.getClass().getSimpleName() + ": " + t.getMessage();
         }
-        c.ms = (System.nanoTime() - t0) / 1_000_000;
-        return c;
+        return new Case(module, name, ok, detail, (System.nanoTime() - t0) / 1_000_000);
     }
 
     private static void assertPdf(byte[] pdf) {

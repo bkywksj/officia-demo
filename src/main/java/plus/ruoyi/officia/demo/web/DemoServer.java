@@ -2,6 +2,7 @@ package plus.ruoyi.officia.demo.web;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import plus.ruoyi.officia.common.exception.OfficiaException;
 import plus.ruoyi.officia.license.OfficiaLicense;
 
 import java.awt.Desktop;
@@ -12,6 +13,7 @@ import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
@@ -56,8 +58,16 @@ public final class DemoServer {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.createContext("/", DemoServer::handle);
         // 用线程池，支持并发上传/转换（大文档转换较慢，避免串行阻塞界面）
-        server.setExecutor(Executors.newFixedThreadPool(Math.max(4, Runtime.getRuntime().availableProcessors())));
+        ExecutorService pool = Executors.newFixedThreadPool(
+            Math.max(4, Runtime.getRuntime().availableProcessors()));
+        server.setExecutor(pool);
         server.start();
+
+        // 优雅停机：Ctrl+C 时给在途请求 1 秒收尾，再关线程池，避免半截响应与线程泄漏
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            server.stop(1);
+            pool.shutdown();
+        }, "officia-demo-shutdown"));
 
         String url = "http://127.0.0.1:" + port + "/";
         banner(url, port);
@@ -82,11 +92,18 @@ public final class DemoServer {
                 return;
             }
             serveStatic(ex, path);
+        } catch (Http.PayloadTooLargeException e) {
+            // 请求体超限 → 413
+            safeError(ex, 413, e.getMessage());
         } catch (IllegalArgumentException e) {
-            // 入参问题（找不到 id、参数非法）→ 400，前端直接展示
+            // 入参问题（找不到 id、参数非法）→ 400
             safeError(ex, 400, e.getMessage());
+        } catch (OfficiaException e) {
+            // officia 业务异常绝大多数是"输入不合规"（如条码校验位错、文档格式不支持、口令错），
+            // 属调用方可修正 → 400，而非 500。报 500 会让用户误以为服务故障。
+            safeError(ex, 400, e.getMessage() == null ? "输入不合规" : e.getMessage());
         } catch (Throwable t) {
-            // 业务异常（含 OfficiaException）→ 500，带上类型便于定位
+            // 真正意外 → 500，带类型便于定位
             String msg = t.getClass().getSimpleName() + ": " + (t.getMessage() == null ? "无详情" : t.getMessage());
             safeError(ex, 500, msg);
         } finally {
@@ -103,9 +120,9 @@ public final class DemoServer {
         }
         String disp = "1".equals(q.get("download")) ? "attachment" : "inline";
         // 文件名用 RFC 5987 编码，保证中文名下载正常
-        String encoded = java.net.URLEncoder.encode(b.name, StandardCharsets.UTF_8).replace("+", "%20");
+        String encoded = java.net.URLEncoder.encode(b.name(), StandardCharsets.UTF_8).replace("+", "%20");
         ex.getResponseHeaders().set("Content-Disposition", disp + "; filename*=UTF-8''" + encoded);
-        Http.send(ex, 200, b.mime, b.data);
+        Http.send(ex, 200, b.mime(), b.data());
     }
 
     /** classpath 静态资源（打进 jar，随 jar 分发）。 */

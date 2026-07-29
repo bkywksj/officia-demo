@@ -16,7 +16,7 @@ import plus.ruoyi.officia.words.OfficiaWords;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,391 +27,63 @@ import java.util.Map;
  * <p>约定：源文件先 POST /api/upload 拿 id，后续操作只传 id（多输入如 PDF 合并天然支持）；
  * 产出统一进 {@link Store} 并返回元信息（id/大小/页数/耗时），前端据此预览或下载。</p>
  *
+ * <p>端点用 {@link Router} 注册成路由表并<b>按模块分组</b>，新增端点只加一行，
+ * 不必再维护一个几百行的 switch。</p>
+ *
  * @author officia-demo
  */
 final class ApiRoutes {
+
+    /** 全部端点；类加载时一次性注册。 */
+    private static final Router ROUTER = buildRouter();
 
     private ApiRoutes() {
     }
 
     /** 分发一条 /api/* 请求；返回 true 表示已处理。 */
     static boolean dispatch(HttpExchange ex, String path, Map<String, String> q) throws Exception {
-        switch (path) {
-            case "/api/health":
-                Http.json(ex, Json.obj().put("ok", true).put("blobs", Store.size()).end());
-                return true;
-            case "/api/upload":
-                upload(ex, q);
-                return true;
-            case "/api/samples":
-                samples(ex);
-                return true;
-
-            // ---- 授权 ----
-            case "/api/license/status":
-                Http.json(ex, licenseStatus().end());
-                return true;
-            case "/api/license/set": {
-                String token = new String(Http.body(ex), StandardCharsets.UTF_8).trim();
-                OfficiaLicense.setLicense(token);
-                Http.json(ex, licenseStatus().end());
-                return true;
-            }
-            case "/api/license/reset":
-                OfficiaLicense.reset();
-                Http.json(ex, licenseStatus().end());
-                return true;
-            case "/api/license/enforce":
-                OfficiaLicense.enableEnforcement(!"false".equals(q.get("on")));
-                Http.json(ex, licenseStatus().end());
-                return true;
-
-            // ---- Words ----
-            case "/api/words/topdf": {
-                byte[] src = Store.bytes(q.get("id"));
-                long t0 = System.nanoTime();
-                byte[] pdf;
-                if ("stream".equals(q.get("mode"))) {
-                    ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    OfficiaWords.toPdf(src, out);      // 流式直写，省峰值内存
-                    pdf = out.toByteArray();
-                } else {
-                    pdf = OfficiaWords.toPdf(src);     // 自动识别 DOCX(OOXML) / DOC(CFB)
-                }
-                Http.json(ex, result("words.pdf", "application/pdf", pdf, t0).end());
-                return true;
-            }
-            case "/api/words/template": {
-                byte[] tpl = Store.bytes(q.get("tplId"));
-                String json = new String(Http.body(ex), StandardCharsets.UTF_8).trim();
-                String mode = q.getOrDefault("mode", "single");
-                long t0 = System.nanoTime();
-                if ("each".equals(mode)) {
-                    // fillTemplateEachToPdf 只有 List 重载，故先用 officia 自带 MiniJson 把 JSON 数组解析成 List<Map>
-                    List<Map<String, Object>> dataList = new ArrayList<>();
-                    for (Object o : MiniJson.parseArray(json)) {
-                        if (!(o instanceof Map)) {
-                            throw new IllegalArgumentException("JSON 数组元素须为对象");
-                        }
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> m = (Map<String, Object>) o;
-                        dataList.add(m);
-                    }
-                    List<byte[]> list = OfficiaWords.fillTemplateEachToPdf(tpl, dataList);
-                    List<Object> arr = new ArrayList<>();
-                    for (int i = 0; i < list.size(); i++) {
-                        Store.Blob b = store("填充结果-" + (i + 1) + ".pdf", "application/pdf", list.get(i), t0);
-                        arr.add(b.toJson());
-                    }
-                    Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
-                } else if ("merged".equals(mode)) {
-                    byte[] pdf = OfficiaWords.fillTemplateMergedToPdf(tpl, json);
-                    Http.json(ex, result("邮件合并.pdf", "application/pdf", pdf, t0).end());
-                } else if ("docx".equals(mode)) {
-                    byte[] docx = OfficiaWords.fillTemplate(tpl, json);
-                    Http.json(ex, result("填充结果.docx",
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", docx, t0).end());
-                } else {
-                    byte[] pdf = OfficiaWords.fillTemplateToPdf(tpl, json);
-                    Http.json(ex, result("填充结果.pdf", "application/pdf", pdf, t0).end());
-                }
-                return true;
-            }
-
-            // ---- Cells ----
-            case "/api/cells/topdf": {
-                long t0 = System.nanoTime();
-                byte[] pdf = OfficiaCells.toPdf(Store.bytes(q.get("id")));
-                Http.json(ex, result("cells.pdf", "application/pdf", pdf, t0).end());
-                return true;
-            }
-            case "/api/cells/tocsv": {
-                long t0 = System.nanoTime();
-                String csv = OfficiaCells.toCsv(Store.bytes(q.get("id")));
-                Http.json(ex, result("cells.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8), t0)
-                    .put("text", csv.length() > 20000 ? csv.substring(0, 20000) + "\n…" : csv).end());
-                return true;
-            }
-            case "/api/cells/csvtopdf": {
-                String csv = new String(Http.body(ex), StandardCharsets.UTF_8);
-                long t0 = System.nanoTime();
-                byte[] pdf = OfficiaCells.csvToPdf(csv);
-                Http.json(ex, result("csv.pdf", "application/pdf", pdf, t0).end());
-                return true;
-            }
-            case "/api/cells/parsecsv": {
-                String csv = new String(Http.body(ex), StandardCharsets.UTF_8);
-                List<List<String>> rows = OfficiaCells.parseCsv(csv);
-                List<Object> out = new ArrayList<>();
-                for (List<String> r : rows) {
-                    out.add(new ArrayList<Object>(r));
-                }
-                Http.json(ex, Json.obj().put("rows", out).end());
-                return true;
-            }
-            case "/api/cells/formula": {
-                String cell = q.get("cell");
-                Object v = OfficiaCells.evaluateXlsxCell(Store.bytes(q.get("id")), cell);
-                Http.json(ex, Json.obj().put("cell", cell).put("value", String.valueOf(v)).end());
-                return true;
-            }
-            case "/api/cells/recalc": {
-                Map<String, Object> m = OfficiaCells.recalculateXlsx(Store.bytes(q.get("id")));
-                Map<String, Object> shown = new LinkedHashMap<>();
-                int n = 0;
-                for (Map.Entry<String, Object> e : m.entrySet()) {
-                    if (n++ >= 200) {
-                        break;
-                    }
-                    shown.put(e.getKey(), String.valueOf(e.getValue()));
-                }
-                Http.json(ex, Json.obj().put("count", m.size()).put("cells", shown).end());
-                return true;
-            }
-
-            // ---- Slides ----
-            case "/api/slides/topdf": {
-                byte[] src = Store.bytes(q.get("id"));
-                long t0 = System.nanoTime();
-                byte[] pdf = "true".equals(q.get("layout"))
-                    ? OfficiaSlides.toPdfLayoutAware(src) : OfficiaSlides.toPdf(src);
-                Http.json(ex, result("slides.pdf", "application/pdf", pdf, t0).end());
-                return true;
-            }
-
-            // ---- PDF ----
-            case "/api/pdf/info": {
-                byte[] pdf = Store.bytes(q.get("id"));
-                List<float[]> sizes = OfficiaPdf.pageSizes(pdf);
-                String size = sizes.isEmpty() ? "-"
-                    : Math.round(sizes.get(0)[0]) + "×" + Math.round(sizes.get(0)[1]);
-                Http.json(ex, Json.obj().put("pages", OfficiaPdf.pageCount(pdf))
-                    .put("encrypted", OfficiaPdf.isEncrypted(pdf)).put("firstPageSize", size).end());
-                return true;
-            }
-            case "/api/pdf/merge": {
-                List<byte[]> list = new ArrayList<>();
-                for (String id : q.getOrDefault("ids", "").split(",")) {
-                    if (!id.isBlank()) {
-                        list.add(Store.bytes(id.trim()));
-                    }
-                }
-                long t0 = System.nanoTime();
-                byte[] pdf = OfficiaPdf.merge(list);
-                Http.json(ex, result("合并.pdf", "application/pdf", pdf, t0).end());
-                return true;
-            }
-            case "/api/pdf/split": {
-                long t0 = System.nanoTime();
-                List<byte[]> parts = OfficiaPdf.split(Store.bytes(q.get("id")));
-                List<Object> arr = new ArrayList<>();
-                for (int i = 0; i < parts.size(); i++) {
-                    arr.add(store("第" + (i + 1) + "页.pdf", "application/pdf", parts.get(i), t0).toJson());
-                }
-                Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
-                return true;
-            }
-            case "/api/pdf/pages": {
-                byte[] pdf = Store.bytes(q.get("id"));
-                int[] idx = parseInts(q.get("pages"));
-                long t0 = System.nanoTime();
-                byte[] out = "remove".equals(q.get("op"))
-                    ? OfficiaPdf.removePages(pdf, idx) : OfficiaPdf.extractPages(pdf, idx);
-                Http.json(ex, result("页面处理.pdf", "application/pdf", out, t0).end());
-                return true;
-            }
-            case "/api/pdf/rotate": {
-                long t0 = System.nanoTime();
-                byte[] out = OfficiaPdf.rotate(Store.bytes(q.get("id")),
-                    Integer.parseInt(q.getOrDefault("deg", "90")));
-                Http.json(ex, result("旋转.pdf", "application/pdf", out, t0).end());
-                return true;
-            }
-            case "/api/pdf/watermark": {
-                byte[] pdf = Store.bytes(q.get("id"));
-                String text = q.getOrDefault("text", "CONFIDENTIAL");
-                byte[] font = fontBytes(q.get("fontId"));
-                long t0 = System.nanoTime();
-                byte[] out = font != null ? OfficiaPdf.watermark(pdf, text, font) : OfficiaPdf.watermark(pdf, text);
-                Http.json(ex, result("水印.pdf", "application/pdf", out, t0).end());
-                return true;
-            }
-            case "/api/pdf/pagenumbers": {
-                byte[] pdf = Store.bytes(q.get("id"));
-                String fmt = q.getOrDefault("format", "{page} / {total}");
-                byte[] font = fontBytes(q.get("fontId"));
-                long t0 = System.nanoTime();
-                byte[] out = font != null ? OfficiaPdf.addPageNumbers(pdf, fmt, font)
-                    : OfficiaPdf.addPageNumbers(pdf, fmt);
-                Http.json(ex, result("页码.pdf", "application/pdf", out, t0).end());
-                return true;
-            }
-            case "/api/pdf/text": {
-                byte[] pdf = Store.bytes(q.get("id"));
-                List<String> byPage = OfficiaPdf.extractTextByPage(pdf);
-                Http.json(ex, Json.obj().put("pages", byPage.size())
-                    .put("text", new ArrayList<Object>(byPage)).end());
-                return true;
-            }
-            case "/api/pdf/images": {
-                long t0 = System.nanoTime();
-                List<byte[]> imgs = OfficiaPdf.extractImages(Store.bytes(q.get("id")));
-                List<Object> arr = new ArrayList<>();
-                for (int i = 0; i < imgs.size(); i++) {
-                    arr.add(store("图片-" + (i + 1) + ".png", "image/png", imgs.get(i), t0).toJson());
-                }
-                Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
-                return true;
-            }
-            case "/api/pdf/encrypt": {
-                byte[] pdf = Store.bytes(q.get("id"));
-                String user = q.getOrDefault("user", "open");
-                String owner = q.getOrDefault("owner", "owner");
-                int bits = Integer.parseInt(q.getOrDefault("bits", "256"));
-                long t0 = System.nanoTime();
-                byte[] out = bits == 256 ? OfficiaPdf.encryptAes256(pdf, user, owner)
-                    : OfficiaPdf.encrypt(pdf, user, owner, bits);
-                Http.json(ex, result("加密.pdf", "application/pdf", out, t0)
-                    .put("algo", bits == 256 ? "AES-256 (AESV3)" : "RC4-" + bits).end());
-                return true;
-            }
-
-            // ---- Imaging ----
-            case "/api/imaging/op": {
-                byte[] src = Store.bytes(q.get("id"));
-                long t0 = System.nanoTime();
-                byte[] out = imaging(src, q);
-                String mime = "convert".equals(q.get("op"))
-                    ? "image/" + q.getOrDefault("format", "png").toLowerCase() : "image/png";
-                Http.json(ex, result("处理结果." + mime.substring(mime.indexOf('/') + 1), mime, out, t0).end());
-                return true;
-            }
-            case "/api/imaging/topdf": {
-                List<byte[]> imgs = new ArrayList<>();
-                for (String id : q.getOrDefault("ids", "").split(",")) {
-                    if (!id.isBlank()) {
-                        imgs.add(Store.bytes(id.trim()));
-                    }
-                }
-                long t0 = System.nanoTime();
-                byte[] pdf = OfficiaImaging.toPdf(imgs);
-                Http.json(ex, result("图片.pdf", "application/pdf", pdf, t0).end());
-                return true;
-            }
-
-            // ---- BarCode ----
-            case "/api/barcode": {
-                long t0 = System.nanoTime();
-                byte[] png = barcode(q);
-                Http.json(ex, result(q.getOrDefault("type", "qr") + ".png", "image/png", png, t0).end());
-                return true;
-            }
-
-            // ---- Email ----
-            case "/api/email/parse": {
-                EmailMessage m = OfficiaEmail.parseEml(Store.bytes(q.get("id")));
-                Json j = Json.obj().put("subject", m.getSubject()).put("from", m.getFrom())
-                    .put("to", String.join(", ", nz(m.getTo()))).put("date", String.valueOf(m.getDate()));
-                List<Object> atts = new ArrayList<>();
-                if (m.getAttachments() != null) {
-                    m.getAttachments().forEach(a -> atts.add(Json.obj()
-                        .put("name", a.getFilename()).put("size", a.getSize())));
-                }
-                String body = m.getHtmlBody() != null && !m.getHtmlBody().isBlank() ? m.getHtmlBody() : m.getTextBody();
-                Http.json(ex, j.put("attachments", atts).put("body", body == null ? "" : body).end());
-                return true;
-            }
-            case "/api/email/topdf": {
-                long t0 = System.nanoTime();
-                byte[] pdf = OfficiaEmail.toPdf(Store.bytes(q.get("id")));
-                Http.json(ex, result("邮件归档.pdf", "application/pdf", pdf, t0).end());
-                return true;
-            }
-
-            case "/api/batch/run":
-                Http.json(ex, Batch.run().end());
-                return true;
-            default:
-                return false;
-        }
+        return ROUTER.dispatch(ex, path, q);
     }
 
-    // ==================== 具体能力 ====================
-
-    private static byte[] imaging(byte[] src, Map<String, String> q) {
-        String op = q.getOrDefault("op", "grayscale");
-        int a = Integer.parseInt(q.getOrDefault("a", "0"));
-        int b = Integer.parseInt(q.getOrDefault("b", "0"));
-        switch (op) {
-            case "grayscale":  return OfficiaImaging.grayscale(src);
-            case "sepia":      return OfficiaImaging.sepia(src);
-            case "invert":     return OfficiaImaging.invert(src);
-            case "binarize":   return OfficiaImaging.binarize(src, a == 0 ? 128 : a);
-            case "blur":       return OfficiaImaging.blur(src, a == 0 ? 3 : a);
-            case "sharpen":    return OfficiaImaging.sharpen(src);
-            case "brightness": return OfficiaImaging.brightness(src, a == 0 ? 30 : a);
-            case "contrast":   return OfficiaImaging.contrast(src, Float.parseFloat(q.getOrDefault("f", "1.4")));
-            case "posterize":  return OfficiaImaging.posterize(src, a == 0 ? 4 : a);
-            case "resize":     return OfficiaImaging.resize(src, a == 0 ? 640 : a, b == 0 ? 360 : b);
-            case "crop":       return OfficiaImaging.crop(src, a, b,
-                Integer.parseInt(q.getOrDefault("w", "200")), Integer.parseInt(q.getOrDefault("h", "200")));
-            case "rotate":     return OfficiaImaging.rotate(src, Double.parseDouble(q.getOrDefault("deg", "90")));
-            case "flipH":      return OfficiaImaging.flipHorizontal(src);
-            case "flipV":      return OfficiaImaging.flipVertical(src);
-            case "convert":    return OfficiaImaging.convert(src, q.getOrDefault("format", "jpg"));
-            case "textmark":   return OfficiaImaging.textWatermark(src, q.getOrDefault("text", "Officia Demo"),
-                a, b == 0 ? 40 : b, Float.parseFloat(q.getOrDefault("size", "28")), 0x808080,
-                Float.parseFloat(q.getOrDefault("opacity", "0.5")));
-            case "imgmark":    return OfficiaImaging.imageWatermark(src, Store.bytes(q.get("markId")), a, b,
-                Float.parseFloat(q.getOrDefault("opacity", "0.5")));
-            default: throw new IllegalArgumentException("未知图像操作: " + op);
-        }
+    /** 已注册端点数（自检用）。 */
+    static int endpointCount() {
+        return ROUTER.size();
     }
 
-    private static byte[] barcode(Map<String, String> q) {
-        String type = q.getOrDefault("type", "qr");
-        String text = q.getOrDefault("text", "https://ruoyi.plus");
-        int mod = Integer.parseInt(q.getOrDefault("module", "8"));
-        int quiet = Integer.parseInt(q.getOrDefault("quiet", "4"));
-        int h = Integer.parseInt(q.getOrDefault("height", "80"));
-        boolean withText = "true".equals(q.get("withText"));
-        switch (type) {
-            case "qr":
-                return OfficiaBarCode.qrPng(text, eccOf(q.getOrDefault("ecc", "M")), mod, quiet);
-            case "code128": return withText ? OfficiaBarCode.code128PngText(text) : OfficiaBarCode.code128Png(text, mod, h, quiet);
-            case "code39":  return withText ? OfficiaBarCode.code39PngText(text)  : OfficiaBarCode.code39Png(text, mod, h, quiet);
-            case "code93":  return withText ? OfficiaBarCode.code93PngText(text)  : OfficiaBarCode.code93Png(text, mod, h, quiet);
-            case "ean13":   return withText ? OfficiaBarCode.ean13PngText(text)   : OfficiaBarCode.ean13Png(text, mod, h, quiet);
-            case "ean8":    return withText ? OfficiaBarCode.ean8PngText(text)    : OfficiaBarCode.ean8Png(text, mod, h, quiet);
-            case "upca":    return OfficiaBarCode.upcaPng(text);
-            case "itf14":   return withText ? OfficiaBarCode.itf14PngText(text)   : OfficiaBarCode.itf14Png(text, mod, h, quiet);
-            default: throw new IllegalArgumentException("未知码制: " + type);
-        }
-    }
-
-    private static QrEcc eccOf(String s) {
-        switch (s.toUpperCase()) {
-            case "L": return QrEcc.L;
-            case "Q": return QrEcc.Q;
-            case "H": return QrEcc.H;
-            default:  return QrEcc.M;
-        }
+    private static Router buildRouter() {
+        Router r = new Router();
+        registerCore(r);
+        registerLicense(r);
+        registerWords(r);
+        registerCells(r);
+        registerSlides(r);
+        registerPdf(r);
+        registerImaging(r);
+        registerBarCode(r);
+        registerEmail(r);
+        return r;
     }
 
     // ==================== 通用 ====================
 
-    private static void upload(HttpExchange ex, Map<String, String> q) throws Exception {
-        byte[] data = Http.body(ex);
-        String name = q.getOrDefault("name", "upload.bin");
-        Store.Blob b = Store.put(name, Http.mimeOf(name), data);
-        if (name.toLowerCase().endsWith(".pdf")) {
-            try {
-                b.pages = OfficiaPdf.pageCount(data);
-            } catch (RuntimeException ignore) {
-                // 加密或异常 PDF：页数留 -1，不影响上传
+    private static void registerCore(Router r) {
+        // 注意：lambda 在请求时才执行，此时 ROUTER 已完成初始化，可安全调用 endpointCount()
+        r.add("/api/health", (ex, q) -> Http.json(ex, Json.obj()
+            .put("ok", true).put("blobs", Store.size()).put("bytes", Store.bytesUsed())
+            .put("endpoints", endpointCount()).end()));
+
+        r.add("/api/upload", (ex, q) -> {
+            byte[] data = Http.body(ex);
+            String name = q.getOrDefault("name", "upload.bin");
+            Store.Blob b = Store.put(name, Http.mimeOf(name), data);
+            if (name.toLowerCase().endsWith(".pdf")) {
+                b.withPages(pagesOrUnknown(data));
             }
-        }
-        Http.json(ex, b.toJson().end());
+            Http.json(ex, b.toJson().end());
+        });
+
+        r.add("/api/samples", (ex, q) -> samples(ex));
+        r.add("/api/batch/run", (ex, q) -> Http.json(ex, Batch.run().end()));
     }
 
     /** 生成内置样本（officia 自产自销：CSV/PDF/PNG/EML 都能现造，docx/xlsx/pptx 需用户上传）。 */
@@ -421,17 +93,11 @@ final class ApiRoutes {
         for (int i = 1; i <= 120; i++) {
             csv.append(i).append(",员工").append(i).append(",研发部,深圳,").append(1000 + i * 7).append('\n');
         }
-        byte[] csvBytes = csv.toString().getBytes(StandardCharsets.UTF_8);
-        arr.add(Store.put("样本-120行.csv", "text/csv", csvBytes).toJson());
+        arr.add(Store.put("样本-120行.csv", "text/csv",
+            csv.toString().getBytes(StandardCharsets.UTF_8)).toJson());
 
         byte[] pdf = OfficiaCells.csvToPdf(csv.toString());
-        Store.Blob pb = Store.put("样本-多页.pdf", "application/pdf", pdf);
-        try {
-            pb.pages = OfficiaPdf.pageCount(pdf);
-        } catch (RuntimeException ignore) {
-            // 评估降级下仍可用，忽略页数异常
-        }
-        arr.add(pb.toJson());
+        arr.add(Store.put("样本-多页.pdf", "application/pdf", pdf).withPages(pagesOrUnknown(pdf)).toJson());
 
         arr.add(Store.put("样本-二维码.png", "image/png",
             OfficiaBarCode.qrPng("https://ruoyi.plus")).toJson());
@@ -442,6 +108,27 @@ final class ApiRoutes {
         arr.add(Store.put("样本-邮件.eml", "message/rfc822", OfficiaEmail.writeEml(m)).toJson());
 
         Http.json(ex, Json.obj().put("samples", arr).end());
+    }
+
+    // ==================== 授权 ====================
+
+    private static void registerLicense(Router r) {
+        r.add("/api/license/status", (ex, q) -> Http.json(ex, licenseStatus().end()));
+
+        r.add("/api/license/set", (ex, q) -> {
+            OfficiaLicense.setLicense(new String(Http.body(ex), StandardCharsets.UTF_8).trim());
+            Http.json(ex, licenseStatus().end());
+        });
+
+        r.add("/api/license/reset", (ex, q) -> {
+            OfficiaLicense.reset();
+            Http.json(ex, licenseStatus().end());
+        });
+
+        r.add("/api/license/enforce", (ex, q) -> {
+            OfficiaLicense.enableEnforcement(!"false".equals(q.get("on")));
+            Http.json(ex, licenseStatus().end());
+        });
     }
 
     private static Json licenseStatus() {
@@ -460,24 +147,379 @@ final class ApiRoutes {
             .put("modules", mods);
     }
 
-    private static Store.Blob store(String name, String mime, byte[] data, long t0) {
-        Store.Blob b = Store.put(name, mime, data);
-        b.ms = (System.nanoTime() - t0) / 1_000_000;
-        if ("application/pdf".equals(mime)) {
-            try {
-                b.pages = OfficiaPdf.pageCount(data);
-            } catch (RuntimeException ignore) {
-                // 加密后的 PDF 读页数会失败，属预期
+    // ==================== Words ====================
+
+    private static void registerWords(Router r) {
+        r.add("/api/words/topdf", (ex, q) -> {
+            byte[] src = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            byte[] pdf;
+            if ("stream".equals(q.get("mode"))) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                OfficiaWords.toPdf(src, out);      // 流式直写，省峰值内存
+                pdf = out.toByteArray();
+            } else {
+                pdf = OfficiaWords.toPdf(src);     // 自动识别 DOCX(OOXML) / DOC(CFB)
             }
-        }
-        return b;
+            Http.json(ex, result("words.pdf", "application/pdf", pdf, t0).end());
+        });
+
+        r.add("/api/words/template", (ex, q) -> {
+            byte[] tpl = Store.bytes(q.get("tplId"));
+            String json = new String(Http.body(ex), StandardCharsets.UTF_8).trim();
+            String mode = q.getOrDefault("mode", "single");
+            long t0 = System.nanoTime();
+            switch (mode) {
+                case "each": {
+                    List<byte[]> list = OfficiaWords.fillTemplateEachToPdf(tpl, parseJsonArray(json));
+                    List<Object> arr = new ArrayList<>();
+                    for (int i = 0; i < list.size(); i++) {
+                        arr.add(store("填充结果-" + (i + 1) + ".pdf", "application/pdf", list.get(i), t0).toJson());
+                    }
+                    Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
+                    break;
+                }
+                case "merged":
+                    Http.json(ex, result("邮件合并.pdf", "application/pdf",
+                        OfficiaWords.fillTemplateMergedToPdf(tpl, json), t0).end());
+                    break;
+                case "docx":
+                    Http.json(ex, result("填充结果.docx",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        OfficiaWords.fillTemplate(tpl, json), t0).end());
+                    break;
+                default:
+                    Http.json(ex, result("填充结果.pdf", "application/pdf",
+                        OfficiaWords.fillTemplateToPdf(tpl, json), t0).end());
+            }
+        });
     }
 
+    /**
+     * JSON 数组 → {@code List<Map>}（fillTemplateEachToPdf 只有 List 重载）。
+     * 用 officia 自带的 MiniJson 解析，元素非对象即报可读错误（见 json-serialization 技能）。
+     */
+    private static List<Map<String, Object>> parseJsonArray(String json) {
+        List<Map<String, Object>> dataList = new ArrayList<>();
+        for (Object o : MiniJson.parseArray(json)) {
+            if (!(o instanceof Map)) {
+                throw new IllegalArgumentException("JSON 数组元素须为对象");
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> m = (Map<String, Object>) o;
+            dataList.add(m);
+        }
+        return dataList;
+    }
+
+    // ==================== Cells ====================
+
+    private static void registerCells(Router r) {
+        r.add("/api/cells/topdf", (ex, q) -> {
+            long t0 = System.nanoTime();
+            Http.json(ex, result("cells.pdf", "application/pdf",
+                OfficiaCells.toPdf(Store.bytes(q.get("id"))), t0).end());
+        });
+
+        r.add("/api/cells/tocsv", (ex, q) -> {
+            long t0 = System.nanoTime();
+            String csv = OfficiaCells.toCsv(Store.bytes(q.get("id")));
+            Http.json(ex, result("cells.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8), t0)
+                .put("text", csv.length() > 20000 ? csv.substring(0, 20000) + "\n…" : csv).end());
+        });
+
+        r.add("/api/cells/csvtopdf", (ex, q) -> {
+            String csv = new String(Http.body(ex), StandardCharsets.UTF_8);
+            long t0 = System.nanoTime();
+            Http.json(ex, result("csv.pdf", "application/pdf", OfficiaCells.csvToPdf(csv), t0).end());
+        });
+
+        r.add("/api/cells/parsecsv", (ex, q) -> {
+            List<List<String>> rows = OfficiaCells.parseCsv(new String(Http.body(ex), StandardCharsets.UTF_8));
+            List<Object> out = new ArrayList<>();
+            for (List<String> row : rows) {
+                out.add(new ArrayList<Object>(row));
+            }
+            Http.json(ex, Json.obj().put("rows", out).end());
+        });
+
+        r.add("/api/cells/formula", (ex, q) -> {
+            String cell = q.get("cell");
+            Object v = OfficiaCells.evaluateXlsxCell(Store.bytes(q.get("id")), cell);
+            Http.json(ex, Json.obj().put("cell", cell).put("value", String.valueOf(v)).end());
+        });
+
+        r.add("/api/cells/recalc", (ex, q) -> {
+            Map<String, Object> all = OfficiaCells.recalculateXlsx(Store.bytes(q.get("id")));
+            Map<String, Object> shown = new LinkedHashMap<>();
+            int n = 0;
+            for (Map.Entry<String, Object> e : all.entrySet()) {
+                if (n++ >= 200) {   // 只回传前 200 个，避免超大表把响应撑爆
+                    break;
+                }
+                shown.put(e.getKey(), String.valueOf(e.getValue()));
+            }
+            Http.json(ex, Json.obj().put("count", all.size()).put("cells", shown).end());
+        });
+    }
+
+    // ==================== Slides ====================
+
+    private static void registerSlides(Router r) {
+        r.add("/api/slides/topdf", (ex, q) -> {
+            byte[] src = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            byte[] pdf = "true".equals(q.get("layout"))
+                ? OfficiaSlides.toPdfLayoutAware(src) : OfficiaSlides.toPdf(src);
+            Http.json(ex, result("slides.pdf", "application/pdf", pdf, t0).end());
+        });
+    }
+
+    // ==================== PDF ====================
+
+    private static void registerPdf(Router r) {
+        r.add("/api/pdf/info", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            List<float[]> sizes = OfficiaPdf.pageSizes(pdf);
+            String size = sizes.isEmpty() ? "-"
+                : Math.round(sizes.get(0)[0]) + "×" + Math.round(sizes.get(0)[1]);
+            Http.json(ex, Json.obj().put("pages", OfficiaPdf.pageCount(pdf))
+                .put("encrypted", OfficiaPdf.isEncrypted(pdf)).put("firstPageSize", size).end());
+        });
+
+        r.add("/api/pdf/merge", (ex, q) -> {
+            long t0 = System.nanoTime();
+            Http.json(ex, result("合并.pdf", "application/pdf",
+                OfficiaPdf.merge(bytesOfIds(q.get("ids"))), t0).end());
+        });
+
+        r.add("/api/pdf/split", (ex, q) -> {
+            long t0 = System.nanoTime();
+            List<byte[]> parts = OfficiaPdf.split(Store.bytes(q.get("id")));
+            List<Object> arr = new ArrayList<>();
+            for (int i = 0; i < parts.size(); i++) {
+                arr.add(store("第" + (i + 1) + "页.pdf", "application/pdf", parts.get(i), t0).toJson());
+            }
+            Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
+        });
+
+        r.add("/api/pdf/pages", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            int[] idx = parseInts(q.get("pages"));
+            long t0 = System.nanoTime();
+            byte[] out = "remove".equals(q.get("op"))
+                ? OfficiaPdf.removePages(pdf, idx) : OfficiaPdf.extractPages(pdf, idx);
+            Http.json(ex, result("页面处理.pdf", "application/pdf", out, t0).end());
+        });
+
+        r.add("/api/pdf/rotate", (ex, q) -> {
+            long t0 = System.nanoTime();
+            byte[] out = OfficiaPdf.rotate(Store.bytes(q.get("id")),
+                Integer.parseInt(q.getOrDefault("deg", "90")));
+            Http.json(ex, result("旋转.pdf", "application/pdf", out, t0).end());
+        });
+
+        r.add("/api/pdf/watermark", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            String text = q.getOrDefault("text", "CONFIDENTIAL");
+            byte[] font = fontBytes(q.get("fontId"));
+            long t0 = System.nanoTime();
+            byte[] out = font != null ? OfficiaPdf.watermark(pdf, text, font) : OfficiaPdf.watermark(pdf, text);
+            Http.json(ex, result("水印.pdf", "application/pdf", out, t0).end());
+        });
+
+        r.add("/api/pdf/pagenumbers", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            String fmt = q.getOrDefault("format", "{page} / {total}");
+            byte[] font = fontBytes(q.get("fontId"));
+            long t0 = System.nanoTime();
+            byte[] out = font != null ? OfficiaPdf.addPageNumbers(pdf, fmt, font)
+                : OfficiaPdf.addPageNumbers(pdf, fmt);
+            Http.json(ex, result("页码.pdf", "application/pdf", out, t0).end());
+        });
+
+        r.add("/api/pdf/text", (ex, q) -> {
+            List<String> byPage = OfficiaPdf.extractTextByPage(Store.bytes(q.get("id")));
+            Http.json(ex, Json.obj().put("pages", byPage.size())
+                .put("text", new ArrayList<Object>(byPage)).end());
+        });
+
+        r.add("/api/pdf/images", (ex, q) -> {
+            long t0 = System.nanoTime();
+            List<byte[]> imgs = OfficiaPdf.extractImages(Store.bytes(q.get("id")));
+            List<Object> arr = new ArrayList<>();
+            for (int i = 0; i < imgs.size(); i++) {
+                arr.add(store("图片-" + (i + 1) + ".png", "image/png", imgs.get(i), t0).toJson());
+            }
+            Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
+        });
+
+        r.add("/api/pdf/encrypt", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            String user = q.getOrDefault("user", "open");
+            String owner = q.getOrDefault("owner", "owner");
+            int bits = Integer.parseInt(q.getOrDefault("bits", "256"));
+            long t0 = System.nanoTime();
+            byte[] out = bits == 256 ? OfficiaPdf.encryptAes256(pdf, user, owner)
+                : OfficiaPdf.encrypt(pdf, user, owner, bits);
+            Http.json(ex, result("加密.pdf", "application/pdf", out, t0)
+                .put("algo", bits == 256 ? "AES-256 (AESV3)" : "RC4-" + bits).end());
+        });
+    }
+
+    // ==================== Imaging ====================
+
+    private static void registerImaging(Router r) {
+        r.add("/api/imaging/op", (ex, q) -> {
+            byte[] src = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            byte[] out = imaging(src, q);
+            String format = "convert".equals(q.get("op")) ? q.getOrDefault("format", "png").toLowerCase() : "png";
+            Http.json(ex, result("处理结果." + format, "image/" + format, out, t0).end());
+        });
+
+        r.add("/api/imaging/topdf", (ex, q) -> {
+            long t0 = System.nanoTime();
+            Http.json(ex, result("图片.pdf", "application/pdf",
+                OfficiaImaging.toPdf(bytesOfIds(q.get("ids"))), t0).end());
+        });
+    }
+
+    /**
+     * 图像操作分派。参数名语义：{@code x/y} 位置、{@code width/height} 尺寸、
+     * {@code amount} 强度（阈值/半径/增量/级数）、{@code factor} 系数、{@code opacity} 透明度。
+     */
+    private static byte[] imaging(byte[] src, Map<String, String> q) {
+        String op = q.getOrDefault("op", "grayscale");
+        int x = intOf(q, "x", 0);
+        int y = intOf(q, "y", 0);
+        int amount = intOf(q, "amount", 0);
+        switch (op) {
+            case "grayscale":  return OfficiaImaging.grayscale(src);
+            case "sepia":      return OfficiaImaging.sepia(src);
+            case "invert":     return OfficiaImaging.invert(src);
+            case "sharpen":    return OfficiaImaging.sharpen(src);
+            case "flipH":      return OfficiaImaging.flipHorizontal(src);
+            case "flipV":      return OfficiaImaging.flipVertical(src);
+            case "binarize":   return OfficiaImaging.binarize(src, amount == 0 ? 128 : amount);
+            case "blur":       return OfficiaImaging.blur(src, amount == 0 ? 3 : amount);
+            case "brightness": return OfficiaImaging.brightness(src, amount == 0 ? 30 : amount);
+            case "posterize":  return OfficiaImaging.posterize(src, amount == 0 ? 4 : amount);
+            case "contrast":   return OfficiaImaging.contrast(src, floatOf(q, "factor", 1.4f));
+            case "resize":     return OfficiaImaging.resize(src, intOf(q, "width", 640), intOf(q, "height", 360));
+            case "crop":       return OfficiaImaging.crop(src, x, y, intOf(q, "width", 200), intOf(q, "height", 200));
+            case "rotate":     return OfficiaImaging.rotate(src, Double.parseDouble(q.getOrDefault("deg", "90")));
+            case "convert":    return OfficiaImaging.convert(src, q.getOrDefault("format", "jpg"));
+            case "textmark":   return OfficiaImaging.textWatermark(src, q.getOrDefault("text", "Officia Demo"),
+                x, y == 0 ? 40 : y, floatOf(q, "size", 28f), 0x808080, floatOf(q, "opacity", 0.5f));
+            case "imgmark":    return OfficiaImaging.imageWatermark(src, Store.bytes(q.get("markId")),
+                x, y, floatOf(q, "opacity", 0.5f));
+            default: throw new IllegalArgumentException("未知图像操作: " + op);
+        }
+    }
+
+    // ==================== BarCode ====================
+
+    private static void registerBarCode(Router r) {
+        r.add("/api/barcode", (ex, q) -> {
+            long t0 = System.nanoTime();
+            byte[] png = barcode(q);
+            Http.json(ex, result(q.getOrDefault("type", "qr") + ".png", "image/png", png, t0).end());
+        });
+    }
+
+    private static byte[] barcode(Map<String, String> q) {
+        String type = q.getOrDefault("type", "qr");
+        String text = q.getOrDefault("text", "https://ruoyi.plus");
+        int module = intOf(q, "module", 8);
+        int quiet = intOf(q, "quiet", 4);
+        int height = intOf(q, "height", 80);
+        boolean withText = "true".equals(q.get("withText"));
+        switch (type) {
+            case "qr":      return OfficiaBarCode.qrPng(text, eccOf(q.getOrDefault("ecc", "M")), module, quiet);
+            case "code128": return withText ? OfficiaBarCode.code128PngText(text) : OfficiaBarCode.code128Png(text, module, height, quiet);
+            case "code39":  return withText ? OfficiaBarCode.code39PngText(text)  : OfficiaBarCode.code39Png(text, module, height, quiet);
+            case "code93":  return withText ? OfficiaBarCode.code93PngText(text)  : OfficiaBarCode.code93Png(text, module, height, quiet);
+            case "ean13":   return withText ? OfficiaBarCode.ean13PngText(text)   : OfficiaBarCode.ean13Png(text, module, height, quiet);
+            case "ean8":    return withText ? OfficiaBarCode.ean8PngText(text)    : OfficiaBarCode.ean8Png(text, module, height, quiet);
+            case "upca":    return withText ? OfficiaBarCode.upcaPngText(text)    : OfficiaBarCode.upcaPng(text, module, height, quiet);
+            case "itf14":   return withText ? OfficiaBarCode.itf14PngText(text)   : OfficiaBarCode.itf14Png(text, module, height, quiet);
+            default: throw new IllegalArgumentException("未知码制: " + type);
+        }
+    }
+
+    private static QrEcc eccOf(String s) {
+        switch (s.toUpperCase()) {
+            case "L": return QrEcc.L;
+            case "Q": return QrEcc.Q;
+            case "H": return QrEcc.H;
+            default:  return QrEcc.M;
+        }
+    }
+
+    // ==================== Email ====================
+
+    private static void registerEmail(Router r) {
+        r.add("/api/email/parse", (ex, q) -> {
+            EmailMessage m = OfficiaEmail.parseEml(Store.bytes(q.get("id")));
+            Json j = Json.obj().put("subject", m.getSubject()).put("from", m.getFrom())
+                .put("to", String.join(", ", nz(m.getTo()))).put("date", String.valueOf(m.getDate()));
+            List<Object> atts = new ArrayList<>();
+            if (m.getAttachments() != null) {
+                m.getAttachments().forEach(a -> atts.add(Json.obj()
+                    .put("name", a.getFilename()).put("size", a.getSize())));
+            }
+            String body = m.getHtmlBody() != null && !m.getHtmlBody().isBlank()
+                ? m.getHtmlBody() : m.getTextBody();
+            Http.json(ex, j.put("attachments", atts).put("body", body == null ? "" : body).end());
+        });
+
+        r.add("/api/email/topdf", (ex, q) -> {
+            long t0 = System.nanoTime();
+            Http.json(ex, result("邮件归档.pdf", "application/pdf",
+                OfficiaEmail.toPdf(Store.bytes(q.get("id"))), t0).end());
+        });
+    }
+
+    // ==================== 小工具 ====================
+
+    /** 存入产物并补齐耗时/页数，返回 Blob。 */
+    private static Store.Blob store(String name, String mime, byte[] data, long t0) {
+        Store.Blob b = Store.put(name, mime, data).withMs((System.nanoTime() - t0) / 1_000_000);
+        return "application/pdf".equals(mime) ? b.withPages(pagesOrUnknown(data)) : b;
+    }
+
+    /** 产物元信息 JSON（附当前授权态，前端据此提示"评估降级"）。 */
     private static Json result(String name, String mime, byte[] data, long t0) {
-        return store(name, mime, data, t0).toJson().put("evaluation", OfficiaLicense.isEvaluation())
+        return store(name, mime, data, t0).toJson()
+            .put("evaluation", OfficiaLicense.isEvaluation())
             .put("enforced", OfficiaLicense.isEnforced());
     }
 
+    /** 读 PDF 页数；加密或异常 PDF 返回 -1（不视为失败）。 */
+    private static int pagesOrUnknown(byte[] pdf) {
+        try {
+            return OfficiaPdf.pageCount(pdf);
+        } catch (RuntimeException ignore) {
+            return -1;
+        }
+    }
+
+    /** 逗号分隔的 id 列表 → 字节列表（多输入操作用）。 */
+    private static List<byte[]> bytesOfIds(String ids) {
+        List<byte[]> list = new ArrayList<>();
+        for (String id : (ids == null ? "" : ids).split(",")) {
+            if (!id.isBlank()) {
+                list.add(Store.bytes(id.trim()));
+            }
+        }
+        if (list.isEmpty()) {
+            throw new IllegalArgumentException("未指定输入文件（ids 为空）");
+        }
+        return list;
+    }
+
+    /** 水印/页码用的中文字体：优先用户上传，其次系统探测，都没有则 null（退回 ASCII 重载）。 */
     private static byte[] fontBytes(String fontId) {
         if (fontId != null && !fontId.isBlank()) {
             return Store.bytes(fontId);
@@ -497,7 +539,17 @@ final class ApiRoutes {
         return out;
     }
 
+    private static int intOf(Map<String, String> q, String key, int def) {
+        String v = q.get(key);
+        return v == null || v.isBlank() ? def : Integer.parseInt(v.trim());
+    }
+
+    private static float floatOf(Map<String, String> q, String key, float def) {
+        String v = q.get(key);
+        return v == null || v.isBlank() ? def : Float.parseFloat(v.trim());
+    }
+
     private static List<String> nz(List<String> l) {
-        return l == null ? Arrays.asList() : l;
+        return l == null ? Collections.emptyList() : l;
     }
 }
