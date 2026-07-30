@@ -4,3 +4,6 @@ target/
 .idea/
 *.iml
 .vscode/
+
+# License 令牌：可解锁凭据，任何形态都不入库（含浏览器重名的 "officia (1).lic"）
+*.lic
