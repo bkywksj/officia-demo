@@ -104,15 +104,33 @@ byte[] enc = OfficiaPdf.encryptAes256(pdf, "userPwd", "ownerPwd");       // 同�
 | 128 | RC4-128（/V2 /R3） | `encrypt(3 参)` 的默认 |
 | **256** | **AES-256（AESV3 /V5 /R6）** | **推荐**——现代阅读器通用，强于 RC4 |
 
+> ⚠️ `bits` **只接受 40 / 128 / 256**，其它值抛 `OfficiaException`。别指望传 64 会得到"64 位加密"。
+
 口令语义：
 
 - `userPassword`：**打开所需**的口令。空串 = 无口令可打开，但内容仍加密
 - `ownerPassword`：权限口令，**可空**，空则等同 user
+- **两个口令都能用于打开文档**（读取与解密时任传其一即可），RC4 与 AES-256 一致
+
+### 解密：加密文档要编辑必须先解密
+
+加密 PDF 只能读（文本/元数据/页数），**不能直接编辑**——水印、页码、合并、删页都要先解密：
+
+```java
+byte[] plain = OfficiaPdf.decrypt(enc, "userPwd");        // 导出未加密副本（owner 口令同样可用）
+byte[] out   = OfficiaPdf.edit(enc, "userPwd")            // 或直接带口令进入链式编辑
+        .keepPages(0, 1)
+        .watermark("REVIEWED")
+        .encryptAes256("newPwd", "newOwner")              // 需要的话换口令重新加密
+        .toBytes();
+```
+
+`decrypt` 对未加密文档是安全的恒等操作（口令参数被忽略），所以"不确定来源是否加密"时可以无脑先调它。
 
 ## 五、链式编辑器 `PdfEditor`（多步操作首选）
 
 ```java
-byte[] out = OfficiaPdf.edit(pdf)
+byte[] out = OfficiaPdf.edit(pdf)           // 加密文档用 edit(pdf, password)
     .keepPages(0, 1, 2)                     // 只留前 3 页
     .rotate(90)
     .watermark("机密", fontTtf)
