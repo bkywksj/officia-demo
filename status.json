@@ -1,0 +1,160 @@
+{
+  "framework": "officia-demo",
+  "type": "consumer-side-skill-system",
+  "audience": "使用 officia 的开发者（接入 / 调 API / 排错 / 集成），非 officia 库开发者",
+  "system": "dual (claude + codex)",
+  "note": "双系统：Claude(.claude/) + Codex(.codex/ + AGENTS.md) 已镜像完成。与 ../officia 的开发者技能体系（26 技能）定位互补、不重叠。",
+  "spec": "Anthropic 2025-12 Agent Skills Spec + skill-factory 4 层复用模型",
+  "createdAt": "2026-07-30",
+  "updatedAt": "2026-07-30",
+  "sourcePath": "E:/my/高级模块/officia-demo",
+  "referencePaths": {
+    "library_source": "E:/my/高级模块/officia",
+    "docs_site": "E:/my/高级模块/officia-docs",
+    "dev_skill_system": "E:/my/高级模块/officia/.claude （面向库开发者的 26 技能，本体系不与之重叠）"
+  },
+  "phase": 7,
+  "progress": {
+    "phase0_init": "completed",
+    "phase1_analysis": "completed",
+    "phase2_claude_md": "completed",
+    "phase3_core_skills": "completed",
+    "phase4_hooks_commands": "completed",
+    "phase4_5_codex_system": "completed",
+    "phase6_quality_check": "completed",
+    "phase6_5_usage_guide": "completed"
+  },
+  "progress_note": {
+    "phase1_analysis": "扫 ../officia 全部 8 个门面类真实签名 + ../officia/status.json 实测事实 + 文档站 + demo 测试台端点，作为技能内容唯一真相源",
+    "phase2_claude_md": "CLAUDE.md 三铁律（API 以源码为准 / 令牌不入库 / UTF-8 无 BOM）+ 真相源优先级 + 强制技能评估索引 + 与 ../officia 开发者体系的定位边界",
+    "phase3_core_skills": "18/18 完成，全部锚定真实 API 签名，含明确不支持项与未压测事实的诚实标注",
+    "phase4_hooks_commands": "hooks(skill-forced-eval + pre-tool-use) + settings.json(新版 matcher+hooks 嵌套格式) + commands/(6: convert/license/testbench/check/demo/next) + docs/experience/.gitkeep",
+    "phase4_5_codex_system": ".codex/skills 24 个（18 技能镜像字节一致 + 6 命令转技能加 YAML 头）；.codex/hooks 4 个（session-start/stop 为 L1 复制，skill-forced-eval 为 demo 使用者版，pre-tool-use 与 Claude 端一致）+ config.toml + hooks.json；AGENTS.md 入口",
+    "phase6_quality_check": "落盘/BOM/name==目录/hook 清单交叉一致/JSON 与 JS 语法 已核实",
+    "phase6_5_usage_guide": "docs/usage-guide.md 已生成"
+  },
+  "skills": {
+    "total": 19,
+    "completed": 19,
+    "categories": {
+      "entry_and_setup": {
+        "count": 3,
+        "list": [
+          "officia-capability-map",
+          "officia-setup",
+          "officia-license"
+        ]
+      },
+      "capability_usage": {
+        "count": 8,
+        "list": [
+          "officia-words",
+          "officia-template",
+          "officia-cells",
+          "officia-slides",
+          "officia-pdf",
+          "officia-barcode",
+          "officia-imaging",
+          "officia-email"
+        ]
+      },
+      "troubleshooting_and_engineering": {
+        "count": 5,
+        "list": [
+          "officia-chinese-font",
+          "officia-troubleshooting",
+          "officia-performance",
+          "officia-spring-integration",
+          "officia-upgrade"
+        ]
+      },
+      "demo_itself": {
+        "count": 2,
+        "list": [
+          "officia-testbench",
+          "officia-demo-test"
+        ]
+      },
+      "skill_system_maintenance": {
+        "count": 1,
+        "list": [
+          "officia-skill-maintain"
+        ],
+        "note": "技能体系自维护：新增/修改/删除技能、跟随 officia 升级更新内容、双系统六处同步。与 scripts/sync-codex.cjs 配对使用。"
+      }
+    }
+  },
+  "commands": {
+    "count": 7,
+    "list": ["convert", "license", "testbench", "check", "demo", "next", "sync"]
+  },
+  "maintenance": {
+    "sync_script": "scripts/sync-codex.cjs",
+    "usage": "node scripts/sync-codex.cjs（同步+自检） / --check（只自检，CI 与提交前用）",
+    "command_meta": "scripts/command-skill-meta.json（新增命令时必须补一条，否则同步报错）",
+    "sync_points": [
+      "1. .claude/skills/{name}/SKILL.md —— 技能正文（唯一手写源）",
+      "2. .claude/hooks/skill-forced-eval.cjs 技能清单 —— 漏了技能永不被激活（脚本强制校验）",
+      "3. CLAUDE.md 技能索引表 —— 脚本校验覆盖，不代写",
+      "4. AGENTS.md 技能清单表 —— 脚本校验覆盖，不代写",
+      "5. .codex/skills/ —— 脚本全量重建（生成物，勿手改）",
+      "6. status.json 计数 —— 脚本强制校验"
+    ],
+    "generated_artifacts": [
+      ".codex/skills/officia-* （.claude/skills 的字节镜像）",
+      ".codex/skills/{命令名} （.claude/commands + command-skill-meta.json 生成）"
+    ]
+  },
+  "codex_mirror": {
+    "enabled": true,
+    "built_at": "2026-07-30",
+    "skills": 26,
+    "mirrored_skills": 19,
+    "command_skills": 7,
+    "hooks_generated": 4,
+    "config_files_generated": true,
+    "detail": ".codex/skills 26 个（19 技能镜像字节一致 + 7 命令转技能加 YAML 头），由 scripts/sync-codex.cjs 全量重建并校验；.codex/hooks 4 个 + config.toml(features hooks=true) + hooks.json；AGENTS.md 入口（核心铁律 + 能力速览 + 26 技能清单表）"
+  },
+  "truth_sources_verified": {
+    "note": "技能内容中的 API 事实均从下列真实位置提取，非凭印象撰写",
+    "facade_signatures": [
+      "officia-words/.../OfficiaWords.java",
+      "officia-cells/.../OfficiaCells.java",
+      "officia-slides/.../OfficiaSlides.java",
+      "officia-pdf/.../OfficiaPdf.java",
+      "officia-barcode/.../OfficiaBarCode.java",
+      "officia-imaging/.../OfficiaImaging.java",
+      "officia-email/.../OfficiaEmail.java",
+      "officia-license/.../OfficiaLicense.java"
+    ],
+    "key_facts_extracted": [
+      "ConvertOptions 四项配置与默认值；PageSize 五个枚举值及尺寸",
+      "OfficiaWords 16 个 fillTemplate* 重载；模板九类占位符语法（取自 Wml*/Template* 实现类注释）",
+      "FormulaEngine 支持的 34 个 Excel 函数（grep case \"XXX\" 实得）",
+      "PDF 加密 bits 取值 40/128/256 与各自 /V /R 规格；PdfEditor 全部链式方法",
+      "BarCode 各码制输入位数约束与自动补校验位规则；默认 moduleWidth=2 heightPx=60 quiet=10（EAN/UPC=11）、QR module=4 quiet=4",
+      "CfbLimits.defaults() 十项真实上限（maxInputBytes=256MiB 等）",
+      "BuildFlags.ENFORCED_BY_DEFAULT 是构建期常量：默认 false（开发构建不降级），mvn -Prelease 为 true（发布版门控恒开不可关）",
+      "License 自动加载顺序：-Dofficia.license → OFFICIA_LICENSE → classpath /officia.lic → ./officia.lic",
+      "officia-all 已聚合 officia-license（demo pom 单独再引属显式冗余）",
+      "异常消息前缀分布可作故障域路标（MS-DOC 719 / CFB 105 / MS-ODRAW 85 / MS-OLEPS 53 …）",
+      "demo 测试台 32 个 /api 端点与 Batch.run() 的 10 个回归用例"
+    ],
+    "honest_disclaimers_carried": [
+      "doc 二进制输入：主链路可用且绿测覆盖，但未宣布生产就绪",
+      "明确不支持：加密 DOC(XOR/RC4/CryptoAPI)、WMF/EMF/PICT/CMYK JPEG 负载、宏/OLE/签名负载内部解析",
+      "已知缺口：竖排与 RTL 文本框、DOC 内嵌字体(EOT 规范未归档)",
+      "大文档吞吐与高并发未系统压测；CfbLimits 是内存安全边界而非容量承诺",
+      "流式 API 只省输出侧内存，输入与排版仍需整篇在内存",
+      "过时注释已标注：words/template/package-info.java 的『骨架预留』与实际实现不符"
+    ]
+  },
+  "not_included": {
+    "note": "以下刻意不做，避免与 ../officia 的开发者技能体系重叠或超出使用者关注范围",
+    "items": [
+      "洁净室合规 / 零依赖铁律 / IR 模型 / 排版引擎 / 字体子集 / render-pdf 后端等库内部实现技能（在 ../officia/.claude/skills）",
+      "Maven 发布 / GPG 签名 / staging（属库发布方职责）",
+      "任何携带真实 License 令牌的示例"
+    ]
+  }
+}

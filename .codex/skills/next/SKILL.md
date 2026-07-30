@@ -1,0 +1,62 @@
+---
+name: next
+description: |
+  /next - 根据当前所处阶段给出下一步建议
+
+  触发场景：
+  - 不知道接下来该做什么
+  - 刚接入完想知道下一步
+  - 要上线前想确认还差什么
+
+  触发词：/next、下一步、接下来、然后呢、还差什么、该做什么
+disable-model-invocation: false
+allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
+---
+# /next - 下一步建议
+
+根据用户当前所处阶段，给出接下来最该做的 1-3 件事。
+
+## 执行步骤
+
+### 1. 判断用户处在哪个阶段
+
+先看现场证据（不要问一堆问题）：
+
+```bash
+ls ~/.m2/repository/plus/ruoyi/ 2>/dev/null     # 本地仓有没有 officia
+ls target/*.jar 2>/dev/null                     # 有没有构建过
+ls officia.lic 2>/dev/null                      # 有没有放授权
+```
+
+| 阶段 | 判据 | 下一步建议 |
+|---|---|---|
+| **还没接入** | 本地仓没有 officia | `mvn install`（在 `../officia`）→ 引依赖 → 冒烟验证 → 技能 `officia-setup` |
+| **接好了没试过** | 有依赖，没跑过 | `/demo` 跑示例 → `/testbench` 上传真实文件实测 |
+| **试过了要选能力** | 已实测 | 用 `officia-capability-map` 定位方法 → `/convert` 出代码 |
+| **在写业务代码** | 已有调用代码 | 按能力激活对应技能；准备 `officia-spring-integration`（若要做接口） |
+| **遇到水印** | 输出有评估水印 | `/license` |
+| **中文有问题** | 方块 / 空白 | 技能 `officia-chinese-font` |
+| **报错了** | 抛 `OfficiaException` | 技能 `officia-troubleshooting`（先看异常消息前缀） |
+| **要上线** | 代码写完 | `/check` 自检 → 配授权注入 → 配中文字体 → 限并发与超时（`officia-performance`） |
+| **要升级** | 换版本 | 技能 `officia-upgrade` 的检查清单 |
+
+### 2. 给出建议
+
+每条建议必须是**可立即执行的动作**（一条命令、一个技能名、一段代码），不要给"你可以考虑一下……"这类空话。
+
+### 3. 顺带提醒最容易被忽略的两件事
+
+用户到上线阶段还没处理过的话，主动提：
+
+- **中文字体**：容器里默认没有中文字体，PDF 会是方块
+- **授权注入**：`.lic` 不要打进镜像，用挂载 / 环境变量；且发布版门控恒开
+
+## 输出格式
+
+```
+【当前阶段】<判断依据>
+【下一步】
+1. <具体动作> —— <一句话为什么>
+2. ...
+【顺带提醒】<若适用>
+```
