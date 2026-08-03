@@ -77,12 +77,17 @@ ooxml 解包
 
 ## `ConvertOptions`
 
-与 Words / Cells 通用（纸张 / 字体目录 / 嵌入字体 / 超时），见 `officia-words`。中文场景务必配 `fontDirectory`。
+与 Words / Cells 通用（纸张 / 字体目录 / 嵌入字体 / 图像降采样 / 超时），见 `officia-words`。中文场景务必配 `fontDirectory`。
 
 ```java
 ConvertOptions opts = ConvertOptions.defaults().setFontDirectory("/usr/share/fonts");
 byte[] pdf = OfficiaSlides.toPdfLayoutAware(pptx, opts);
 ```
+
+**设计型 PPT 尤其注意 `maxImageDpi`（默认 150）**：模板素材的图片像素数常远超它在页面上占的面积
+（实测一张 8684×8684 的底图只画到 724pt 宽 = 863 dpi）。按原始像素嵌入会让产物大得离谱——
+实测某 143 页模板 222 MB，开默认降采样后 105 MB、耗时也从 140 s 降到 62 s，肉眼看不出差别。
+要原始像素时 `setMaxImageDpi(0)`。
 
 ## 排查表
 
@@ -90,13 +95,27 @@ byte[] pdf = OfficiaSlides.toPdfLayoutAware(pptx, opts);
 |---|---|---|
 | 文字都在但位置全乱 / 挤成一列 | 用了内容提取式 `toPdf` | 改用 `toPdfLayoutAware` |
 | 页数与幻灯片数不一致 | 内容提取式按流式排版分页 | 要"一张一页"用 `toPdfLayoutAware` |
-| 图片 / 图表没出来 | 版式保真式当前按**形状文本**绝对摆放 | 先用测试台实测确认；复杂图形元素属预期差异 |
+| 某块内容整个空白 | 该元素类型不在支持范围（见下表） | 先用测试台实测确认是哪类元素 |
 | 母版上的元素丢了 | — | 用 `toPdfLayoutAware`（它处理 layout/master 继承） |
 | 中文方块 | 字体 | `officia-chinese-font` |
 | 有水印 | 未授权 + 门控开 | `officia-license` |
 
-> ⚠️ **不要凭猜断言"支持/不支持某类元素"**。PPT 元素类型多（SmartArt、图表、嵌入视频、动画…），拿不准就**用测试台上传真实文件实测**，或读
-> `../officia/officia-slides/src/main/java/plus/ruoyi/officia/slides/` 下 `SlidesLayoutParser` / `SlidesPdfRenderer` 的实现。
+### 版式保真式（`toPdfLayoutAware`）画得出什么
+
+以真实模板逐页比对 PowerPoint 导出的 PDF 得出（上游 `docs/fidelity-benchmark/small-modules-review.md`）：
+
+| 画得出 | 画不出（整块空白或退化） |
+|---|---|
+| 文本（含母版/版式继承、主题色与主题字体） | **SmartArt**（`dgm`）|
+| 图片（PNG/JPEG/GIF/BMP）| **嵌入视频 / 音频 / 动画** |
+| 形状与预设几何、自定义几何、渐变、阴影、透明度 | **数学公式**（OMML）|
+| 表格 | 文字的发光/描边等文本效果 |
+| 图表：折线 / 柱状 / 饼 / 圆环（含 3D 变体，按平面画）| 面积图**按折线**近似（不填充）|
+| 弧形艺术字（`prstTxWarp`）| 竖排书写方向（`vert="eaVert"`）|
+
+> ⚠️ 上表是**实测结论**，不是承诺清单。PPT 元素类型极多，遇到没列到的类型仍以**测试台上传真实文件实测**为准；
+> 要看细节就读 `../officia/officia-slides/src/main/java/plus/ruoyi/officia/slides/` 下
+> `SlidesLayoutParser` / `SlidesPdfRenderer` 的实现。
 
 ## 完整示例：两种模式并排输出对比
 

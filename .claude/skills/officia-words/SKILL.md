@@ -2,7 +2,7 @@
 name: officia-words
 description: |
   用 OfficiaWords 把 Word 转成 PDF：docx / doc（自动识别）、四种入参形态、流式转换省内存、
-  取页数与耗时、ConvertOptions 配置（纸张 / 字体目录 / 字体嵌入 / 超时）。
+  取页数与耗时、ConvertOptions 配置（纸张 / 字体目录 / 字体嵌入 / 图像降采样 / 超时）。
 
   触发场景：
   - Word 转 PDF、docx 转 PDF、doc 转 PDF
@@ -11,7 +11,7 @@ description: |
   - 要改纸张大小、指定字体目录
   - .doc 老格式能不能转、有什么限制
 
-  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4
+  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积
 disable-model-invocation: false
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 ---
@@ -85,6 +85,7 @@ ConvertOptions opts = ConvertOptions.defaults()
     .setDefaultPageSize(PageSize.A4)        // 默认 A4
     .setFontDirectory("/usr/share/fonts")   // 字体目录（中文关键，见 officia-chinese-font）
     .setEmbedFonts(true)                    // 默认 true
+    .setMaxImageDpi(150)                    // 位图降采样上限，0 = 不降采样
     .setTimeoutMillis(30_000);              // 0 = 不限制（默认）
 
 byte[] pdf = OfficiaWords.toPdf(docx, opts);
@@ -95,7 +96,10 @@ byte[] pdf = OfficiaWords.toPdf(docx, opts);
 | `defaultPageSize` | `PageSize.A4` | 可选 `A4` / `A5` / `A3` / `LETTER` / `LEGAL`。仅作**默认**——文档自身声明了纸张时以文档为准 |
 | `fontDirectory` | `null` | 指定字体扫描目录。中文文档必看 `officia-chinese-font` |
 | `embedFonts` | `true` | 嵌入字体子集，保证换机器显示一致 |
+| `maxImageDpi` | `150` | 位图按它在页面上占的面积降采样，超出部分是纯浪费。设 `0` 关闭、按源图原始像素嵌入 |
 | `timeoutMillis` | `0`（不限） | 超时保护，处理不可信来源文档时建议设 |
+
+**`maxImageDpi` 什么时候要改**：默认 150 dpi 屏幕阅读与一般打印看不出差别，能大幅压体积——实测某 143 页设计模板 222 MB → 105 MB，耗时也从 140 s 降到 62 s。只有**高精度印刷**或产物还要**二次编辑**时才设 `0` 保留原始像素，代价是体积可能大出数倍。JPEG 源图始终走字节直通、不受该项影响。
 
 `PageSize` 尺寸（PDF 点，1pt = 1/72 英寸）：`A4` 595.32×841.92、`A5` 419.58×595.32、`A3` 841.92×1190.7、`LETTER` 612×792、`LEGAL` 612×1008。
 
