@@ -86,7 +86,8 @@ ConvertOptions opts = ConvertOptions.defaults()
     .setFontDirectory("/usr/share/fonts")   // 字体目录（中文关键，见 officia-chinese-font）
     .setEmbedFonts(true)                    // 默认 true
     .setMaxImageDpi(150)                    // 位图降采样上限，0 = 不降采样
-    .setTimeoutMillis(30_000);              // 0 = 不限制（默认）
+    .setTimeoutMillis(30_000)               // 0 = 不限制（默认）
+    .setReportFontSubstitutions(true);      // 记录字体替换，默认 false
 
 byte[] pdf = OfficiaWords.toPdf(docx, opts);
 ```
@@ -98,6 +99,7 @@ byte[] pdf = OfficiaWords.toPdf(docx, opts);
 | `embedFonts` | `true` | 嵌入字体子集，保证换机器显示一致 |
 | `maxImageDpi` | `150` | 位图按它在页面上占的面积降采样，超出部分是纯浪费。设 `0` 关闭、按源图原始像素嵌入 |
 | `timeoutMillis` | `0`（不限） | 超时保护，处理不可信来源文档时建议设 |
+| `reportFontSubstitutions` | `false` | 记录字体替换/回退，经 `ConvertResult.getFontSubstitutions()` 取出。排查跨平台版式差异用，见 `officia-chinese-font` |
 
 **`maxImageDpi` 什么时候要改**：默认 150 dpi 屏幕阅读与一般打印看不出差别，能大幅压体积——实测某 143 页设计模板 222 MB → 105 MB，耗时也从 140 s 降到 62 s。只有**高精度印刷**或产物还要**二次编辑**时才设 `0` 保留原始像素，代价是体积可能大出数倍。JPEG 源图始终走字节直通、不受该项影响。
 
