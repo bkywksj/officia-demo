@@ -210,6 +210,9 @@ public final class DemoServer {
         System.out.println("  中文字体： " + (Fonts.available() ? "已探测到系统 TTF（PDF 中文水印可用）"
             : "未探测到（PDF 中文水印请在界面上传 TTF）"));
         System.out.println("  运行依赖： 仅 JDK + officia（运行时零第三方依赖）");
+        // 大文件（设计型 PPTX 常上百 MB）撞上限时，用户第一反应是"传不上去"，先把边界摆出来
+        System.out.println("  内存上限： 最大堆 " + Http.humanSize(Runtime.getRuntime().maxMemory())
+            + "，单次上传上限 " + Http.humanSize(Http.MAX_BODY_BYTES) + "（java -Xmx4g -jar … 可调大）");
         System.out.println();
         System.out.println("  按 Ctrl+C 停止");
         System.out.println(line);

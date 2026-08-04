@@ -22,8 +22,13 @@ public final class Store {
 
     /** 最多保留的条目数。 */
     private static final int MAX_ENTRIES = 200;
-    /** 最多占用的总字节（512 MB）——测试台跑在本机，给足又不至于吃垮 JVM。 */
-    private static final long MAX_BYTES = 512L * 1024 * 1024;
+    /**
+     * 最多占用的总字节：按 JVM 最大堆的 1/4 取，至少 512 MB。
+     *
+     * <p>写死 512 MB 会在大文件场景立刻打满——一份 150 MB 的设计型 PPTX 加上转换产出与后续 PDF 操作的
+     * 中间产物就逼近上限，导致刚上传的源文件被 LRU 逐出、下一步操作报「找不到文件 id」。跟着堆走更合理。</p>
+     */
+    private static final long MAX_BYTES = Math.max(512L * 1024 * 1024, Runtime.getRuntime().maxMemory() / 4);
 
     /** 一条 Blob：字节 + 展示名 + MIME + 附带指标。 */
     public static final class Blob {
@@ -102,7 +107,7 @@ public final class Store {
         Blob b = new Blob(id, name, mime, data);
         BLOBS.put(id, b);
         totalBytes += data.length;
-        evictIfNeeded();
+        evictIfNeeded(id);
         return b;
     }
 
@@ -136,11 +141,19 @@ public final class Store {
         totalBytes = 0;
     }
 
-    /** 超出条目数或总字节上限时，按 LRU 逐出最久未访问的条目。 */
-    private static void evictIfNeeded() {
+    /**
+     * 超出条目数或总字节上限时，按 LRU 逐出最久未访问的条目。
+     *
+     * @param keepId 本次刚存入的 id，永不逐出——否则单个大文件就能把自己挤掉，
+     *               调用方拿着刚返回的 id 下一步就报「找不到文件」
+     */
+    private static void evictIfNeeded(String keepId) {
         Iterator<Map.Entry<String, Blob>> it = BLOBS.entrySet().iterator();
         while (it.hasNext() && (BLOBS.size() > MAX_ENTRIES || totalBytes > MAX_BYTES)) {
             Map.Entry<String, Blob> eldest = it.next();
+            if (eldest.getKey().equals(keepId)) {
+                continue;
+            }
             totalBytes -= eldest.getValue().data.length;
             it.remove();
         }

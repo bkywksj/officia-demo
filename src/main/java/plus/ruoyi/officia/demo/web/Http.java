@@ -21,8 +21,19 @@ import java.util.Map;
  */
 final class Http {
 
-    /** 单次请求体上限（100 MB）：防止误传超大文件把测试台 JVM 撑爆。 */
-    static final int MAX_BODY_BYTES = 100 * 1024 * 1024;
+    /**
+     * 单次请求体上限：按 JVM 最大堆的 1/8 取，夹在 [64 MB, 1 GB] 之间。
+     *
+     * <p>不写死 100 MB 的原因：设计型 PPTX、高清图册动辄一两百 MB，写死会把正常文件挡在门外；
+     * 但小堆机器上放任 1 GB 又会 OOM。上传件要在内存里驻留（{@link Store}）并参与转换，
+     * 取 1/8 能给「源文件 + 中间态 + 产出」都留出余量。用 {@code -Xmx} 调大堆即同步放宽。</p>
+     */
+    static final long MAX_BODY_BYTES = maxBodyBytes();
+
+    private static long maxBodyBytes() {
+        long byHeap = Runtime.getRuntime().maxMemory() / 8;
+        return Math.max(64L * 1024 * 1024, Math.min(1024L * 1024 * 1024, byHeap));
+    }
 
     /** 扩展名 → MIME 静态表（比一长串 if 可读、可扩展）。 */
     private static final Map<String, String> MIME = new LinkedHashMap<>();
@@ -84,17 +95,47 @@ final class Http {
             ByteArrayOutputStream out = new ByteArrayOutputStream(8192);
             byte[] buf = new byte[8192];
             int n;
-            int total = 0;
+            long total = 0;
             while ((n = in.read(buf)) > 0) {
                 total += n;
                 if (total > MAX_BODY_BYTES) {
+                    long actual = drain(in, total);
                     throw new PayloadTooLargeException(
-                        "请求体超过上限 " + (MAX_BODY_BYTES / 1024 / 1024) + " MB");
+                        "文件 " + humanSize(actual) + " 超过单次上传上限 " + humanSize(MAX_BODY_BYTES)
+                            + "（启动时加 -Xmx 调大堆可同步放宽上限）");
                 }
                 out.write(buf, 0, n);
             }
             return out.toByteArray();
         }
+    }
+
+    /**
+     * 丢弃剩余请求体，只计数不留存。
+     *
+     * <p>🔴 超限后<b>必须</b>把客户端仍在发的字节读完再回 413：否则 HttpServer 收尾 exchange 时
+     * 会直接断开底层连接，浏览器 fetch 拿到的是 <code>TypeError: Failed to fetch</code>，
+     * 413 响应体里那句可读的错误根本送不到前端——用户只看见"Failed to fetch"，无从判断原因。</p>
+     *
+     * @param already 已读入的字节数
+     * @return 请求体实际总字节（用于把真实体积写进错误消息）；触及兜底上限时为估算下界
+     */
+    private static long drain(InputStream in, long already) throws IOException {
+        // 兜底：异常大的流不无限读下去，读满 4 倍上限就放弃（此时连接断开也认了）
+        long limit = MAX_BODY_BYTES * 4;
+        byte[] sink = new byte[8192];
+        long total = already;
+        int n;
+        while (total < limit && (n = in.read(sink)) > 0) {
+            total += n;
+        }
+        return total;
+    }
+
+    /** 字节数转易读文本（错误消息与启动横幅共用）：不足 1 GB 用 MB，否则用 GB。 */
+    static String humanSize(long bytes) {
+        double mib = bytes / 1024.0 / 1024.0;
+        return mib < 1024 ? String.format("%.1f MB", mib) : String.format("%.1f GB", mib / 1024.0);
     }
 
     /** 请求体超限（映射为 HTTP 413）。 */
