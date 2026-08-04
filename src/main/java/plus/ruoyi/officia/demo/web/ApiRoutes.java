@@ -68,9 +68,13 @@ final class ApiRoutes {
 
     private static void registerCore(Router r) {
         // 注意：lambda 在请求时才执行，此时 ROUTER 已完成初始化，可安全调用 endpointCount()
+        // maxUpload 供前端在发请求前预检文件体积：超限的请求一旦发出去，服务端中止读取会导致
+        // 连接被 RST，浏览器只报 "Failed to fetch"，看不到真正的原因（见 Http.drain 的说明）。
         r.add("/api/health", (ex, q) -> Http.json(ex, Json.obj()
             .put("ok", true).put("blobs", Store.size()).put("bytes", Store.bytesUsed())
-            .put("endpoints", endpointCount()).end()));
+            .put("endpoints", endpointCount())
+            .put("maxUpload", Http.MAX_BODY_BYTES)
+            .put("maxHeap", Runtime.getRuntime().maxMemory()).end()));
 
         r.add("/api/upload", (ex, q) -> {
             byte[] data = Http.body(ex);
@@ -269,8 +273,8 @@ final class ApiRoutes {
         r.add("/api/slides/topdf", (ex, q) -> {
             byte[] src = Store.bytes(q.get("id"));
             long t0 = System.nanoTime();
-            byte[] pdf = "true".equals(q.get("layout"))
-                ? OfficiaSlides.toPdfLayoutAware(src) : OfficiaSlides.toPdf(src);
+            // toPdf 即版式保真（形状绝对定位、每张幻灯片一页），不再有模式分支
+            byte[] pdf = OfficiaSlides.toPdf(src);
             Http.json(ex, result("slides.pdf", "application/pdf", pdf, t0).end());
         });
     }

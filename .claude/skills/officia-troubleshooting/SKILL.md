@@ -85,7 +85,7 @@ officia 的异常消息用统一前缀标注问题发生在哪一层（核实自
 │   ├─ 源文档本身就是空的？先 pageCount / extractText 验证
 │   └─ 版式引擎未覆盖的元素类型 → 用测试台对比确认
 ├─ 版式与 Word/PPT 里不一致
-│   ├─ PPT：可能用错了模式 → toPdfLayoutAware，见 officia-slides
+│   ├─ PPT：某类元素画不出（SmartArt / 公式 / 视频）→ 见 officia-slides 的能力边界表
 │   └─ Word：自研排版引擎非逐像素复刻，复杂版式差异属预期
 ├─ 表格/循环没渲染
 │   └─ 模板语法问题 → officia-template 的排查表

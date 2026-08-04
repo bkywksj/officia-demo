@@ -201,9 +201,9 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
           <i data-lucide="file-up" class="w-8 h-8 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">上传 .pptx</div></div>
         <input type="file" id="slidesFile" class="hidden" accept=".pptx" onchange="upload(this.files[0],'slides')">
         <div id="slidesInfo" class="mt-3 text-xs text-slate-400">尚未选择文件</div>
-        <div class="mt-4 space-y-2">
-          <label class="flex items-start gap-2.5 border border-slate-200 rounded-md p-3 cursor-pointer hover:border-primary transition"><input type="radio" name="sm" value="false" checked class="mt-0.5 cursor-pointer"><div><div class="text-sm font-medium">标准模式</div><div class="text-xs text-slate-500 mt-0.5">toPdf — 内容提取</div></div></label>
-          <label class="flex items-start gap-2.5 border border-slate-200 rounded-md p-3 cursor-pointer hover:border-primary transition"><input type="radio" name="sm" value="true" class="mt-0.5 cursor-pointer"><div><div class="text-sm font-medium">版式保真</div><div class="text-xs text-slate-500 mt-0.5">toPdfLayoutAware</div></div></label>
+        <div class="mt-4 border border-slate-200 rounded-md p-3 bg-slate-50">
+          <div class="text-sm font-medium">版式保真</div>
+          <div class="text-xs text-slate-500 mt-0.5">OfficiaSlides.toPdf — 形状按 a:xfrm 绝对定位，每张幻灯片一页</div>
         </div>
         <button onclick="slidesRun()" class="w-full mt-4 bg-primary text-white py-2.5 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i>转换</button>
       </div>
@@ -394,15 +394,34 @@ function drop(e,key){e.preventDefault();e.currentTarget.classList.remove('over')
 function fmt(n){return n>1048576?(n/1048576).toFixed(1)+' MB':n>1024?(n/1024).toFixed(0)+' KB':n+' B'}
 
 async function api(path,opt){
-  const r=await fetch(path,opt);
+  let r;
+  try{r=await fetch(path,opt)}
+  catch(e){
+    // fetch 只在网络层失败时抛 TypeError（message 恒为 "Failed to fetch"），照搬毫无信息量。
+    // 本机测试台只可能是这几种：服务停了、请求体过大被中止、转换途中进程崩了。
+    throw new Error('连接中断：服务已停止，或文件过大 / 转换途中 JVM 退出（看启动测试台的那个控制台窗口）');
+  }
   const ct=r.headers.get('content-type')||'';
   if(!ct.includes('json')){if(!r.ok)throw new Error('HTTP '+r.status);return {}}
   const j=await r.json();
   if(!r.ok||j.error)throw new Error(j.message||('HTTP '+r.status));
   return j;
 }
+// 单次上传上限（字节），启动时从 /api/health 取真实值；取不到就按服务端的下限 64 MB 保守估
+let MAX_UPLOAD=64*1048576;
+async function loadLimits(){
+  try{const j=await api('/api/health');if(j.maxUpload)MAX_UPLOAD=j.maxUpload}catch(e){}
+}
+/** 发请求前拦下超限文件：超限的请求发出去只会得到无意义的 "Failed to fetch"。 */
+function tooLarge(file){
+  if(file.size<=MAX_UPLOAD)return false;
+  toast(file.name+' 有 '+fmt(file.size)+'，超过单次上传上限 '+fmt(MAX_UPLOAD)
+    +'（给 java 加 -Xmx 参数调大堆即可放宽）',false);
+  return true;
+}
 async function upload(file,key){
   if(!file)return;
+  if(tooLarge(file))return;
   try{
     const j=await api('/api/upload?name='+encodeURIComponent(file.name),{method:'POST',body:file});
     S[key]=j.id;
@@ -414,6 +433,7 @@ async function upload(file,key){
 async function uploadMulti(files,key){
   S[key+'s']=S[key+'s']||[];
   for(const f of files){
+    if(tooLarge(f))continue;
     try{const j=await api('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:f});
       S[key+'s'].push(j);S[key]=j.id;}catch(e){toast(e.message,false)}
   }
@@ -527,7 +547,7 @@ async function csvParse(){
 async function slidesRun(){
   if(!need('slides','请先上传 .pptx'))return;
   busy('slidesOut','转换中…');
-  try{const j=await api('/api/slides/topdf?id='+S.slides+'&layout='+document.querySelector('input[name=sm]:checked').value,{method:'POST'});
+  try{const j=await api('/api/slides/topdf?id='+S.slides,{method:'POST'});
     show('slidesOut',card('PPTX → PDF',j));logTask('Slides',j);toast('完成，'+j.pages+' 页');
   }catch(e){show('slidesOut','');toast(e.message,false)}
 }
@@ -720,7 +740,7 @@ async function loadSamples(){
 }
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
-lucide.createIcons();refreshLic();
+lucide.createIcons();refreshLic();loadLimits();
 </script>
 </body>
 </html>

@@ -33,6 +33,7 @@ mvn -o package                                          # 产出自包含 jar（
 java -jar target/officia-demo-1.0.0.jar                 # 启动，自动打开浏览器
 java -jar target/officia-demo-1.0.0.jar 9090            # 指定端口
 java -jar target/officia-demo-1.0.0.jar 9090 --no-open  # 不自动开浏览器
+java -Xmx8g -jar target/officia-demo-1.0.0.jar          # 大文件（设计型 PPTX 常上百 MB）建议调大堆
 ```
 
 启动细节（核实自 `DemoServer.java`）：
@@ -40,6 +41,7 @@ java -jar target/officia-demo-1.0.0.jar 9090 --no-open  # 不自动开浏览器
 - 绑定 **`127.0.0.1`**——只有本机可访问（不对外网暴露）
 - 端口被占时会**自动往后找可用端口**，以控制台打印的实际地址为准
 - 控制台会打印访问链接，并显示**是否探测到中文字体**（最快的字体环境自检）
+- 控制台还会打印**最大堆与单次上传上限**：上限 = 最大堆的 1/8，夹在 [64 MB, 1 GB]，用 `-Xmx` 调大堆即放宽
 - Windows 控制台是 GBK 而 JVM 默认 UTF-8，`DemoServer` 已做编码处理避免中文乱码
 
 > 前置：本地仓要有 officia。没有就先在 `../officia` 跑 `mvn install -DskipTests`，见 `officia-setup`。
@@ -51,7 +53,7 @@ java -jar target/officia-demo-1.0.0.jar 9090 --no-open  # 不自动开浏览器
 | **Words · DOC/DOCX** | 上传 `.doc`（CFB）/`.docx`（OOXML）→ PDF，**自动识别格式**；字节 / 流式两种输出 | `officia-words` |
 | **模板填充 · 邮件合并** | 模板 + JSON → 单条 / 合并一份 / 每条一份 / 只填 docx | `officia-template` |
 | **Cells · XLSX/CSV** | XLSX→PDF、XLSX→CSV、CSV→PDF、CSV 解析、单元格公式求值、整表重算 | `officia-cells` |
-| **Slides · PPTX** | PPTX→PDF，**标准 / 版式保真双模式**并排 | `officia-slides` |
+| **Slides · PPTX** | PPTX→PDF（版式保真），看页数 / 耗时 / 体积并内嵌预览 | `officia-slides` |
 | **PDF 工具箱** | 合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图片·RC4-128·AES-256·信息 | `officia-pdf` |
 | **Imaging · 图像** | 滤镜/变换全项 + 格式转换 + 图片→PDF，**处理前后并排对比** | `officia-imaging` |
 | **BarCode · 条码** | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR（4 档纠错）+ **全码制一键预览** | `officia-barcode` |
@@ -139,7 +141,8 @@ curl -X POST http://127.0.0.1:8080/api/batch/run     # 全能力回归，返回 
 | 端口被占 | — | 会自动换端口，看控制台实际地址；或显式传端口 |
 | 别的机器访问不了 | 绑定的是 `127.0.0.1` | 设计如此（本机工具，不对外暴露） |
 | 控制台中文乱码 | Windows GBK vs JVM UTF-8 | `DemoServer` 已处理；若仍乱码，终端设 UTF-8 代码页 |
-| 上传大文件失败 | 上传只存内存 | 用小文件验证；生产场景的大文件走你自己的服务 |
+| 上传时前端弹「超过单次上传上限」 | 单次上传上限 = 最大堆的 1/8，夹在 [64 MB, 1 GB]（启动横幅有打印） | `java -Xmx8g -jar …` 调大堆，上限随之放宽 |
+| 上传时前端弹「连接中断」 | 服务已停 / 转换途中 JVM 退出 | 看启动测试台那个控制台窗口的输出 |
 | 重启后上传的文件没了 | 设计如此——只存内存、不落盘 | 需要留存请自行保存下载结果 |
 | 转换结果有水印 | 未授权 + 门控开 | `officia-license` |
 

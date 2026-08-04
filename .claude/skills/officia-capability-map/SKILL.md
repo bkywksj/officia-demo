@@ -8,7 +8,7 @@ description: |
   - 不知道该用哪个门面 / 哪个方法
   - 问"officia 能不能做 X"、"支持不支持 Y 格式"
   - 要做能力选型、评估 officia 是否满足需求
-  - 同一件事有多个方法（如 Slides 两种模式、PDF 单次 vs 链式），不知道选哪个
+  - 同一件事有多个方法（如 PDF 单次 vs 链式、Words 直出字节 vs 直写流），不知道选哪个
 
   触发词：能力、支持、能不能、选型、用哪个、怎么选、全景、清单、方法选择、能做什么、限制
 disable-model-invocation: false
@@ -37,7 +37,7 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 | `.xlsx` | CSV 文本 | `OfficiaCells.toCsv(byte[])` | `officia-cells` |
 | CSV 文本 | PDF | `OfficiaCells.csvToPdf(String)` | `officia-cells` |
 | CSV 文本 | 行列网格 | `OfficiaCells.parseCsv(String)` | `officia-cells` |
-| `.pptx` | PDF | `OfficiaSlides.toPdf(byte[])` 或 `toPdfLayoutAware(byte[])` | `officia-slides` |
+| `.pptx` | PDF | `OfficiaSlides.toPdf(byte[])` | `officia-slides` |
 | 多个 PDF | 一个 PDF | `OfficiaPdf.merge(List<byte[]>)` | `officia-pdf` |
 | 一个 PDF | 多个单页 PDF | `OfficiaPdf.split(byte[])` | `officia-pdf` |
 | PDF | 纯文本 | `OfficiaPdf.extractText(byte[])` | `officia-pdf` |
@@ -55,8 +55,7 @@ OfficiaWords.toPdf(docx)                    // Word（docx / doc 自动识别）
 OfficiaWords.fillTemplateToPdf(tpl, data)   // 模板填充后直出 PDF（一步）
 OfficiaCells.toPdf(xlsx)                    // Excel
 OfficiaCells.csvToPdf(csvText)              // CSV
-OfficiaSlides.toPdf(pptx)                   // PPT（内容提取式）
-OfficiaSlides.toPdfLayoutAware(pptx)        // PPT（版式保真式，绝对定位）
+OfficiaSlides.toPdf(pptx)                   // PPT（版式保真，每张幻灯片一页）
 OfficiaImaging.toPdf(imageBytes)            // 单张图片 → PDF
 OfficiaImaging.toPdf(List<byte[]> images)   // 多张图片 → 一份 PDF
 OfficiaEmail.toPdf(eml)                     // 邮件归档 → PDF
@@ -68,7 +67,6 @@ OfficiaEmail.toPdf(eml)                     // 邮件归档 → PDF
 |---|---|---|---|
 | Words 输出形态 | `toPdf(byte[])` → `byte[]` | `toPdf(byte[], OutputStream)` → 页数 | 大文档 / 直写 HTTP 响应用 B（省一份整份 PDF 的内存），普通用 A |
 | Words 要不要页数耗时 | `toPdf(...)` | `convert(...)` → `ConvertResult` | 需要 `getPageCount()` / `getCostMillis()` 用 B |
-| Slides 转换模式 | `toPdf`（内容提取式） | `toPdfLayoutAware`（版式保真式） | 只要文字齐全用 A；要贴近原稿版式（形状绝对坐标）用 B |
 | PDF 多步操作 | 逐个静态方法 | `OfficiaPdf.edit(pdf).xxx().yyy().toBytes()` | 两步以上用链式 `PdfEditor`，少一轮解析/序列化 |
 | Cells 公式求值 | `evaluateFormula(Map, ref)` | `evaluateXlsxCell(xlsx, ref)` | 没有 xlsx、只想算一张散列表用 A；对真实 xlsx 实算用 B |
 | 模板批量 | `fillTemplateEach` → N 份 | `fillTemplateMerged` → 1 份长文档 | 每人一份文件用 A；打印/归档成一份用 B |

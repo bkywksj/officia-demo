@@ -46,7 +46,7 @@ ConvertOptions opts = ConvertOptions.defaults()
 
 byte[] pdf = OfficiaWords.toPdf(docx, opts);
 byte[] pdf = OfficiaCells.toPdf(xlsx, opts);
-byte[] pdf = OfficiaSlides.toPdfLayoutAware(pptx, opts);
+byte[] pdf = OfficiaSlides.toPdf(pptx, opts);
 byte[] pdf = OfficiaEmail.toPdf(eml, opts);
 byte[] pdf = OfficiaCells.csvToPdf(csv, opts);
 ```

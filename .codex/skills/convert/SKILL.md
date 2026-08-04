@@ -28,7 +28,7 @@ allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
    | docx 模板 + 数据 → PDF | `OfficiaWords.fillTemplateToPdf(tpl, data)` |
    | xlsx → PDF / CSV | `OfficiaCells.toPdf(...)` / `toCsv(...)` |
    | CSV → PDF | `OfficiaCells.csvToPdf(String)` |
-   | pptx → PDF | `OfficiaSlides.toPdf(...)` / `toPdfLayoutAware(...)` |
+   | pptx → PDF | `OfficiaSlides.toPdf(...)` |
    | 图片 → PDF | `OfficiaImaging.toPdf(...)` |
    | eml → PDF | `OfficiaEmail.toPdf(...)` |
    | PDF ↔ PDF | `OfficiaPdf.*` / `OfficiaPdf.edit(...)` 链式 |

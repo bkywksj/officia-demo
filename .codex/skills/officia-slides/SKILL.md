@@ -1,16 +1,16 @@
 ---
 name: officia-slides
 description: |
-  用 OfficiaSlides 把 PPTX 转成 PDF：内容提取式与版式保真式两种模式的差异、如何选、
-  以及各自的适用场景与局限。
+  用 OfficiaSlides 把 PPTX 转成 PDF：版式保真转换的做法、能力边界（画得出什么 / 画不出什么）、
+  ConvertOptions 配置与常见问题排查。
 
   触发场景：
   - PPT 转 PDF、pptx 转 PDF
   - 转出来的版式跑掉了 / 文字位置不对
-  - 不知道 toPdf 和 toPdfLayoutAware 选哪个
   - 要幻灯片一张一页
+  - 设计型 PPT 转出来体积过大
 
-  触发词：PPT、pptx、幻灯片、演示文稿、转PDF、版式、保真、layoutAware、母版、占位符
+  触发词：PPT、pptx、幻灯片、演示文稿、转PDF、版式、保真、母版、占位符
 disable-model-invocation: false
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 ---
@@ -19,49 +19,37 @@ allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 
 ## 概述
 
-`OfficiaSlides` 提供**两种转换模式**，这是它与其它门面最大的不同——选错模式是最常见的困惑来源。
-
-## 两种模式对照
-
-| | `toPdf`（内容提取式） | `toPdfLayoutAware`（版式保真式） |
-|---|---|---|
-| 做法 | 各幻灯片**文本框内容归一为 IR**，复用 engine 流式排版 + render-pdf | 解析形状**绝对定位几何**（`a:xfrm`）与占位符 layout/master 继承，文本按形状坐标绝对摆放 |
-| 分页 | 幻灯片间分页 | **每张幻灯片一页** |
-| 文字完整性 | ✅ 齐全 | ✅ 齐全 |
-| 版式还原 | ❌ 无绝对定位 | ✅ 贴近原稿 |
-| 中文 | 走 render-pdf 的 CID 子集嵌入 | 同左 |
-| 适合 | 提取内容 / 存档 / 全文检索 | 给人看的演示稿归档 |
+`OfficiaSlides.toPdf` 做**版式保真**转换：解析形状绝对定位几何（`a:xfrm`）与占位符 layout/master 继承，
+按形状坐标绝对摆放，**每张幻灯片一页**。用法与 `OfficiaWords` / `OfficiaCells` 完全一致。
 
 ```java
 import plus.ruoyi.officia.slides.OfficiaSlides;
 
-byte[] pdf1 = OfficiaSlides.toPdf(pptxBytes);             // 内容提取式
-byte[] pdf2 = OfficiaSlides.toPdfLayoutAware(pptxBytes);  // 版式保真式（推荐给人看的场景）
+byte[] pdf = OfficiaSlides.toPdf(pptxBytes);
 ```
-
-> **一句话选型**：要"看起来像原来的 PPT" → `toPdfLayoutAware`；只要"文字都在、能搜到" → `toPdf`。
 
 ## 全部方法（核实自 `OfficiaSlides` 源码）
 
 ```java
-// 内容提取式
 byte[] toPdf(byte[] pptx)
 byte[] toPdf(byte[] pptx, ConvertOptions options)
 byte[] toPdf(InputStream in)          // 读取后不主动关闭调用方的流
 byte[] toPdf(File file)
 ConvertResult convert(byte[] pptx, ConvertOptions options)   // 富结果：页数 + 耗时
-
-// 版式保真式
-byte[] toPdfLayoutAware(byte[] pptx)
-byte[] toPdfLayoutAware(byte[] pptx, ConvertOptions options)
 ```
 
-> 注意：**版式保真式没有 `InputStream` / `File` 重载**，也没有 `convert` 富结果版。需要时自己先读成 `byte[]`：
-> ```java
-> byte[] pdf = OfficiaSlides.toPdfLayoutAware(Files.readAllBytes(Path.of("in.pptx")));
-> ```
+页数即幻灯片数（每张一页），`convert(...).getPageCount()` 可直接拿到。
 
-## 版式保真式的内部流程（理解它的能力边界）
+## 只要纯文本时
+
+不需要另一条转换链——对产物再抽一次即可，而且拿到的文字比"只读文本框"更全
+（保真链解析了 layout/master 占位符继承）：
+
+```java
+String text = OfficiaPdf.extractText(OfficiaSlides.toPdf(pptx));
+```
+
+## 内部流程（理解它的能力边界）
 
 ```
 ooxml 解包
@@ -75,13 +63,16 @@ ooxml 解包
 - 走的是**绝对坐标渲染**，不做流式重排——所以位置准，但也不会自动避让/回流
 - 中文经 render-pdf 的 CID 子集嵌入
 
+> 幻灯片是「绝对定位画布」，形状位置由 `a:xfrm` 直接给定，没有 Word/Excel 那种文字流与分页语义。
+> 因此 slides 是三条产品线里唯一不经 engine 排版、直接从自有模型渲染的一条。
+
 ## `ConvertOptions`
 
 与 Words / Cells 通用（纸张 / 字体目录 / 嵌入字体 / 图像降采样 / 超时），见 `officia-words`。中文场景务必配 `fontDirectory`。
 
 ```java
 ConvertOptions opts = ConvertOptions.defaults().setFontDirectory("/usr/share/fonts");
-byte[] pdf = OfficiaSlides.toPdfLayoutAware(pptx, opts);
+byte[] pdf = OfficiaSlides.toPdf(pptx, opts);
 ```
 
 **设计型 PPT 尤其注意 `maxImageDpi`（默认 150）**：模板素材的图片像素数常远超它在页面上占的面积
@@ -93,15 +84,13 @@ byte[] pdf = OfficiaSlides.toPdfLayoutAware(pptx, opts);
 
 | 现象 | 原因 | 处置 |
 |---|---|---|
-| 文字都在但位置全乱 / 挤成一列 | 用了内容提取式 `toPdf` | 改用 `toPdfLayoutAware` |
-| 页数与幻灯片数不一致 | 内容提取式按流式排版分页 | 要"一张一页"用 `toPdfLayoutAware` |
 | 某块内容整个空白 | 该元素类型不在支持范围（见下表） | 先用测试台实测确认是哪类元素 |
-| 母版上的元素丢了 | — | 用 `toPdfLayoutAware`（它处理 layout/master 继承） |
 | 某张图偏暗 / 颜色不对 / 挡住内容 | SVG、WMF/EMF 元文件、WDP 等 JDK 解不开的格式会被跳过（少一张，不影响其余） | 用测试台实测；把该图另存为 PNG/JPEG 再放回 PPT |
+| 产物体积过大 / 转换很慢 | 素材图按原始像素嵌入 | 保持默认 `maxImageDpi=150`，别设 0 |
 | 中文方块 | 字体 | `officia-chinese-font` |
 | 有水印 | 未授权 + 门控开 | `officia-license` |
 
-### 版式保真式（`toPdfLayoutAware`）画得出什么
+### 画得出什么
 
 以真实模板逐页比对 PowerPoint 导出的 PDF 得出（上游 `docs/fidelity-benchmark/small-modules-review.md`）：
 
@@ -118,25 +107,27 @@ byte[] pdf = OfficiaSlides.toPdfLayoutAware(pptx, opts);
 > 要看细节就读 `../officia/officia-slides/src/main/java/plus/ruoyi/officia/slides/` 下
 > `SlidesLayoutParser` / `SlidesPdfRenderer` 的实现。
 
-## 完整示例：两种模式并排输出对比
+## 完整示例
 
 ```java
 import plus.ruoyi.officia.slides.OfficiaSlides;
+import plus.ruoyi.officia.engine.api.ConvertResult;
+import plus.ruoyi.officia.engine.api.ConvertOptions;
 import java.nio.file.*;
 
-public class PptxCompare {
+public class PptxToPdf {
     public static void main(String[] args) throws Exception {
         byte[] pptx = Files.readAllBytes(Path.of("deck.pptx"));
-        Files.write(Path.of("deck-content.pdf"), OfficiaSlides.toPdf(pptx));
-        Files.write(Path.of("deck-layout.pdf"),  OfficiaSlides.toPdfLayoutAware(pptx));
-        System.out.println("两种模式已输出，打开对比后再决定生产用哪个");
+        ConvertResult r = OfficiaSlides.convert(pptx, ConvertOptions.defaults());
+        Files.write(Path.of("deck.pdf"), r.getData());
+        System.out.println(r.getPageCount() + " 页，耗时 " + r.getCostMillis() + " ms");
     }
 }
 ```
 
 ## 在测试台里实测
 
-面板 **「Slides · PPTX」**：上传 pptx，**标准 / 版式保真双模式**并排产出，直接看差异。
+面板 **「Slides · PPTX」**：上传 pptx 直接转换，看页数 / 耗时 / 体积并内嵌预览。
 端点 `/api/slides/topdf`。
 
 ## 相关技能
