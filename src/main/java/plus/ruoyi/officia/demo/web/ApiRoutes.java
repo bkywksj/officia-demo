@@ -165,7 +165,8 @@ final class ApiRoutes {
             } else {
                 pdf = OfficiaWords.toPdf(src);     // 自动识别 DOCX(OOXML) / DOC(CFB)
             }
-            Http.json(ex, result("words.pdf", "application/pdf", pdf, t0).end());
+            Http.json(ex, result(outName(q.get("id"), "pdf", "words.pdf"),
+                "application/pdf", pdf, t0).end());
         });
 
         r.add("/api/words/template", (ex, q) -> {
@@ -178,22 +179,25 @@ final class ApiRoutes {
                     List<byte[]> list = OfficiaWords.fillTemplateEachToPdf(tpl, parseJsonArray(json));
                     List<Object> arr = new ArrayList<>();
                     for (int i = 0; i < list.size(); i++) {
-                        arr.add(store("填充结果-" + (i + 1) + ".pdf", "application/pdf", list.get(i), t0).toJson());
+                        arr.add(store(outName(q.get("tplId"), "填充" + (i + 1), "pdf", "填充结果.pdf"),
+                            "application/pdf", list.get(i), t0).toJson());
                     }
                     Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
                     break;
                 }
                 case "merged":
-                    Http.json(ex, result("邮件合并.pdf", "application/pdf",
+                    Http.json(ex, result(outName(q.get("tplId"), "邮件合并", "pdf", "邮件合并.pdf"),
+                        "application/pdf",
                         OfficiaWords.fillTemplateMergedToPdf(tpl, json), t0).end());
                     break;
                 case "docx":
-                    Http.json(ex, result("填充结果.docx",
+                    Http.json(ex, result(outName(q.get("tplId"), "填充", "docx", "填充结果.docx"),
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         OfficiaWords.fillTemplate(tpl, json), t0).end());
                     break;
                 default:
-                    Http.json(ex, result("填充结果.pdf", "application/pdf",
+                    Http.json(ex, result(outName(q.get("tplId"), "填充", "pdf", "填充结果.pdf"),
+                        "application/pdf",
                         OfficiaWords.fillTemplateToPdf(tpl, json), t0).end());
             }
         });
@@ -221,14 +225,15 @@ final class ApiRoutes {
     private static void registerCells(Router r) {
         r.add("/api/cells/topdf", (ex, q) -> {
             long t0 = System.nanoTime();
-            Http.json(ex, result("cells.pdf", "application/pdf",
+            Http.json(ex, result(outName(q.get("id"), "pdf", "cells.pdf"), "application/pdf",
                 OfficiaCells.toPdf(Store.bytes(q.get("id"))), t0).end());
         });
 
         r.add("/api/cells/tocsv", (ex, q) -> {
             long t0 = System.nanoTime();
             String csv = OfficiaCells.toCsv(Store.bytes(q.get("id")));
-            Http.json(ex, result("cells.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8), t0)
+            Http.json(ex, result(outName(q.get("id"), "csv", "cells.csv"),
+                    "text/csv", csv.getBytes(StandardCharsets.UTF_8), t0)
                 .put("text", csv.length() > 20000 ? csv.substring(0, 20000) + "\n…" : csv).end());
         });
 
@@ -275,7 +280,8 @@ final class ApiRoutes {
             long t0 = System.nanoTime();
             // toPdf 即版式保真（形状绝对定位、每张幻灯片一页），不再有模式分支
             byte[] pdf = OfficiaSlides.toPdf(src);
-            Http.json(ex, result("slides.pdf", "application/pdf", pdf, t0).end());
+            Http.json(ex, result(outName(q.get("id"), "pdf", "slides.pdf"),
+                "application/pdf", pdf, t0).end());
         });
     }
 
@@ -293,7 +299,7 @@ final class ApiRoutes {
 
         r.add("/api/pdf/merge", (ex, q) -> {
             long t0 = System.nanoTime();
-            Http.json(ex, result("合并.pdf", "application/pdf",
+            Http.json(ex, result(mergedName(q.get("ids"), "合并", "pdf", "合并.pdf"), "application/pdf",
                 OfficiaPdf.merge(bytesOfIds(q.get("ids"))), t0).end());
         });
 
@@ -302,7 +308,8 @@ final class ApiRoutes {
             List<byte[]> parts = OfficiaPdf.split(Store.bytes(q.get("id")));
             List<Object> arr = new ArrayList<>();
             for (int i = 0; i < parts.size(); i++) {
-                arr.add(store("第" + (i + 1) + "页.pdf", "application/pdf", parts.get(i), t0).toJson());
+                arr.add(store(outName(q.get("id"), "第" + (i + 1) + "页", "pdf", "拆分.pdf"),
+                    "application/pdf", parts.get(i), t0).toJson());
             }
             Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
         });
@@ -311,16 +318,18 @@ final class ApiRoutes {
             byte[] pdf = Store.bytes(q.get("id"));
             int[] idx = parseInts(q.get("pages"));
             long t0 = System.nanoTime();
-            byte[] out = "remove".equals(q.get("op"))
-                ? OfficiaPdf.removePages(pdf, idx) : OfficiaPdf.extractPages(pdf, idx);
-            Http.json(ex, result("页面处理.pdf", "application/pdf", out, t0).end());
+            boolean remove = "remove".equals(q.get("op"));
+            byte[] out = remove ? OfficiaPdf.removePages(pdf, idx) : OfficiaPdf.extractPages(pdf, idx);
+            Http.json(ex, result(outName(q.get("id"), remove ? "删页" : "抽页", "pdf", "页面处理.pdf"),
+                "application/pdf", out, t0).end());
         });
 
         r.add("/api/pdf/rotate", (ex, q) -> {
             long t0 = System.nanoTime();
             byte[] out = OfficiaPdf.rotate(Store.bytes(q.get("id")),
                 Integer.parseInt(q.getOrDefault("deg", "90")));
-            Http.json(ex, result("旋转.pdf", "application/pdf", out, t0).end());
+            Http.json(ex, result(outName(q.get("id"), "旋转", "pdf", "旋转.pdf"),
+                "application/pdf", out, t0).end());
         });
 
         r.add("/api/pdf/watermark", (ex, q) -> {
@@ -329,7 +338,8 @@ final class ApiRoutes {
             byte[] font = fontBytes(q.get("fontId"));
             long t0 = System.nanoTime();
             byte[] out = font != null ? OfficiaPdf.watermark(pdf, text, font) : OfficiaPdf.watermark(pdf, text);
-            Http.json(ex, result("水印.pdf", "application/pdf", out, t0).end());
+            Http.json(ex, result(outName(q.get("id"), "水印", "pdf", "水印.pdf"),
+                "application/pdf", out, t0).end());
         });
 
         r.add("/api/pdf/pagenumbers", (ex, q) -> {
@@ -339,7 +349,8 @@ final class ApiRoutes {
             long t0 = System.nanoTime();
             byte[] out = font != null ? OfficiaPdf.addPageNumbers(pdf, fmt, font)
                 : OfficiaPdf.addPageNumbers(pdf, fmt);
-            Http.json(ex, result("页码.pdf", "application/pdf", out, t0).end());
+            Http.json(ex, result(outName(q.get("id"), "页码", "pdf", "页码.pdf"),
+                "application/pdf", out, t0).end());
         });
 
         r.add("/api/pdf/text", (ex, q) -> {
@@ -353,7 +364,8 @@ final class ApiRoutes {
             List<byte[]> imgs = OfficiaPdf.extractImages(Store.bytes(q.get("id")));
             List<Object> arr = new ArrayList<>();
             for (int i = 0; i < imgs.size(); i++) {
-                arr.add(store("图片-" + (i + 1) + ".png", "image/png", imgs.get(i), t0).toJson());
+                arr.add(store(outName(q.get("id"), "图片" + (i + 1), "png", "图片.png"),
+                    "image/png", imgs.get(i), t0).toJson());
             }
             Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
         });
@@ -366,7 +378,8 @@ final class ApiRoutes {
             long t0 = System.nanoTime();
             byte[] out = bits == 256 ? OfficiaPdf.encryptAes256(pdf, user, owner)
                 : OfficiaPdf.encrypt(pdf, user, owner, bits);
-            Http.json(ex, result("加密.pdf", "application/pdf", out, t0)
+            Http.json(ex, result(outName(q.get("id"), "加密", "pdf", "加密.pdf"),
+                "application/pdf", out, t0)
                 .put("algo", bits == 256 ? "AES-256 (AESV3)" : "RC4-" + bits).end());
         });
     }
@@ -378,13 +391,18 @@ final class ApiRoutes {
             byte[] src = Store.bytes(q.get("id"));
             long t0 = System.nanoTime();
             byte[] out = imaging(src, q);
-            String format = "convert".equals(q.get("op")) ? q.getOrDefault("format", "png").toLowerCase() : "png";
-            Http.json(ex, result("处理结果." + format, "image/" + format, out, t0).end());
+            boolean convert = "convert".equals(q.get("op"));
+            String format = convert ? q.getOrDefault("format", "png").toLowerCase() : "png";
+            // 纯格式转换只换后缀（照片.jpg → 照片.png）；滤镜/变换的产出与源同为 png，
+            // 用操作名区分，免得一串同名结果分不清是灰度还是模糊
+            String op = q.getOrDefault("op", "grayscale");
+            Http.json(ex, result(outName(q.get("id"), convert ? null : IMG_TAG.getOrDefault(op, op),
+                format, "处理结果." + format), "image/" + format, out, t0).end());
         });
 
         r.add("/api/imaging/topdf", (ex, q) -> {
             long t0 = System.nanoTime();
-            Http.json(ex, result("图片.pdf", "application/pdf",
+            Http.json(ex, result(mergedName(q.get("ids"), "图片", "pdf", "图片.pdf"), "application/pdf",
                 OfficiaImaging.toPdf(bytesOfIds(q.get("ids"))), t0).end());
         });
     }
@@ -480,9 +498,81 @@ final class ApiRoutes {
 
         r.add("/api/email/topdf", (ex, q) -> {
             long t0 = System.nanoTime();
-            Http.json(ex, result("邮件归档.pdf", "application/pdf",
+            Http.json(ex, result(outName(q.get("id"), "pdf", "邮件归档.pdf"), "application/pdf",
                 OfficiaEmail.toPdf(Store.bytes(q.get("id"))), t0).end());
         });
+    }
+
+    // ==================== 结果命名 ====================
+
+    /** 图像操作 → 中文标记：产物名进的是中文界面与中文文件系统，不该混英文 op 名。 */
+    private static final Map<String, String> IMG_TAG = Map.ofEntries(
+        Map.entry("grayscale", "灰度"), Map.entry("sepia", "怀旧"), Map.entry("invert", "反色"),
+        Map.entry("sharpen", "锐化"), Map.entry("blur", "模糊"), Map.entry("binarize", "二值化"),
+        Map.entry("posterize", "色调分离"), Map.entry("brightness", "亮度"), Map.entry("contrast", "对比度"),
+        Map.entry("flipH", "水平翻转"), Map.entry("flipV", "垂直翻转"), Map.entry("resize", "缩放"),
+        Map.entry("crop", "裁剪"), Map.entry("rotate", "旋转"),
+        Map.entry("textmark", "文字水印"), Map.entry("imgmark", "图片水印"));
+
+    /**
+     * 结果文件名：沿用源文件名，只换扩展名（{@code 年度报告.docx} → {@code 年度报告.pdf}）。
+     *
+     * <p>此前所有产物都叫 words.pdf / cells.pdf 这类固定名，连转几份后浏览器只能靠
+     * "words (1).pdf""words (4).pdf" 区分，下载目录里根本对不上是哪个源文件转的。</p>
+     *
+     * @param id       源文件的 Blob id；取不到（已被 LRU 逐出 / 无源文件）时退回 fallback
+     * @param ext      新扩展名（不带点）
+     * @param fallback 无源文件时的兜底名（须自带扩展名）
+     */
+    private static String outName(String id, String ext, String fallback) {
+        return outName(id, null, ext, fallback);
+    }
+
+    /**
+     * 同上，额外加操作标记（{@code 合同.pdf} + {@code 水印} → {@code 合同-水印.pdf}）。
+     *
+     * <p>PDF→PDF、DOCX→DOCX 这类<b>不改格式</b>的操作必须用它：只换后缀的话结果与源文件同名，
+     * 下载时照样被浏览器加 "(1)"，还容易把原件覆盖混淆。</p>
+     */
+    private static String outName(String id, String tag, String ext, String fallback) {
+        Store.Blob b = id == null || id.isBlank() ? null : Store.get(id);
+        String base = baseName(b == null ? fallback : b.name());
+        if (base.isBlank()) {
+            base = baseName(fallback);
+        }
+        return base + (tag == null || tag.isBlank() ? "" : "-" + tag) + "." + ext;
+    }
+
+    /**
+     * 多输入产物的名字：取首个源文件名并标注份数（{@code 合同等3份-合并.pdf}）。
+     *
+     * @param ids 逗号分隔的 Blob id 列表
+     */
+    private static String mergedName(String ids, String tag, String ext, String fallback) {
+        String[] arr = ids == null || ids.isBlank() ? new String[0] : ids.split(",");
+        if (arr.length == 0) {
+            return baseName(fallback) + "." + ext;
+        }
+        String first = outName(arr[0].trim(), null, ext, fallback);
+        String base = baseName(first);
+        return arr.length > 1 ? base + "等" + arr.length + "份-" + tag + "." + ext
+            : base + "-" + tag + "." + ext;
+    }
+
+    /**
+     * 去扩展名，并剥掉路径部分。
+     *
+     * <p>剥路径是必要的：个别浏览器/客户端会把 {@code D:\download\合同.docx} 整段当文件名传上来，
+     * 直接拼进结果名会得到一个带盘符的怪名字。</p>
+     */
+    private static String baseName(String name) {
+        String s = name == null ? "" : name.trim();
+        int slash = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'));
+        if (slash >= 0) {
+            s = s.substring(slash + 1);
+        }
+        int dot = s.lastIndexOf('.');
+        return dot > 0 ? s.substring(0, dot) : s;
     }
 
     // ==================== 小工具 ====================
