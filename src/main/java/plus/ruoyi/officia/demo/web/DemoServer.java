@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
  *   java -jar officia-demo-1.0.0.jar          # 默认 8080，被占用则自动顺延
  *   java -jar officia-demo-1.0.0.jar 9090     # 指定端口
  *   java -jar officia-demo-1.0.0.jar 9090 --no-open   # 不自动开浏览器
+ *   java -jar officia-demo-1.0.0.jar --host 0.0.0.0   # 监听所有网卡（容器内必须）
  * }</pre>
  *
  * @author officia-demo
@@ -35,27 +36,57 @@ public final class DemoServer {
 
     private static final int DEFAULT_PORT = 8080;
 
+    /**
+     * 默认只监听本机回环。
+     *
+     * <p>测试台<b>没有任何鉴权</b>，且能上传文件、加载 License、跑重 CPU/内存的转换——
+     * 默认对外监听等于把这些能力白送给同网段任何人，所以默认值必须是回环地址。
+     * 容器内没有"宿主本机"的概念（回环只在容器内可达，端口映射转发到 eth0 会连不上），
+     * 必须显式传 {@code --host 0.0.0.0}，再由 compose 把宿主端口只发布到 127.0.0.1。</p>
+     */
+    private static final String DEFAULT_HOST = "127.0.0.1";
+
     private DemoServer() {
     }
 
     public static void main(String[] args) throws Exception {
         int wanted = DEFAULT_PORT;
         boolean autoOpen = true;
-        for (String a : args) {
+        // 优先级：命令行 --host > 环境变量 OFFICIA_DEMO_HOST > 默认回环
+        // 环境变量入口是给容器编排用的（compose 里改 environment 比改 ENTRYPOINT 方便）
+        String host = trimToNull(System.getenv("OFFICIA_DEMO_HOST"));
+        for (int i = 0; i < args.length; i++) {
+            String a = args[i];
             if ("--no-open".equals(a)) {
                 autoOpen = false;
+            } else if (a.startsWith("--host=")) {
+                host = trimToNull(a.substring("--host=".length()));
+            } else if ("--host".equals(a) && i + 1 < args.length) {
+                host = trimToNull(args[++i]);
             } else if (a.matches("\\d+")) {
                 wanted = Integer.parseInt(a);
             }
         }
-        int port = freePortFrom(wanted);
+        if (host == null) {
+            host = DEFAULT_HOST;
+        }
+
+        java.net.InetAddress bind;
+        try {
+            bind = java.net.InetAddress.getByName(host);
+        } catch (java.net.UnknownHostException e) {
+            // 提前失败并说清怎么改，否则 HttpServer.create 只会抛 "unresolved address"
+            System.err.println("无法解析监听地址：" + host + "（本机用 127.0.0.1，容器内用 0.0.0.0）");
+            return;
+        }
+        int port = freePortFrom(bind, wanted);
 
         // 默认打开强制门控，让测试台的"开箱行为"与真实发布版一致：
         // 未授权即降级（水印 + 限页）。想看完整输出，在「授权门控与对比」面板取消勾选即可。
         // （发布版 jar 里该开关恒开且关不掉，见 BuildFlags.ENFORCED_BY_DEFAULT）
         OfficiaLicense.enableEnforcement(true);
 
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(bind, port), 0);
         server.createContext("/", DemoServer::handle);
         // 用线程池，支持并发上传/转换（大文档转换较慢，避免串行阻塞界面）
         ExecutorService pool = Executors.newFixedThreadPool(
@@ -69,11 +100,21 @@ public final class DemoServer {
             pool.shutdown();
         }, "officia-demo-shutdown"));
 
-        String url = "http://127.0.0.1:" + port + "/";
-        banner(url, port);
+        // 监听 0.0.0.0 时不能拿它当访问地址（浏览器打不开通配地址），回落到回环
+        String url = "http://" + (bind.isAnyLocalAddress() ? "127.0.0.1" : host) + ":" + port + "/";
+        banner(url, port, bind);
         if (autoOpen) {
             openBrowser(url);
         }
+    }
+
+    /** 去空白后为空则返回 null，便于"未设置"与"设了空串"统一处理。 */
+    private static String trimToNull(String s) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
 
     /** 请求分发：/api/* → ApiRoutes；/api/result/{id} → 字节；其余 → 静态资源。 */
@@ -145,10 +186,15 @@ public final class DemoServer {
         }
     }
 
-    /** 从 wanted 起找一个可用端口（最多顺延 20 个）。 */
-    private static int freePortFrom(int wanted) {
+    /**
+     * 从 wanted 起找一个可用端口（最多顺延 20 个）。
+     *
+     * <p>探测必须绑<b>实际监听地址</b>：绑 127.0.0.1 探通不代表 0.0.0.0 也空闲
+     * （别的进程可能正占着同端口的其它网卡）。</p>
+     */
+    private static int freePortFrom(java.net.InetAddress bind, int wanted) {
         for (int p = wanted; p < wanted + 20; p++) {
-            try (ServerSocket s = new ServerSocket(p, 1, java.net.InetAddress.getByName("127.0.0.1"))) {
+            try (ServerSocket s = new ServerSocket(p, 1, bind)) {
                 return s.getLocalPort();
             } catch (IOException ignore) {
                 // 被占用，试下一个
@@ -186,7 +232,7 @@ public final class DemoServer {
      * <p>用 {@code native.encoding}（JDK17+ 给出的 OS 默认字符集）重建 stdout——
      * Windows 控制台是 GBK 而 JVM 默认 UTF-8，直接 println 中文会乱码。</p>
      */
-    private static void banner(String url, int port) {
+    private static void banner(String url, int port, java.net.InetAddress bind) {
         try {
             // 有真实控制台 → 用控制台字符集（Windows 多为 GBK，直接显示中文正常）；
             // 被重定向到文件/管道 → 用 UTF-8（日志文件按 UTF-8 读才正常）。
@@ -204,10 +250,19 @@ public final class DemoServer {
         System.out.println(line);
         System.out.println("  访问地址： " + url);
         System.out.println("            http://localhost:" + port + "/");
+        System.out.println("  监听地址： " + bind.getHostAddress() + ":" + port
+            + (bind.isLoopbackAddress() ? "（仅本机可达）" : "（本机之外也可达）"));
+        if (!bind.isLoopbackAddress()) {
+            // 测试台无鉴权：非回环监听时把风险摆到最显眼处，别让人稀里糊涂暴露到公网
+            System.out.println("  ⚠ 安全：  测试台无鉴权，任何能访问该地址的人都能上传文件并消耗本机 CPU/内存。");
+            System.out.println("            容器内属正常（宿主端口应只发布到 127.0.0.1）；裸机上请确认这是你要的。");
+        }
         System.out.println();
         System.out.println("  授权状态： " + (OfficiaLicense.isLicensed() ? "已授权" : "评估版（未加载 License）")
             + "    强制门控：" + (OfficiaLicense.isEnforced() ? "开" : "关"));
-        System.out.println("  中文字体： " + (Fonts.available() ? "已探测到系统 TTF（PDF 中文水印可用）"
+        // 只探测到拉丁字体时必须说清楚：那种情况下中文水印仍是方块，不能报"可用"
+        System.out.println("  中文字体： " + (Fonts.hasCjk() ? "已探测到中文 TTF（PDF 中文水印可用）"
+            : Fonts.available() ? "只探测到拉丁字体（中文水印会是方块，请在界面上传中文 TTF）"
             : "未探测到（PDF 中文水印请在界面上传 TTF）"));
         System.out.println("  运行依赖： 仅 JDK + officia（运行时零第三方依赖）");
         // 大文件（设计型 PPTX 常上百 MB）撞上限时，用户第一反应是"传不上去"，先把边界摆出来
