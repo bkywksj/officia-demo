@@ -7,3 +7,7 @@ target/
 
 # License 令牌：可解锁凭据，任何形态都不入库（含浏览器重名的 "officia (1).lic"）
 *.lic
+
+# 容器编排的本地配置（含端口/内存等本机取值）；.env.example 才是入库的模板
+deploy/.env
+deploy/fonts/

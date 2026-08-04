@@ -1,0 +1,67 @@
+# Officia 能力测试台 —— 单服务容器编排
+#
+# 用法（在 deploy/ 目录执行）：
+#     cd .. && mvn -o package -DskipTests && cd deploy   # 先在宿主构建 jar
+#     cp .env.example .env                               # 按需改端口 / 内存
+#     docker compose up -d --build
+#     curl http://127.0.0.1:18080/api/health
+#
+# 【为什么没有数据库、没有数据卷】
+# 测试台上传的文件只存内存（Store），重启即清、不落盘不入库；没有任何持久化状态，
+# 所以不需要 logs / upload / temp 卷。唯一可能要挂的是 License 与自备字体，见下方（默认关闭）。
+services:
+  officia-demo:
+    build:
+      # 上下文必须是项目根目录：Dockerfile 要 COPY target/ 下的 jar
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: officia-demo:1.0.0
+    container_name: officia-demo
+
+    ports:
+      # 🔴 默认只发布到宿主回环（BIND_ADDR=127.0.0.1）。
+      # 测试台没有任何鉴权，且能上传任意文件、跑重 CPU/内存的转换——对外发布
+      # 等于把这些能力送给能访问该地址的任何人。
+      #   最安全：保持默认，从别的机器走 SSH 隧道 ssh -L 18080:127.0.0.1:18080 user@host
+      #   内网直访：在 .env 里设 BIND_ADDR=0.0.0.0（前提是该网络里的人都可信）
+      - "${BIND_ADDR:-127.0.0.1}:${HOST_PORT:-18080}:18080"
+
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      # 容器内监听所有网卡（宿主侧的暴露范围由上面的 ports 控制）
+      OFFICIA_DEMO_HOST: 0.0.0.0
+      OFFICIA_DEMO_PORT: 18080
+      OFFICIA_FONTS_DIR: ${OFFICIA_FONTS_DIR:-/usr/share/fonts}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
+      # 授权：把 .lic 用下面的 volumes 挂进来后，再放开这一行。
+      # 🔴 .lic 绝不 COPY 进镜像层、绝不入库（.gitignore 已拦 *.lic）。
+      # 不配也能跑：未授权只是降级（水印 + 限页），能力全部可用。
+      # OFFICIA_LICENSE: /etc/officia/officia.lic
+
+    # volumes:
+    #   # 授权文件：只读挂载，宿主放一份 deploy/officia.lic（不会被提交）
+    #   - ./officia.lic:/etc/officia/officia.lic:ro
+    #   # 自备字体目录：镜像内字体不够用时挂进来，并把 OFFICIA_FONTS_DIR 指到这里
+    #   - ./fonts:/opt/officia/fonts:ro
+
+    # 内存上限直接决定能传多大文件：
+    #   容器内存 → JVM 堆（MaxRAMPercentage=75）→ 单次上传上限（堆 ÷ 8，夹在 [64MB, 1GB]）
+    # 4g 约对应 384MB 上传上限。低于 2g 不建议：Blob 仓下限 512MB 会逼近堆，容易 OOM。
+    mem_limit: ${MEM_LIMIT:-4g}
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:18080/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+    # 转换是重 CPU/内存操作，异常退出后自动拉起；但不要用 always——
+    # 手动 stop 后不希望它自己回来。
+    restart: unless-stopped
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
