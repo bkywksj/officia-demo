@@ -6,7 +6,7 @@
   "note": "双系统：Claude(.claude/) + Codex(.codex/ + AGENTS.md) 已镜像完成。与 ../officia 的开发者技能体系（26 技能）定位互补、不重叠。",
   "spec": "Anthropic 2025-12 Agent Skills Spec + skill-factory 4 层复用模型",
   "createdAt": "2026-07-30",
-  "updatedAt": "2026-07-30",
+  "updatedAt": "2026-08-04",
   "sourcePath": "E:/my/高级模块/officia-demo",
   "referencePaths": {
     "library_source": "E:/my/高级模块/officia",
@@ -34,8 +34,8 @@
     "phase6_5_usage_guide": "docs/usage-guide.md 已生成"
   },
   "skills": {
-    "total": 19,
-    "completed": 19,
+    "total": 20,
+    "completed": 20,
     "categories": {
       "entry_and_setup": {
         "count": 3,
@@ -59,12 +59,13 @@
         ]
       },
       "troubleshooting_and_engineering": {
-        "count": 5,
+        "count": 6,
         "list": [
           "officia-chinese-font",
           "officia-troubleshooting",
           "officia-performance",
           "officia-spring-integration",
+          "officia-deploy",
           "officia-upgrade"
         ]
       },
@@ -108,12 +109,12 @@
   "codex_mirror": {
     "enabled": true,
     "built_at": "2026-07-30",
-    "skills": 26,
-    "mirrored_skills": 19,
+    "skills": 27,
+    "mirrored_skills": 20,
     "command_skills": 7,
     "hooks_generated": 4,
     "config_files_generated": true,
-    "detail": ".codex/skills 26 个（19 技能镜像字节一致 + 7 命令转技能加 YAML 头），由 scripts/sync-codex.cjs 全量重建并校验；.codex/hooks 4 个 + config.toml(features hooks=true) + hooks.json；AGENTS.md 入口（核心铁律 + 能力速览 + 26 技能清单表）"
+    "detail": ".codex/skills 27 个（20 技能镜像字节一致 + 7 命令转技能加 YAML 头），由 scripts/sync-codex.cjs 全量重建并校验；.codex/hooks 4 个 + config.toml(features hooks=true) + hooks.json；AGENTS.md 入口（核心铁律 + 能力速览 + 20 技能清单表）"
   },
   "truth_sources_verified": {
     "note": "技能内容中的 API 事实均从下列真实位置提取，非凭印象撰写",

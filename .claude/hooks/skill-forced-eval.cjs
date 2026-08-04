@@ -73,6 +73,7 @@ const instructions = `## 强制技能激活流程（必须执行）
 - officia-troubleshooting: 报错、异常、OfficiaException、失败、打不开、空白、结果不对、排查、调试
 - officia-performance: 性能、慢、内存、OOM、大文件、大文档、并发、超时、流式
 - officia-spring-integration: Spring、SpringBoot、Web、接口、上传、下载、MultipartFile、Controller、集成、微服务
+- officia-deploy: 部署、上线、发布、容器、Docker、镜像、compose、编排、Dockerfile、K8s、服务器、运维、端口映射、连不上、健康检查、生产环境
 - officia-upgrade: 升级、版本、更新officia、破坏性变更、回归、兼容
 
 【Demo 自身】

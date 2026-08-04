@@ -116,7 +116,7 @@ mvn -o test
 | `officia-imaging` | 图片滤镜变换、格式互转、图片 → PDF、水印 |
 | `officia-email` | EML 解析、邮件归档 PDF、构造 EML |
 
-### 排坑与工程化（5）
+### 排坑与工程化（6）
 
 | 技能 | 什么时候用 |
 |---|---|
@@ -124,6 +124,7 @@ mvn -o test
 | `officia-troubleshooting` | 抛 `OfficiaException`、转换失败、输出为空/异常、加密文档打不开 |
 | `officia-performance` | 大文档、内存峰值、流式 API 选型、并发调用、超时 |
 | `officia-spring-integration` | 集成进 Spring Boot / Web：上传→转换→下载、线程安全、临时文件 |
+| `officia-deploy` | 容器化与部署：Dockerfile / compose 编排、监听地址、内存联动、字体、License 注入、远程部署 |
 | `officia-upgrade` | 升级 officia 版本、API 破坏性变更检查、回归验证 |
 
 ### Demo 自身（2）
@@ -172,6 +173,7 @@ officia-demo/
 ├── README.md                  # 面向人的说明
 ├── status.json                # 技能体系状态台账
 ├── docs/usage-guide.md        # 使用指南
+├── deploy/                    # 容器编排（Dockerfile / docker-compose.yml / .env.example）
 ├── scripts/
 │   ├── sync-codex.cjs         # ★ 技能体系同步与六处一致性自检（改完技能必跑）
 │   └── command-skill-meta.json# 命令 → Codex 技能的 frontmatter 元数据

@@ -100,7 +100,7 @@ Codex 启动时已自动加载全部 SKILL.md 的 frontmatter。按 description 
 | `officia-imaging` | 滤镜变换、格式互转、水印、图片 → PDF |
 | `officia-email` | EML 解析、归档 PDF、构造写出 |
 
-### 排坑与工程化（5）
+### 排坑与工程化（6）
 
 | 技能 | 用途 |
 |---|---|
@@ -108,6 +108,7 @@ Codex 启动时已自动加载全部 SKILL.md 的 frontmatter。按 description 
 | `officia-troubleshooting` | 异常消息**前缀 = 故障域路标**；结果不对的判别流程 |
 | `officia-performance` | 流式省什么、`CfbLimits` 真实默认值、线程安全边界、并发建议 |
 | `officia-spring-integration` | Spring Boot 集成全套：上传/下载/授权初始化/异常处理/健康检查 |
+| `officia-deploy` | 容器编排与部署：监听地址、内存三级联动、字体三入口、License 注入、Reeve |
 | `officia-upgrade` | 升级流程、破坏性变更检查、回归护栏、回退 |
 
 ### Demo 自身（2）
