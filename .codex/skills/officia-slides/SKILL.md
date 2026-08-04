@@ -97,6 +97,7 @@ byte[] pdf = OfficiaSlides.toPdfLayoutAware(pptx, opts);
 | 页数与幻灯片数不一致 | 内容提取式按流式排版分页 | 要"一张一页"用 `toPdfLayoutAware` |
 | 某块内容整个空白 | 该元素类型不在支持范围（见下表） | 先用测试台实测确认是哪类元素 |
 | 母版上的元素丢了 | — | 用 `toPdfLayoutAware`（它处理 layout/master 继承） |
+| 某张图偏暗 / 颜色不对 / 挡住内容 | SVG、WMF/EMF 元文件、WDP 等 JDK 解不开的格式会被跳过（少一张，不影响其余） | 用测试台实测；把该图另存为 PNG/JPEG 再放回 PPT |
 | 中文方块 | 字体 | `officia-chinese-font` |
 | 有水印 | 未授权 + 门控开 | `officia-license` |
 
@@ -107,7 +108,7 @@ byte[] pdf = OfficiaSlides.toPdfLayoutAware(pptx, opts);
 | 画得出 | 画不出（整块空白或退化） |
 |---|---|
 | 文本（含母版/版式继承、主题色与主题字体） | **SmartArt**（`dgm`）|
-| 图片（PNG/JPEG/GIF/BMP）| **嵌入视频 / 音频 / 动画** |
+| 图片（PNG/JPEG/GIF/BMP）+ 图片效果：源图裁切 `srcRect`、镜像 `flipH/flipV`、整体不透明度 `alphaModFix`、双色调重着色 `duotone` | **嵌入视频 / 音频 / 动画** |
 | 形状与预设几何、自定义几何、渐变、阴影、透明度 | **数学公式**（OMML）|
 | 表格 | 文字的发光/描边等文本效果 |
 | 图表：折线 / 柱状 / 饼 / 圆环（含 3D 变体，按平面画）| 面积图**按折线**近似（不填充）|
