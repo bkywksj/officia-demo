@@ -220,35 +220,65 @@ curl -s http://127.0.0.1:18080/api/health
 
 | 入口 | 管什么 | 容器里怎么配 |
 |---|---|---|
-| **officia 内置字体**（classpath `/fonts/NotoSansSC-VF.ttf`，OFL） | 转换类的兜底字形 | 零配置，空白容器也能出中文 |
+| **officia 内置字体**（classpath `/fonts/WenQuanYiMicroHei.ttf`，Apache-2.0） | 转换类的兜底字形 | 零配置，空白容器也能出中文 |
 | **`OFFICIA_FONTS_DIR`**（或 `-Dofficia.fonts.dir`，`:` 分隔多目录） | officia 排版引擎的运维字体目录 | `ENV OFFICIA_FONTS_DIR=/usr/share/fonts` |
 | **测试台 `Fonts.java` 固定路径探测** | **PDF 水印 / 页码**的 `fontTtf` | 必须装系统字体，且**路径要在探测表里** |
 
-🔴 第三条是容器里最容易"装了却没用"的地方：`fonts-noto-cjk` 在不同发行版装出的文件名不同
-（`NotoSansCJK-Regular.ttc` / `NotoSansCJK-VF.otf.ttc`），`deploy/Dockerfile` 因此在装完后**软链到探测表的第一条路径**。
+### 🔴 装字体只有一条硬标准：TrueType `glyf` 轮廓
 
-探测表认的 Linux 路径（含中文字形的，按优先级）：
+officia 的 PDF 子集器**只支持 glyf**。装错轮廓的后果分两种，症状完全不同：
+
+| 装了什么 | 会怎样 |
+|---|---|
+| **CFF/OTTO 轮廓**（`fonts-noto-cjk`、思源黑体 `.otf`、macOS `PingFang.ttc`） | `FontLoader` 加载阶段直接跳过；显式当 `fontTtf` 传进去则抛 `字体无 glyf/loca` → 水印接口 **400** |
+| **纯拉丁 glyf**（DejaVu、Arial） | **不报错**，中文码位落到 `.notdef` → 水印中文**静默画成空白/方框**，比报错难查得多 |
+
+> ⚠️ **不要装 `fonts-noto-cjk`** —— Debian/Ubuntu 官方包装出来的 `NotoSansCJK-*.ttc` 是
+> CFF 轮廓（sfnt 版本 `OTTO`），对 officia **零收益**：装了，中文水印照样出不来。
+> 用 `fonts-wqy-zenhei` / `fonts-wqy-microhei`（glyf、Apache-2.0、体积还小一个数量级）。
+
+换字体包前先验轮廓：
+
+```bash
+od -A n -t x1 -N 4 /path/to/font.ttf | tr -d ' '
+# 00010000 → glyf，可用
+# 4f54544f → 'OTTO' = CFF，officia 用不了
+# 74746366 → 'ttcf' 集合体，要再看它第 0 号 face 的版本
+```
+
+`deploy/Dockerfile` 已把这条验证内建成**构建期断言**：装出来是 CFF 就直接构建失败，
+不会等到上线才发现水印是空白。
+
+探测表认的 Linux 路径（含中文字形的，按优先级 —— glyf 的排在 CFF 前面）：
 
 ```
-/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
-/usr/share/fonts/opentype/noto/NotoSansCJK-VF.otf.ttc
-/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf
-/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc
-/usr/share/fonts/truetype/wqy/wqy-microhei.ttc
+/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc          ← glyf，可用
+/usr/share/fonts/truetype/wqy/wqy-microhei.ttc        ← glyf，可用
+/usr/share/fonts/truetype/arphic/uming.ttc            ← glyf，可用
+/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc  ← CFF，校验会拒
+/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf   ← CFF，校验会拒
 ```
 
+> `Fonts.java` 不只判"文件在不在"，还会验 **glyf 轮廓 + 真有中文字形**（`usableForCjk`），
+> 校验不过就跳到下一个候选。所以表里保留 Noto 路径无害——它只是永远不会被选中。
+>
 > DejaVu / Arial 属**拉丁兜底**，排在最后——它们没有中文字形，命中它们时横幅会明说
-> 「只探测到拉丁字体（中文水印会是方块）」，别把它当成"字体没问题"。
+> 「只探测到拉丁字体（中文水印会是空白）」，别把它当成"字体没问题"。
 
 验收：
 
 ```bash
 docker compose logs officia-demo | grep 中文字体
-#   中文字体： 已探测到中文 TTF（PDF 中文水印可用）     ← 要的是这行
-docker compose exec officia-demo ls -l /usr/share/fonts/opentype/noto/
+#   中文字体： 已探测到中文 TTF（PDF 中文水印可用）     ← 要的是这行（现在这句是可信的，因为探测验过字形）
+docker compose exec officia-demo ls -l /usr/share/fonts/truetype/wqy/
+
+# 端到端验一次最稳：水印中文抽得出来 = 真画出来了（画成空白时抽不出）
+curl -s -X POST "http://127.0.0.1:18080/api/pdf/watermark?id=<PDF的id>&text=%E5%86%85%E9%83%A8%E8%B5%84%E6%96%99"
 ```
 
-自备字体：把目录挂到 `/opt/officia/fonts` 并把 `OFFICIA_FONTS_DIR` 指过去（注意字体的分发授权，Noto/思源是 OFL 可安全分发）。
+自备字体：把目录挂到 `/opt/officia/fonts` 并把 `OFFICIA_FONTS_DIR` 指过去。注意两条约束都要满足：
+**分发授权允许**（文泉驿 Apache-2.0、Noto/思源 OFL 都可以；Windows 的宋体/黑体**不可以**），
+且**轮廓是 glyf**（思源黑体、Noto CJK 的官方 OTF/OTC 版授权没问题，但 officia 用不了）。
 
 ---
 
@@ -327,8 +357,10 @@ ssh user@host 'gunzip -c /tmp/officia-demo.tar.gz | docker load'
 | 传大文件 413 | 上限 = 堆 ÷ 8 | 调大 `.env` 的 `MEM_LIMIT`；确认 `MaxRAMPercentage` 生效（查 `/api/health` 的 `maxHeap`） |
 | `maxHeap` 只有容器内存的 1/4 | 没设 `MaxRAMPercentage` | 补 `JAVA_OPTS=-XX:MaxRAMPercentage=75` |
 | 容器 OOMKilled（exit 137） | 堆比例过高或 `mem_limit` 太小 | 堆比例降到 70、`mem_limit` 提到 4g 以上 |
-| 横幅说"未探测到"字体 | 字体包没装，或路径不在探测表 | 看第四节；`ls /usr/share/fonts/opentype/noto/` 核对 |
-| 横幅说"只探测到拉丁字体" | 只有 DejaVu/Arial | 装 `fonts-noto-cjk` 并确认软链存在 |
+| 横幅说"未探测到"字体 | 字体包没装，或路径不在探测表 | 看第四节；`ls /usr/share/fonts/truetype/wqy/` 核对 |
+| 横幅说"只探测到拉丁字体" | 只有 DejaVu/Arial（有 glyf 但无中文字形） | 装 `fonts-wqy-zenhei`（**不是** `fonts-noto-cjk`，那是 CFF 轮廓、officia 用不了） |
+| 水印中文是**空白/方框**，正文中文却正常 | 拉丁字体排在中文字体前面，抢到了全局回退 | 装 glyf 中文字体；officia ≥ 该修复版已改为按中文码位选水印字体 |
+| 水印接口报 400「字体无 glyf/loca」 | 传进去的是 CFF 轮廓字体（`.otf` / Noto CJK `.ttc`） | 换 glyf 字体；`Fonts.java` 的探测已会自动拒绝 CFF |
 | 输出仍有水印 | 门控默认开 + 未加载 lic | 挂载 `.lic` + 放开 `OFFICIA_LICENSE`；见 `officia-license` |
 | `docker build` 报找不到 jar | 构建上下文不是项目根目录 | `docker build -f deploy/Dockerfile … .`（末尾的 `.` 是根目录） |
 | 多阶段构建拉不到 officia | 本地仓依赖 | 改宿主构建 + COPY jar，见第六节 |

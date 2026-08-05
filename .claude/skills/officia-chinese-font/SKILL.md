@@ -103,6 +103,10 @@ Linux / macOS 候选：
 
 本 demo 的 `Fonts.java` 就是一份现成实现，可以抄进你的项目：
 
+🔴 **只判"文件存不存在"是不够的** —— 线上就是这么翻的车：容器里路径确实有字体，
+启动横幅报"中文水印可用"，实际调用要么抛 `字体无 glyf/loca`，要么中文静默画成空白。
+**必须验轮廓 + 验字形**：
+
 ```java
 /** 取一份可用的中文 TTF 字节；无则 null。探测一次后缓存复用。 */
 static synchronized byte[] systemCjk() {
@@ -111,19 +115,43 @@ static synchronized byte[] systemCjk() {
         "C:/Windows/Fonts/msyh.ttf",
         "C:/Windows/Fonts/simsun.ttc",
         // Linux：文泉驿是 glyf 轮廓，officia 能用；
-        // 不要放 NotoSansCJK-Regular.ttc / PingFang.ttc —— 它们是 CFF，会被跳过
+        // NotoSansCJK-Regular.ttc / PingFang.ttc 是 CFF，放在后面靠校验拒掉即可
         "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     };
     for (String p : candidates) {
         File f = new File(p);
-        if (f.isFile() && f.length() > 0) {
-            try { return Files.readAllBytes(f.toPath()); } catch (Exception ignore) { }
+        if (!f.isFile() || f.length() == 0) {
+            continue;
         }
+        try {
+            byte[] data = Files.readAllBytes(f.toPath());
+            if (usableForCjk(data)) {     // ← 关键：别省这一步
+                return data;
+            }
+        } catch (Exception ignore) { }    // 读不了 / 解析不了就试下一个
     }
     return null;   // 调用方退回不带字体的重载（仅 ASCII）
 }
+
+/** 能不能用来画中文：两个条件缺一不可。 */
+static boolean usableForCjk(byte[] data) {
+    try {
+        TrueTypeFont f = new TrueTypeFont(data);          // plus.ruoyi.officia.engine.font
+        return f.getTable("glyf") != null                 // 拦 CFF/OTTO：否则子集器抛异常
+            && f.hasGlyph('中') && f.hasGlyph('国');       // 拦纯拉丁：否则中文静默变空白
+    } catch (RuntimeException e) {
+        return false;
+    }
+}
 ```
+
+两个条件各拦一种事故，症状完全不同：
+
+| 漏掉哪个校验 | 后果 |
+|---|---|
+| 没验 `glyf` | 拿到 CFF 字体（`.otf` / Noto CJK `.ttc`）→ **抛异常**，调用直接失败 |
+| 没验字形 | 拿到纯拉丁字体（DejaVu/Arial）→ **不报错**，中文画成空白，更难查 |
 
 > 更稳的做法：**把字体文件随应用一起交付**（放进 `src/main/resources/fonts/`），从 classpath 读取，不依赖运行环境装了什么。
 > ⚠️ 两个约束都要满足：**授权允许分发**（Apache 2.0 / SIL OFL 可以；Windows 中文字体不可以），且**轮廓是 TrueType glyf**（思源黑体 / Noto CJK 的官方版是 CFF，授权没问题但 officia 用不了）。文泉驿系列两者都满足。
