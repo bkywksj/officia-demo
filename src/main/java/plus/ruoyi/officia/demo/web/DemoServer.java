@@ -3,6 +3,8 @@ package plus.ruoyi.officia.demo.web;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import plus.ruoyi.officia.common.exception.OfficiaException;
+import plus.ruoyi.officia.engine.font.FontLoader;
+import plus.ruoyi.officia.engine.font.FontRegistry;
 import plus.ruoyi.officia.license.OfficiaLicense;
 
 import java.awt.Desktop;
@@ -260,11 +262,11 @@ public final class DemoServer {
         System.out.println();
         System.out.println("  授权状态： " + (OfficiaLicense.isLicensed() ? "已授权" : "评估版（未加载 License）")
             + "    强制门控：" + (OfficiaLicense.isEnforced() ? "开" : "关"));
-        // 只探测到拉丁字体时必须说清楚：拉丁字体画中文【不报错、但画成空白】，不能报"可用"。
-        // 探测已校验 glyf 轮廓 + 真有中文字形，所以这行不再是"路径存在"式的假承诺（见 Fonts）。
-        System.out.println("  中文字体： " + (Fonts.hasCjk() ? "已探测到中文 TTF（PDF 中文水印可用）"
-            : Fonts.available() ? "只探测到拉丁字体（中文水印会是空白，请在界面上传中文 TTF）"
-            : "未探测到（PDF 中文水印请在界面上传 TTF）"));
+        // 判据必须是「officia 渲染中文时真正会用到的那个字体」，而不是"系统装了什么"——
+        // 系统没有中文字体时 officia 会用<b>内置兜底字体</b>，水印照样画得出来。
+        // 只看系统字体会误报：实测某容器只装了 DejaVu，横幅说"中文水印会是空白"，
+        // 而实际转换出的 PDF 中文与水印全部正常（14776 个可解码汉字）。
+        System.out.println("  中文字体： " + cjkStatus());
         System.out.println("  运行依赖： 仅 JDK + officia（运行时零第三方依赖）");
         // 大文件（设计型 PPTX 常上百 MB）撞上限时，用户第一反应是"传不上去"，先把边界摆出来
         System.out.println("  内存上限： 最大堆 " + Http.humanSize(Runtime.getRuntime().maxMemory())
@@ -273,5 +275,30 @@ public final class DemoServer {
         System.out.println("  按 Ctrl+C 停止");
         System.out.println(line);
         System.out.println();
+    }
+
+    /**
+     * 中文可渲染性：按 officia <b>实际渲染路径</b>判断，并说明字形来自系统字体还是内置兜底。
+     *
+     * <p>探针码位取评估水印文案里的「授」——水印正是靠字形级回退挑字体的，用它判断最贴近真实。
+     * 系统字体缺中文时 officia 会落到内置兜底字体，此时中文<b>可渲染</b>，只是字面变成内置字体的样子；
+     * 只有连内置带系统都没有中文字形，才是真的会画空白。</p>
+     *
+     * @return 供启动横幅显示的一句话
+     */
+    private static String cjkStatus() {
+        try {
+            FontRegistry fonts = FontLoader.load(null);
+            boolean renderable = fonts.get(fonts.resolveFamily(null, '授')).hasGlyph('授');
+            if (!renderable) {
+                return "不可用（中文会画成空白，请在界面上传中文 TTF）";
+            }
+            return Fonts.hasCjk()
+                ? "可用 —— 系统中文 TTF"
+                : "可用 —— 系统无中文字体，走 officia 内置兜底（字面为内置字体）";
+        } catch (RuntimeException e) {
+            // 字体注册表构建失败不该拦住服务启动，如实降级显示
+            return "探测失败（" + e.getClass().getSimpleName() + "）";
+        }
     }
 }
