@@ -1,5 +1,7 @@
 package plus.ruoyi.officia.demo.web;
 
+import plus.ruoyi.officia.engine.font.TrueTypeFont;
+
 import java.io.File;
 import java.nio.file.Files;
 
@@ -10,6 +12,10 @@ import java.nio.file.Files;
  * 找不到返回 {@code null}，调用方退回不带字体的重载（仅 ASCII 可正常显示）。
  * 用户也可在界面上传自己的 TTF，优先级高于本探测。</p>
  *
+ * <p>🔴 <b>光看路径存在不算数，必须验字体本身能用</b>——见 {@link #usableForCjk}。
+ * 曾经只判"文件在不在"，结果在容器里命中了 CFF 轮廓的 Noto CJK，
+ * 启动横幅报"中文水印可用"，实际调用直接抛 {@code 字体无 glyf/loca}。</p>
+ *
  * @author officia-demo
  */
 final class Fonts {
@@ -17,9 +23,16 @@ final class Fonts {
     /**
      * 含中文字形的候选，<b>必须排在拉丁兜底之前</b>。
      *
-     * <p>顺序不是随意的：拉丁字体（DejaVu/Arial）在很多 Linux 与容器镜像里都存在，
-     * 一旦排在前面就会先被命中，结果是"探测到字体了"但中文照样是方块——
-     * 比彻底没字体更难排查。</p>
+     * <p>顺序有两条约束：</p>
+     * <ol>
+     *   <li>拉丁字体（DejaVu/Arial）在很多 Linux 与容器镜像里都存在，
+     *       一旦排在前面就会先被命中，结果是"探测到字体了"但中文照样是方块——
+     *       比彻底没字体更难排查。</li>
+     *   <li>🔴 <b>glyf 轮廓的排在 CFF 轮廓的前面</b>：officia 的 PDF 子集器只支持 TrueType
+     *       {@code glyf}，遇到 CFF/OTTO（Noto CJK 的 .ttc、macOS 的 PingFang.ttc、
+     *       思源黑体 .otf）会抛异常。这些路径保留在表里只是为了"万一哪天换成 glyf 版本"，
+     *       实际能不能用一律由 {@link #usableForCjk} 说了算。</li>
+     * </ol>
      */
     private static final String[] CJK_CANDIDATES = {
         // Windows：优先纯 TTF（.ttc 集合体解析支持有限）
@@ -27,13 +40,18 @@ final class Fonts {
         "C:/Windows/Fonts/msyh.ttf",
         "C:/Windows/Fonts/simsun.ttc",
         "C:/Windows/Fonts/simkai.ttf",
-        // Linux：Debian/Ubuntu 的 fonts-noto-cjk（新旧两种文件名）与文泉驿
+        // Linux：文泉驿是 glyf 轮廓，officia 能用——必须排在 Noto 之前
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/arphic/uming.ttc",
+        "/usr/share/fonts/truetype/arphic/ukai.ttc",
+        // Linux：Debian/Ubuntu 的 fonts-noto-cjk 目前是 CFF 轮廓，官方包用不了；
+        // 留在表里仅为兼容"自行放了 glyf 版 Noto"的环境，校验不过会自动跳到下一个
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-VF.otf.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf",
-        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
-        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
-        // macOS
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        // macOS：PingFang 是 CFF，同样靠校验兜底
         "/System/Library/Fonts/PingFang.ttc"
     };
 
@@ -41,6 +59,7 @@ final class Fonts {
     private static final String[] ASCII_FALLBACK = {
         "C:/Windows/Fonts/arial.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
         "/Library/Fonts/Arial.ttf"
     };
 
@@ -59,28 +78,71 @@ final class Fonts {
             return cached;
         }
         probed = true;
-        if (load(CJK_CANDIDATES)) {
+        if (load(CJK_CANDIDATES, true)) {
             cjk = true;
             return cached;
         }
-        load(ASCII_FALLBACK);
+        load(ASCII_FALLBACK, false);
         return cached;
     }
 
-    /** 依次尝试候选路径，读到第一个可用的即写入缓存并返回 true。 */
-    private static boolean load(String[] candidates) {
+    /**
+     * 依次尝试候选路径，读到第一个<b>校验通过</b>的即写入缓存并返回 true。
+     *
+     * @param candidates 候选路径
+     * @param needCjk    是否要求含中文字形（CJK 候选要求，ASCII 兜底不要求）
+     */
+    private static boolean load(String[] candidates, boolean needCjk) {
         for (String p : candidates) {
             File f = new File(p);
-            if (f.isFile() && f.length() > 0) {
-                try {
-                    cached = Files.readAllBytes(f.toPath());
+            if (!f.isFile() || f.length() == 0) {
+                continue;
+            }
+            try {
+                byte[] data = Files.readAllBytes(f.toPath());
+                if (needCjk ? usableForCjk(data) : usableForAscii(data)) {
+                    cached = data;
                     return true;
-                } catch (Exception ignore) {
-                    // 读不了就试下一个候选
                 }
+            } catch (Exception ignore) {
+                // 读不了 / 解析不了就试下一个候选
             }
         }
         return false;
+    }
+
+    /**
+     * 这份字体字节能不能用来画中文水印。
+     *
+     * <p>两个条件缺一不可，正好对应线上踩过的两种"看起来有字体、实际画不出中文"：</p>
+     * <ul>
+     *   <li><b>有 glyf 表</b>——CFF/OTTO 轮廓（Noto CJK 官方包、PingFang）会让
+     *       officia 的子集器抛 {@code 字体无 glyf/loca（可能为 CFF/OTTO 轮廓）}；</li>
+     *   <li><b>真有中文字形</b>——纯拉丁字体（DejaVu/Arial）有 glyf 但中文码位映射到
+     *       .notdef，子集器不报错，中文<b>静默画成空白</b>，比报错更难发现。</li>
+     * </ul>
+     *
+     * @param data 字体文件字节
+     * @return 能画中文返回 true
+     */
+    static boolean usableForCjk(byte[] data) {
+        try {
+            TrueTypeFont f = new TrueTypeFont(data);
+            return f.getTable("glyf") != null
+                && f.hasGlyph('中') && f.hasGlyph('国') && f.hasGlyph('权');
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** 这份字体能不能至少画 ASCII（同样要求 glyf，否则子集器一样抛异常）。 */
+    static boolean usableForAscii(byte[] data) {
+        try {
+            TrueTypeFont f = new TrueTypeFont(data);
+            return f.getTable("glyf") != null && f.hasGlyph('A');
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /** 供启动日志展示是否探测到可用字体。 */
@@ -88,7 +150,7 @@ final class Fonts {
         return systemCjk() != null;
     }
 
-    /** 探测到的字体是否含中文字形；false 时中文水印会是方块。 */
+    /** 探测到的字体是否含中文字形；false 时中文水印会是空白。 */
     static boolean hasCjk() {
         systemCjk();
         return cjk;

@@ -613,10 +613,28 @@ final class ApiRoutes {
         return list;
     }
 
-    /** 水印/页码用的中文字体：优先用户上传，其次系统探测，都没有则 null（退回 ASCII 重载）。 */
+    /**
+     * 水印/页码用的中文字体：优先用户上传，其次系统探测，都没有则 null（退回 ASCII 重载）。
+     *
+     * <p>上传的字体<b>先校验再用</b>：officia 的子集器只吃 TrueType glyf 轮廓，
+     * 直接把 CFF/OTTO 字体（.otf、Noto CJK 的 .ttc）丢进去只会抛「字体无 glyf/loca」，
+     * 用户看不懂。这里提前拦下并说清该换什么。</p>
+     */
     private static byte[] fontBytes(String fontId) {
         if (fontId != null && !fontId.isBlank()) {
-            return Store.bytes(fontId);
+            byte[] uploaded = Store.bytes(fontId);
+            if (uploaded != null && !Fonts.usableForAscii(uploaded)) {
+                throw new IllegalArgumentException(
+                    "这个字体 officia 用不了：不是 TrueType glyf 轮廓（多半是 CFF/OpenType-PS，"
+                        + "如 .otf 或思源黑体/Noto CJK 的 ttc）。请换 glyf 轮廓的 .ttf/.ttc，"
+                        + "如 simhei.ttf、msyh.ttf、wqy-zenhei.ttc。");
+            }
+            if (uploaded != null && !Fonts.usableForCjk(uploaded)) {
+                throw new IllegalArgumentException(
+                    "这个字体没有中文字形（多半是纯拉丁字体，如 DejaVuSans/Arial）。"
+                        + "用它画中文不会报错，但中文位置会是空白——请换含中文的字体。");
+            }
+            return uploaded;
         }
         return Fonts.systemCjk();
     }

@@ -13,25 +13,30 @@ FROM eclipse-temurin:17-jre
 LABEL org.opencontainers.image.title="officia-demo" \
       org.opencontainers.image.description="Officia 能力可视化测试台（运行时仅 JDK + officia）"
 
-# 中文字体包：默认 Noto CJK（字形最全）；镜像体积敏感可换 fonts-wqy-zenhei（小一个数量级）
-ARG FONT_PKG=fonts-noto-cjk
+# 🔴 中文字体包必须是 TrueType **glyf** 轮廓 —— 不能用 fonts-noto-cjk。
+#
+# officia 的 PDF 子集器只支持 glyf；Debian/Ubuntu 的 fonts-noto-cjk 装出来的
+# NotoSansCJK-*.ttc 内部是 CFF/PostScript 轮廓（sfnt 版本 'OTTO'），officia 在
+# 加载阶段直接跳过，显式当 fontTtf 传进去则抛「字体无 glyf/loca」。
+# 实测该包在本镜像里对 officia 是**零收益**：装了，中文水印照样出不来。
+#
+# 文泉驿正黑是 glyf 轮廓、Apache-2.0 可自由分发，且体积小一个数量级（~15MB vs ~180MB）。
+# 换成别的包之前，先确认它是 .ttf/.ttc 且为 glyf 轮廓（od -A d -t x1 -N 4 看 sfnt 版本，
+# 00010000 = glyf 可用，OTTO = CFF 用不了；ttcf 集合体要看它第 0 号 face）。
+ARG FONT_PKG="fonts-wqy-zenhei fonts-wqy-microhei"
 
 # 装字体 + curl（HEALTHCHECK 要用；temurin 镜像不自带 curl/wget）。
-#
-# 🔴 软链那一步不是多余的：测试台的水印字体走 Fonts.java 的【固定路径探测】，
-# 而 fonts-noto-cjk 在不同发行版装出的文件名不同（NotoSansCJK-Regular.ttc / NotoSansCJK-VF.otf.ttc），
-# 装了却不在探测表里 = 启动横幅报"未探测到"，PDF 中文水印仍是方块。统一软链到探测表第一条路径。
+# 装完当场验一次 glyf，装错包在【构建期】就炸，而不是等上线后发现水印是空白。
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ${FONT_PKG} curl \
     && rm -rf /var/lib/apt/lists/* \
-    && if [ ! -f /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc ]; then \
-         CJK="$(ls /usr/share/fonts/opentype/noto/NotoSansCJK*.ttc 2>/dev/null | head -1)"; \
-         if [ -n "$CJK" ]; then \
-           ln -s "$CJK" /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc; \
-         fi; \
-       fi \
-    && echo "== 已装字体 ==" && (ls -l /usr/share/fonts/opentype/noto/ 2>/dev/null; \
-                                ls -l /usr/share/fonts/truetype/wqy/ 2>/dev/null) || true
+    && echo "== 已装字体 ==" && ls -l /usr/share/fonts/truetype/wqy/ \
+    && F=/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc \
+    && SFNT="$(od -A n -t x1 -N 4 "$F" | tr -d ' \n')" \
+    && echo "== $F sfnt=$SFNT ==" \
+    && if [ "$SFNT" = "4f54544f" ]; then \
+         echo "字体是 CFF/OTTO 轮廓，officia 用不了，构建中止" >&2; exit 1; \
+       fi
 
 WORKDIR /app
 

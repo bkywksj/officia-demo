@@ -260,9 +260,10 @@ public final class DemoServer {
         System.out.println();
         System.out.println("  授权状态： " + (OfficiaLicense.isLicensed() ? "已授权" : "评估版（未加载 License）")
             + "    强制门控：" + (OfficiaLicense.isEnforced() ? "开" : "关"));
-        // 只探测到拉丁字体时必须说清楚：那种情况下中文水印仍是方块，不能报"可用"
+        // 只探测到拉丁字体时必须说清楚：拉丁字体画中文【不报错、但画成空白】，不能报"可用"。
+        // 探测已校验 glyf 轮廓 + 真有中文字形，所以这行不再是"路径存在"式的假承诺（见 Fonts）。
         System.out.println("  中文字体： " + (Fonts.hasCjk() ? "已探测到中文 TTF（PDF 中文水印可用）"
-            : Fonts.available() ? "只探测到拉丁字体（中文水印会是方块，请在界面上传中文 TTF）"
+            : Fonts.available() ? "只探测到拉丁字体（中文水印会是空白，请在界面上传中文 TTF）"
             : "未探测到（PDF 中文水印请在界面上传 TTF）"));
         System.out.println("  运行依赖： 仅 JDK + officia（运行时零第三方依赖）");
         // 大文件（设计型 PPTX 常上百 MB）撞上限时，用户第一反应是"传不上去"，先把边界摆出来
