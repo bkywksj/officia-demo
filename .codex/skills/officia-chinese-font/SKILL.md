@@ -89,11 +89,15 @@ C:/Windows/Fonts/arial.ttf       （仅 ASCII）
 Linux / macOS 候选：
 
 ```
+/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc            文泉驿正黑（glyf ✓）
+/usr/share/fonts/truetype/wqy/wqy-microhei.ttc          文泉驿微米黑（glyf ✓）
 /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf         （仅拉丁，无中文）
-/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
-/System/Library/Fonts/PingFang.ttc                       （macOS）
-/Library/Fonts/Arial.ttf
+/Library/Fonts/Arial.ttf                                 （macOS，仅拉丁）
 ```
+
+> 🔴 `/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`（`fonts-noto-cjk` 装的）
+> 与 macOS 的 `PingFang.ttc` 都是 **CFF 轮廓**，officia 会跳过——见下方「不要装
+> `fonts-noto-cjk`」一节。
 
 ## 可直接复用的字体探测代码
 
@@ -106,8 +110,10 @@ static synchronized byte[] systemCjk() {
         "C:/Windows/Fonts/simhei.ttf",
         "C:/Windows/Fonts/msyh.ttf",
         "C:/Windows/Fonts/simsun.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/System/Library/Fonts/PingFang.ttc",
+        // Linux：文泉驿是 glyf 轮廓，officia 能用；
+        // 不要放 NotoSansCJK-Regular.ttc / PingFang.ttc —— 它们是 CFF，会被跳过
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     };
     for (String p : candidates) {
         File f = new File(p);
@@ -120,40 +126,62 @@ static synchronized byte[] systemCjk() {
 ```
 
 > 更稳的做法：**把字体文件随应用一起交付**（放进 `src/main/resources/fonts/`），从 classpath 读取，不依赖运行环境装了什么。
-> ⚠️ 注意字体的**授权协议**——不是所有字体都允许随应用分发嵌入。思源黑体（Source Han Sans）/ Noto Sans CJK 是 SIL OFL，可安全分发。
+> ⚠️ 两个约束都要满足：**授权允许分发**（Apache 2.0 / SIL OFL 可以；Windows 中文字体不可以），且**轮廓是 TrueType glyf**（思源黑体 / Noto CJK 的官方版是 CFF，授权没问题但 officia 用不了）。文泉驿系列两者都满足。
 
 ## Linux / Docker 环境装中文字体
+
+### 先问一句：真的需要装吗？
+
+officia **内置了兜底中文字体**（随 jar 分发），Linux 裸镜像开箱即用：不出豆腐块、
+文字可复制可检索，而且**断行与分页与 Windows 一致**——因为宋体/仿宋/楷体/黑体的度量
+已由常数规则复现，版式不依赖装了什么字体。实测某 68 页招标文：
+无字体环境断行一致率 89.2%、页数 68，与有字体环境**完全相同**。
+
+缺的只有**字形长相**（内置的是无衬线黑体，宋体是衬线体；宋/仿/楷/黑会塌缩成同一种字面）。
+所以「装字体」是为了字形更接近原稿，不是为了让转换能跑或版式正确。
+
+### 要装的话，装这些
 
 ```dockerfile
 FROM eclipse-temurin:17-jre
 
-# Debian / Ubuntu
-RUN apt-get update && apt-get install -y \
-      fonts-noto-cjk fonts-noto-cjk-extra fonts-wqy-zenhei fontconfig \
+# Debian / Ubuntu —— 文泉驿是 TrueType glyf 轮廓，officia 能用
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      fonts-wqy-zenhei fonts-wqy-microhei fontconfig \
     && fc-cache -f && rm -rf /var/lib/apt/lists/*
 
-# Alpine
-# RUN apk add --no-cache font-noto-cjk fontconfig
-
-ENV OFFICIA_FONT_DIR=/usr/share/fonts
+ENV OFFICIA_FONTS_DIR=/usr/share/fonts
 ```
 
-装完后在代码里 `setFontDirectory("/usr/share/fonts")`，或用上面的探测逻辑自动找。
+`OFFICIA_FONTS_DIR` 环境变量（或 `-Dofficia.fonts.dir=...`）零改码生效；
+也可以在代码里 `setFontDirectory("/usr/share/fonts")`。
 
-### 🔴 必须装到「衬线 + 黑体」两族，否则字面会塌缩
+### 不要装 `fonts-noto-cjk` —— 对 officia 零收益
 
-只装一个黑体系字体时，宋体 / 仿宋 / 楷体 / 黑体会**一起回退到同一个字体**——
-文档里本来有 4 种字面，产物里只剩 1 种，标题和正文长得一样。
-`fonts-noto-cjk` 同时含 Noto Sans CJK（黑体）与 Noto Serif CJK（衬线），装它即可。
+该包装的是 `/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`，
+其 sfnt 版本是 **`OTTO`（CFF/PostScript 轮廓）**；officia 的 PDF 子集器**只支持
+TrueType `glyf` 轮廓**，加载时直接跳过 CFF。装了它，引擎一个字体都拿不到。
 
-用 `setReportFontSubstitutions(true)` 能直接看出来：多个 `requestedFamily` 指向同一个
-`resolvedFamily` 就是塌缩了。
+同理不可用：思源黑体/宋体的 `.otf` 官方版、Noto CJK 的 OTF/OTC 全系。
+**判据：装之前确认是 `.ttf`/`.ttc` 且为 glyf 轮廓。**
+
+### 另一个坑：可变字体只取默认实例
+
+officia 不解析 `gvar` 增量，可变字体（含 `fvar` 表）只渲染**默认实例**。
+Google Fonts 的 `NotoSansSC[wght].ttf` 等 CJK 可变字体 `wght` 轴 default=100，
+默认实例是 **Thin**——挂上去会发现中文笔画极细、整体发虚。
+挂载字体请选**静态、常规字重**的版本。
+
+### 字面塌缩怎么看
+
+用 `setReportFontSubstitutions(true)`：多个 `requestedFamily` 指向同一个
+`resolvedFamily` 就是塌缩了。想分开字面，就挂载对应的衬线/黑体两族字体。
 
 ### ⚠️ 不要把 Windows 中文字体拷进镜像
 
 微软字体许可禁止再分发（*"you may not copy them to other computers or servers"*），
 宋体/黑体/仿宋版权属北京中易，仅授权随 Windows 分发。把 `simsun.ttc` 打进 Docker 镜像
-有法律风险。合规做法：用 Noto / 思源 / 文泉驿（OFL 可商用），或为服务器单独购买字体授权。
+有法律风险。合规做法：用文泉驿（Apache 2.0 / GPL+字体例外，且是 glyf 轮廓），或为服务器单独购买字体授权。
 
 > 注意区分两件事：**把文档里的字体嵌进导出的 PDF** 是许可的（officia 会先校验 OS/2 的
 > `fsType` 嵌入权限位）；**把字体文件本身拷到服务器**才是禁止的。
@@ -226,7 +254,7 @@ for (FontSubstitution s : r.getFontSubstitutions()) {
 │   └─ 用带 fontTtf 的重载，传中文 TTF 字节
 ├─ 设了目录还是方块？
 │   ├─ 目录里只有 .ttc → 换纯 .ttf（simhei.ttf / msyh.ttf）
-│   ├─ 目录里只有拉丁字体（DejaVuSans）→ 装 Noto CJK / 文泉驿
+│   ├─ 目录里只有拉丁字体（DejaVuSans）→ 装文泉驿（glyf；Noto CJK 是 CFF、用不了）
 │   └─ 路径写错 / 容器内不存在 → ls 验证
 ├─ 字都在但断行/分页与 Windows 不同？
 │   └─ 开 setReportFontSubstitutions(true) 看实际用了什么字体（见上一节）
@@ -256,7 +284,7 @@ Files.walk(dir.toPath()).filter(p -> p.toString().matches(".*\\.(ttf|ttc)$"))
 | PDF 体积暴涨 | 嵌入了完整字体而非子集 / 多种字体 | 减少使用的字体种类；确认走的是子集嵌入 |
 | 中文是乱码而非方块 | 不是字体问题，是**源文件编码** | 见 `officia-troubleshooting` |
 | 字都在，但断行 / 分页与 Windows 不同 | 回退字体的**度量**与原字体不同 | 中易系（宋体/仿宋/楷体/黑体）已自动按常数度量补偿；其它字体需装真字体。开 `setReportFontSubstitutions(true)` 确认换成了什么 |
-| 标题与正文字面一样、看不出区别 | 只装了一个字体族，多个字面塌缩到同一字体 | 装 `fonts-noto-cjk`（含 Sans + Serif 两族） |
+| 标题与正文字面一样、看不出区别 | 只有一个字体可用，多个字面塌缩到同一字体 | 挂载衬线 + 黑体两族的 glyf 字体（**不是** `fonts-noto-cjk`，它是 CFF 轮廓、officia 跳过） |
 
 ## 在测试台里实测
 
