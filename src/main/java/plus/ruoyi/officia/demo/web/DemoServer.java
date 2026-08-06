@@ -294,8 +294,8 @@ public final class DemoServer {
                 return "不可用（中文会画成空白，请在界面上传中文 TTF）";
             }
             return Fonts.hasCjk()
-                ? "可用 —— 系统中文 TTF"
-                : "可用 —— 系统无中文字体，走 officia 内置兜底（字面为内置字体）";
+                ? "可用 —— 系统/挂载的中文 TTF"
+                : "可用 —— 未探测到中文字体，走 officia 内置兜底（字面为内置字体）";
         } catch (RuntimeException e) {
             // 字体注册表构建失败不该拦住服务启动，如实降级显示
             return "探测失败（" + e.getClass().getSimpleName() + "）";

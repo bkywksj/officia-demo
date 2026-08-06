@@ -4,6 +4,11 @@ import plus.ruoyi.officia.engine.font.TrueTypeFont;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * 中文字体探测：PDF 水印/页码要写中文必须给 TTF（officia 门面的 fontTtf 入参）。
@@ -78,12 +83,58 @@ final class Fonts {
             return cached;
         }
         probed = true;
-        if (load(CJK_CANDIDATES, true)) {
+        // 运维字体目录排在硬编码候选之前：它是部署方显式配的，优先级本就该最高
+        //（与 FontLoader 的口径一致——那边 OFFICIA_FONTS_DIR 也排在系统扫描之后、用户目录之前）
+        if (load(operatorFontFiles(), true) || load(CJK_CANDIDATES, true)) {
             cjk = true;
             return cached;
         }
         load(ASCII_FALLBACK, false);
         return cached;
+    }
+
+    /**
+     * 运维字体目录（{@code -Dofficia.fonts.dir} / 环境变量 {@code OFFICIA_FONTS_DIR}）里的字体文件。
+     *
+     * <p><b>为什么必须认它</b>：容器里的中文字体常常既不在系统路径、也不随镜像装，而是
+     * <b>挂载</b>进来再用这个变量指过去（msi 上就是 {@code /opt/officia/fonts}）。
+     * 只探 {@link #CJK_CANDIDATES} 那张硬编码表会漏掉它们，于是启动横幅报
+     * 「系统无中文字体，走内置兜底」——而实际渲染早已用上挂载的字体，措辞与事实不符、误导排查。</p>
+     *
+     * <p>解析规则刻意与 {@code FontLoader.scanExtraFromEnv} 保持一致：{@code -D} 优先于环境变量，
+     * 多目录按 {@link File#pathSeparator} 分隔（Windows 是 {@code ;}，故 {@code C:/…} 的冒号不会被误切）。</p>
+     *
+     * @return 目录下的字体文件路径（按文件名排序，保证同一环境每次探测结果一致）；未配置时空数组
+     */
+    // 包内可见（非 private）：探测结果是进程级缓存，单测无法重新触发 systemCjk()，
+    // 只能直接测这段解析逻辑——它正是此前漏掉挂载目录的那处
+    static String[] operatorFontFiles() {
+        String cfg = System.getProperty("officia.fonts.dir");
+        if (cfg == null || cfg.isBlank()) {
+            cfg = System.getenv("OFFICIA_FONTS_DIR");
+        }
+        if (cfg == null || cfg.isBlank()) {
+            return new String[0];
+        }
+        List<String> out = new ArrayList<>();
+        for (String dir : cfg.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+            File d = new File(dir.trim());
+            if (dir.isBlank() || !d.isDirectory()) {
+                continue;
+            }
+            File[] files = d.listFiles(f -> {
+                String n = f.getName().toLowerCase(Locale.ROOT);
+                return f.isFile() && (n.endsWith(".ttf") || n.endsWith(".ttc"));
+            });
+            if (files == null) {
+                continue;
+            }
+            Arrays.sort(files, Comparator.comparing(File::getName));
+            for (File f : files) {
+                out.add(f.getPath());
+            }
+        }
+        return out.toArray(new String[0]);
     }
 
     /**
