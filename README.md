@@ -6,6 +6,13 @@
 
 > 🔒 **本示例不携带任何 License 令牌 / `.lic` 证书**（面向公开展示）。授权解锁效果由使用者放入自己的 `officia.lic` 时生效。
 
+## 🌐 线上站点
+
+本测试台已部署对外访问：**<https://demo.officia.ruoyi.plus/>**（评估版：水印 + 限 30 页）。
+
+想看效果不必本地构建，直接开这个地址即可；本地跑法见下文。
+部署形态（msi / Docker / 18080 端口 / 挂载字体）见 `.claude/skills/officia-deploy/`。
+
 ## 前置：让本地仓有 officia
 
 demo 依赖 `officia-*:1.0.0`。联网环境直接在 officia 目录 `mvn install` 即可；
