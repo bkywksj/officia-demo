@@ -121,7 +121,7 @@ byte[] pdf = OfficiaWords.toPdf(bytes);   // 自动识别 DOCX(OOXML) / DOC(CFB)
 | 生产就绪 | 🚧 **未宣布**——任务仍在收口 |
 | 规范基线 | MS-DOC 12.5 / MS-CFB 12.0 / MS-ODRAW 12.4 / MS-OSHARED 11.1 / MS-OLEPS 9.0 |
 | **加密的 .doc**（XOR / RC4 / CryptoAPI） | ❌ **明确不支持** |
-| WMF / EMF / PICT / CMYK JPEG 图片负载 | ❌ 明确不支持 |
+| WMF / EMF / PICT / CMYK JPEG 图片负载 | ⚠️ 不解码，**退化为空白占位**（2026-07-31 起整篇照常转出，不再被一张图否决）|
 | 宏 / OLE / 签名负载的内部解析 | ❌ 明确不支持（跳过，不解析） |
 | 竖排 / RTL 文本框 | ⚠️ 已知缺口 |
 | DOC 内嵌字体 | ⚠️ 已知缺口（字体数据是 W3C EOT 格式，该规范未归档） |

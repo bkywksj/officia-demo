@@ -98,7 +98,7 @@ Map<String, Object> all = OfficiaCells.recalculateXlsx(xlsxBytes);
 
 也作用于首个工作表。
 
-## 支持的 Excel 函数（34 个，核实自 `FormulaEngine`）
+## 支持的 Excel 函数（35 个，核实自 `FormulaEngine`）
 
 | 分类 | 函数 |
 |---|---|
@@ -143,7 +143,7 @@ public class ReportPipeline {
 |---|---|---|
 | `toCsv` 只有一个 sheet 的数据 | 设计如此——只导首个工作表 | 需要多表就分别处理源文件 |
 | CSV 某些行字段数少 | 合并单元格，按实际输出不补齐 | 下游解析要容忍不定列数，或先在 Excel 里取消合并 |
-| 公式算不出 / 抛异常 | 函数不在 34 个支持清单内、循环引用、网格非法 | 核对函数名；检查是否互相引用 |
+| 公式算不出 / 抛异常 | 函数不在 35 个支持清单内、循环引用、网格非法 | 核对函数名；检查是否互相引用 |
 | xlsx 里显示是 100，算出来不一样 | officia **实算**，不信缓存值——Excel 里的缓存可能过期 | 以实算为准；确认公式依赖的单元格值 |
 | 转出的 PDF 中文方块 | 字体 | `officia-chinese-font` |
 | 转出的 PDF 有水印 | 未授权 + 门控开 | `officia-license` |
