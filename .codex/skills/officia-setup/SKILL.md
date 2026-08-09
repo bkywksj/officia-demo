@@ -50,21 +50,44 @@ implementation 'plus.ruoyi:officia-all:1.0.0'
 `officia-words`、`officia-cells`、`officia-slides`、`officia-pdf`、`officia-barcode`、`officia-imaging`、`officia-email`、**`officia-license`**。
 
 > 💡 所以引了 `officia-all` **就已经有授权客户端了**，不必再单独引 `officia-license`。
-> 本 demo 的 `pom.xml` 仍显式再写一遍，是为了**表达"这是消费方要用到的两个东西"**的意图，不是必需。
 
-### 只用一个能力时：单引模块
+### 🔴 Maven Central 上只有 `officia-all` 这一个构件
+
+发布到 Central 的是 shade 出来的**单一 uber-jar**（632 个类，含全部能力模块 + `officia-license`）。
+**`officia-license`、`officia-pdf`、`officia-words` 等子模块坐标在 Central 上不存在**，引用会解析失败：
+
+```
+Could not resolve dependencies
+  → plus.ruoyi:officia-license:jar:1.0.0 was not found in https://repo1.maven.org/maven2
+```
+
+核实命令（自己验一下，别信记忆）：
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" \
+  https://repo1.maven.org/maven2/plus/ruoyi/officia-all/1.0.0/officia-all-1.0.0.pom      # 200
+curl -s -o /dev/null -w "%{http_code}\n" \
+  https://repo1.maven.org/maven2/plus/ruoyi/officia-license/1.0.0/officia-license-1.0.0.pom  # 404
+```
+
+> 本 demo 的 `pom.xml` 曾多写一条 `officia-license`——本机 `mvn install` 后能解析，客户照抄就 404。
+> 2026-08-09 已删除并加注释说明（见其 pom）。**回答客户"要引哪些依赖"时只说 `officia-all` 一个。**
+
+### 下面这些模块坐标仅存在于源码构建（Central 上没有）
+
+只有**自行 clone officia 源码并 `mvn install`** 后，本地仓才有这些子模块坐标，才谈得上单引：
 
 ```xml
 <dependency>
   <groupId>plus.ruoyi</groupId>
-  <artifactId>officia-pdf</artifactId>   <!-- 只要 PDF 工具箱 -->
+  <artifactId>officia-pdf</artifactId>   <!-- 仅本地 install 后可用，Central 上是 404 -->
   <version>1.0.0</version>
 </dependency>
 ```
 
 Maven 会自动带上该模块依赖的底座（如 `officia-pdf` → `officia-render-pdf` + `officia-common`），你不用手写。
 
-**可单引的能力模块**：
+**源码构建后可单引的能力模块**：
 
 | artifactId | 门面 | 能力 |
 |---|---|---|
@@ -79,11 +102,16 @@ Maven 会自动带上该模块依赖的底座（如 `officia-pdf` → `officia-r
 
 底座模块（`officia-common` / `officia-ooxml` / `officia-cfb` / `officia-engine` / `officia-render-pdf`）**不用手动引**，由能力模块传递带入。
 
-> **选型建议**：多数项目直接用 `officia-all` 最省心——officia 本身零第三方依赖，全引也不会污染依赖树；只有对产物体积极度敏感时才单引。
+> **选型建议**：直接用 `officia-all`——从 Central 拿包时它本来也是唯一选择，且 officia 零第三方依赖，
+> 全引不会污染依赖树。只有"自行源码构建 + 对产物体积极度敏感"这一种情况才谈得上单引。
 
 ## 二、让本地仓库有 officia
 
-发布产物尚未进入公共仓库时（或你要用本地构建版本），先在 officia 源码目录装进本地仓：
+**通常不用做这一步**——`officia-all:1.0.0` 自 2026-08-09 起已在 Maven Central，
+`mvn package` 会自动拉取（首次需联网）。
+
+本节适用于两种情况：**① 要用本地构建版本**（如 dev 版：门控可开关、未混淆，便于做授权前后对比）；
+**② 离线 / 内网环境**。在 officia 源码目录装进本地仓：
 
 ```bash
 # 在 ../officia 目录执行（联网环境）

@@ -300,25 +300,26 @@ K8s 用 Secret 挂载同理。不配也能跑——未授权只是降级（水�
 
 ---
 
-## 六、构建策略：为什么不用多阶段构建
+## 六、构建策略：宿主构建 → COPY jar（多阶段现在也可行了）
 
-`officia-all` / `officia-license` 只存在于**宿主本地仓** `~/.m2`（未发布到公共 Maven 仓库）。
-多阶段构建里的 `mvn` 拿不到它们，会在依赖解析阶段直接失败：
-
-```
-Could not resolve dependencies for project plus.ruoyi.demo:officia-demo
-  → plus.ruoyi:officia-all:jar:1.0.0 was not found
-```
-
-所以固定流程是**宿主构建 → COPY jar**：
+固定流程仍是**宿主构建 → COPY jar**：
 
 ```bash
 mvn -o package -DskipTests      # 产出 target/officia-demo-1.0.0.jar（shade 自包含）
 docker build -f deploy/Dockerfile -t officia-demo:1.0.0 .   # 上下文必须是项目根目录
 ```
 
-> 内网有私服（Nexus/Artifactory）时才有条件改多阶段：先把 officia 各模块 `deploy:deploy-file` 传上去，
-> 再在 Dockerfile 里配 `settings.xml` 指向私服。见 `officia-setup`。
+> ⚠️ **2026-08-09 起前提变了**：`officia-all:1.0.0` 已发布到 **Maven Central**
+> （`https://repo1.maven.org/maven2/plus/ruoyi/officia-all/`），本节原先"未发布到公共仓库、
+> 多阶段构建必然解析失败"的理由**不再成立**——现在容器内 `mvn` 能直接拉到它，多阶段可行。
+>
+> 但**默认仍推荐宿主构建**，理由换成了这两条：
+> ① Central 上是 **release 版**（ProGuard 混淆 + 门控恒开），而本地开发验证常用 dev 版，
+>    两者行为不同，宿主构建能保证"测的就是要发的"；
+> ② 多阶段每次构建都要重新拉依赖，慢且依赖网络。
+>
+> 🔴 若改多阶段，**只引 `officia-all` 一个坐标**：Central 上没有 `officia-license` 与其它
+> `officia-*` 子模块（只发布了聚合 uber-jar），引它们会 404。
 
 ---
 
