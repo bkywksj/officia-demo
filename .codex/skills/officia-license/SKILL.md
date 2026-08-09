@@ -24,6 +24,23 @@ Officia 采用**席位签名授权**：不锁机器、不联网，把"授权给�
 
 **核心语义：库永远不会中断你的程序**。未授权只是**降级**（盖评估水印 + 限制页数），不抛异常、不 `System.exit`。所有 API 在评估态下都可正常调用。
 
+### 评估态到底限制什么（2026-08-08 实测，核实自 `EvaluationGate`）
+
+降级 = **限 30 页 + 每页盖评估水印**，只作用于**产出 PDF 成品**的路径：
+
+| 受门控（未授权会降级） | 不受门控（未授权与授权输出一致） |
+|---|---|
+| `OfficiaWords.toPdf`（docx / doc） | `OfficiaWords.fillTemplate*`（输出 docx） |
+| `OfficiaCells.toPdf` / `csvToPdf` | `OfficiaCells.toCsv` / `parseCsv` / 公式求值 |
+| `OfficiaSlides.toPdf` | `OfficiaBarCode` 全部 |
+| `OfficiaEmail.toPdf` | `OfficiaEmail.parseEml` / `writeEml` |
+| `OfficiaImaging.toPdf` | `OfficiaImaging` 的转换 / 缩放 / 裁剪 / 旋转 / 滤镜 / 水印 |
+| `OfficiaPdf` 全部写出方法 + `PdfEditor` 终结出口 | `OfficiaPdf` 只读（`extractText` / `pageCount` / `metadata` / 抽图） |
+
+> 为什么这么划：条码盖水印就扫不出来、位图盖水印就看不出滤镜效果——那样评估版根本无法评估。
+> 非 PDF 输出（CSV / docx / EML）也套不上"限页 + 水印"这个口径。
+> 回答客户"X 能不能免费用"时按本表如实说，别笼统答"都带水印"。
+
 ## 一、加载授权（零代码，推荐）
 
 买到 `officia.lic` 后放到下列**任一位置**，officia 首次使用能力时自动查找并验签加载，**无需写任何代码**。
