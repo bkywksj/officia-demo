@@ -45,6 +45,15 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
   <div class="border-t border-slate-100 p-3 text-xs text-slate-400">
     <div class="flex items-center gap-1.5"><i data-lucide="package" class="w-3.5 h-3.5"></i>officia-all 1.0.0</div>
     <div class="flex items-center gap-1.5 mt-1"><i data-lucide="shield-off" class="w-3.5 h-3.5"></i>运行时零第三方依赖</div>
+    <div class="mt-2.5 pt-2.5 border-t border-slate-100 space-y-1.5">
+      <a href="https://officia.ruoyi.plus" target="_blank" rel="noopener"
+         class="flex items-center gap-1.5 text-slate-500 hover:text-primary transition">
+        <i data-lucide="book-open" class="w-3.5 h-3.5"></i>官网 · 使用文档</a>
+      <a href="https://officia.ruoyi.plus/guide/licensing.html" target="_blank" rel="noopener"
+         class="flex items-center gap-1.5 text-slate-500 hover:text-primary transition">
+        <i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i>购买授权 · 去水印</a>
+      <div class="flex items-center gap-1.5 pt-0.5"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i>微信 / QQ 770492966</div>
+    </div>
   </div>
 </nav>
 
@@ -57,6 +66,9 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
         <i data-lucide="loader" class="w-3.5 h-3.5"></i>读取授权状态…</span>
       <button onclick="go('lic')" class="border border-slate-300 px-3 py-1.5 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer flex items-center gap-1.5">
         <i data-lucide="key-round" class="w-4 h-4"></i>加载 officia.lic</button>
+      <a href="https://officia.ruoyi.plus" target="_blank" rel="noopener"
+         class="bg-primary text-white px-3 py-1.5 rounded-md text-sm hover:opacity-90 transition flex items-center gap-1.5">
+        <i data-lucide="book-open" class="w-4 h-4"></i>官网 / 文档</a>
     </div>
   </header>
 
@@ -96,6 +108,26 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
         <th class="px-4 py-2.5 text-left font-medium">输出</th><th class="px-4 py-2.5 text-left font-medium">耗时</th>
         <th class="px-4 py-2.5 text-left font-medium">状态</th><th class="px-4 py-2.5 text-left font-medium">操作</th></tr></thead>
         <tbody class="divide-y divide-slate-100" id="taskRows"><tr><td colspan="6" class="px-4 py-8 text-center text-slate-400 text-sm">还没有任务，去左侧选个能力试试</td></tr></tbody></table>
+    </div>
+    <!-- 首屏落脚点：说清"这是什么 + 产物为何带水印 + 去哪了解和购买"，避免访客试完就走 -->
+    <div class="mt-5 bg-white rounded-lg border border-slate-200 p-5 flex items-start justify-between gap-6 flex-wrap">
+      <div>
+        <div class="font-medium text-slate-900 flex items-center gap-2">
+          <i data-lucide="info" class="w-4 h-4 text-primary"></i>这是 Officia 的能力测试台（评估版）</div>
+        <div class="text-sm text-slate-500 mt-2 leading-relaxed">
+          Officia 是纯自研、<b>运行时零第三方依赖</b>的 Java 文档处理套件（对齐 Aspose）：
+          Word / Excel / PPT → PDF、模板填充与邮件合并、PDF 工具箱、图像处理、条码二维码、邮件归档。<br>
+          本站产物带评估水印且限 30 页，加载授权后即为完整输出。上传件只存内存、重启即清、不落盘。
+        </div>
+      </div>
+      <div class="flex flex-col gap-2 shrink-0">
+        <a href="https://officia.ruoyi.plus" target="_blank" rel="noopener"
+           class="bg-primary text-white px-4 py-2 rounded-md text-sm hover:opacity-90 transition flex items-center gap-2 justify-center">
+          <i data-lucide="book-open" class="w-4 h-4"></i>官网 · 使用文档</a>
+        <a href="https://officia.ruoyi.plus/guide/licensing.html" target="_blank" rel="noopener"
+           class="border border-slate-300 px-4 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition flex items-center gap-2 justify-center">
+          <i data-lucide="shopping-cart" class="w-4 h-4"></i>购买授权 · 去水印</a>
+      </div>
     </div>
   </section>
 
@@ -346,6 +378,33 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
         <span class="flex items-center gap-2"><i data-lucide="columns-2" class="w-4 h-4 text-primary"></i>授权前后效果对比（同一份 150 行数据）</span>
         <button onclick="licCompare()" class="text-xs bg-primary text-white px-3 py-1.5 rounded hover:opacity-90 cursor-pointer transition">开始对比</button></div>
       <div id="licCmp" class="p-4 text-sm text-slate-400">点「开始对比」：先在强制门控下生成一次（评估降级），再按当前授权态生成一次，并排比较页数与水印。</div>
+    </div>
+    <!-- 购买引导：放在效果对比之后——用户刚看完"水印+限页 vs 完整输出"的差异，此刻转化意愿最强 -->
+    <div class="mt-4 bg-white rounded-lg border border-primary/30 p-5">
+      <div class="flex items-start justify-between gap-6 flex-wrap">
+        <div>
+          <div class="font-medium text-slate-900 flex items-center gap-2">
+            <i data-lucide="badge-check" class="w-4 h-4 text-primary"></i>去掉水印与页数限制</div>
+          <div class="text-sm text-slate-500 mt-2 leading-relaxed">
+            购买后获得离线授权文件 <code class="bg-slate-100 px-1 rounded text-xs">officia.lic</code>，
+            放到 classpath / 工作目录即自动加载，<b>无需改一行代码</b>。<br>
+            席位签名授权：不锁机器、不联网、可商用可闭源分发。
+          </div>
+          <div class="text-sm text-slate-600 mt-3 flex items-center gap-4 flex-wrap">
+            <span class="flex items-center gap-1.5"><i data-lucide="user" class="w-4 h-4 text-slate-400"></i>个人版 <b>¥1288</b></span>
+            <span class="flex items-center gap-1.5"><i data-lucide="building-2" class="w-4 h-4 text-slate-400"></i>企业版 <b>¥2999</b></span>
+            <span class="flex items-center gap-1.5 text-slate-500"><i data-lucide="message-circle" class="w-4 h-4 text-slate-400"></i>微信 / QQ 770492966</span>
+          </div>
+        </div>
+        <div class="flex flex-col gap-2 shrink-0">
+          <a href="https://officia.ruoyi.plus/guide/licensing.html" target="_blank" rel="noopener"
+             class="bg-primary text-white px-4 py-2 rounded-md text-sm hover:opacity-90 transition flex items-center gap-2 justify-center">
+            <i data-lucide="shopping-cart" class="w-4 h-4"></i>查看授权与定价</a>
+          <a href="https://officia.ruoyi.plus" target="_blank" rel="noopener"
+             class="border border-slate-300 px-4 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition flex items-center gap-2 justify-center">
+            <i data-lucide="book-open" class="w-4 h-4"></i>官网 · 使用文档</a>
+        </div>
+      </div>
     </div>
   </section>
 
