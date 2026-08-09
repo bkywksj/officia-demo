@@ -1,7 +1,7 @@
 package plus.ruoyi.officia.demo.web;
 
-import plus.ruoyi.officia.engine.font.TrueTypeFont;
-
+import java.awt.Font;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -177,23 +177,82 @@ final class Fonts {
      * @return 能画中文返回 true
      */
     static boolean usableForCjk(byte[] data) {
-        try {
-            TrueTypeFont f = new TrueTypeFont(data);
-            return f.getTable("glyf") != null
-                && f.hasGlyph('中') && f.hasGlyph('国') && f.hasGlyph('权');
-        } catch (RuntimeException e) {
-            return false;
-        }
+        return hasGlyfTable(data) && canDisplay(data, '中', '国', '权');
     }
 
     /** 这份字体能不能至少画 ASCII（同样要求 glyf，否则子集器一样抛异常）。 */
     static boolean usableForAscii(byte[] data) {
-        try {
-            TrueTypeFont f = new TrueTypeFont(data);
-            return f.getTable("glyf") != null && f.hasGlyph('A');
-        } catch (RuntimeException e) {
+        return hasGlyfTable(data) && canDisplay(data, 'A');
+    }
+
+    /**
+     * 字体是否含 {@code glyf} 表（sfnt 表目录扫描）。
+     *
+     * <p><b>为什么必须自己扫而不用 java.awt.Font</b>：AWT 能正常加载 CFF/OTF 轮廓字体，
+     * 但 officia 的子集器只支持 TrueType 的 glyf/loca，喂 CFF 会抛「字体无 glyf/loca」。
+     * 只用 AWT 判断就会重演本类开头记的那次事故——容器里命中 CFF 轮廓的 Noto CJK，
+     * 横幅报「中文水印可用」，实际调用直接炸。</p>
+     *
+     * <p>此前这里用的是 officia 的 {@code TrueTypeFont} 内部类。但 Maven Central 上的
+     * officia-all 经 ProGuard 混淆，只保留公开门面，内部类不可用——demo 作为消费方示例
+     * 必须只依赖公开 API，否则客户照抄就编译不过。故改为纯 JDK 自解析。</p>
+     *
+     * <p>格式依据 OpenType 规范的表目录：offset 0 起 4 字节 sfntVersion，
+     * 4-6 numTables，之后每 16 字节一条记录、前 4 字节是表标签。
+     * {@code ttcf} 开头的字体集合取第 0 号字体的表目录。</p>
+     */
+    private static boolean hasGlyfTable(byte[] d) {
+        if (d == null || d.length < 12) {
             return false;
         }
+        try {
+            int base = 0;
+            if (tag(d, 0).equals("ttcf")) {          // TTC：跳到第 0 号字体的表目录
+                base = readInt(d, 12);
+                if (base < 0 || base + 12 > d.length) {
+                    return false;
+                }
+            }
+            int numTables = ((d[base + 4] & 0xFF) << 8) | (d[base + 5] & 0xFF);
+            for (int i = 0; i < numTables; i++) {
+                int rec = base + 12 + i * 16;
+                if (rec + 4 > d.length) {
+                    return false;
+                }
+                if (tag(d, rec).equals("glyf")) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (RuntimeException e) {
+            return false;                            // 结构不合法即视作不可用，不阻断服务
+        }
+    }
+
+    /** 这份字体是否覆盖给定全部码位（交给 AWT 判，不必自己解 cmap）。 */
+    private static boolean canDisplay(byte[] data, char... chars) {
+        try {
+            Font f = Font.createFont(Font.TRUETYPE_FONT, new ByteArrayInputStream(data));
+            for (char c : chars) {
+                if (!f.canDisplay(c)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;                            // 解析失败 = 不可用
+        }
+    }
+
+    /** 读 4 字节表标签。 */
+    private static String tag(byte[] d, int off) {
+        return new String(d, off, 4, java.nio.charset.StandardCharsets.ISO_8859_1);
+    }
+
+    /** 读 4 字节大端无符号整数（作 int 用，字体文件不会大到溢出）。 */
+    private static int readInt(byte[] d, int off) {
+        return ((d[off] & 0xFF) << 24) | ((d[off + 1] & 0xFF) << 16)
+             | ((d[off + 2] & 0xFF) << 8) | (d[off + 3] & 0xFF);
     }
 
     /** 供启动日志展示是否探测到可用字体。 */

@@ -2,10 +2,10 @@ package plus.ruoyi.officia.demo.web;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import plus.ruoyi.officia.cells.OfficiaCells;
 import plus.ruoyi.officia.common.exception.OfficiaException;
-import plus.ruoyi.officia.engine.font.FontLoader;
-import plus.ruoyi.officia.engine.font.FontRegistry;
 import plus.ruoyi.officia.license.OfficiaLicense;
+import plus.ruoyi.officia.pdf.OfficiaPdf;
 
 import java.awt.Desktop;
 import java.io.IOException;
@@ -278,18 +278,25 @@ public final class DemoServer {
     }
 
     /**
-     * 中文可渲染性：按 officia <b>实际渲染路径</b>判断，并说明字形来自系统字体还是内置兜底。
+     * 中文可渲染性：真的转一页含中文的 PDF 再读回来，并说明字形来自系统字体还是内置兜底。
      *
-     * <p>探针码位取评估水印文案里的「授」——水印正是靠字形级回退挑字体的，用它判断最贴近真实。
-     * 系统字体缺中文时 officia 会落到内置兜底字体，此时中文<b>可渲染</b>，只是字面变成内置字体的样子；
-     * 只有连内置带系统都没有中文字形，才是真的会画空白。</p>
+     * <p><b>为什么改成端到端实测</b>：此前探 officia 的 {@code FontRegistry/FontLoader} 内部注册表，
+     * 但 Maven Central 上的 officia-all 经 ProGuard 混淆只保留公开门面，内部类不可用——
+     * demo 作为消费方示例必须只依赖公开 API，否则客户照抄就编译不过。
+     * 换个角度反而更准：与其问"注册表里有没有这个字形"，不如直接转一页看中文能不能读回来，
+     * 这正是用户真正关心的结果，也顺带验证了整条渲染链。</p>
+     *
+     * <p>探针字取评估水印文案里的「授」。系统字体缺中文时 officia 会落到内置兜底字体，
+     * 此时中文<b>可渲染</b>，只是字面变成内置字体的样子；只有连内置带系统都没有中文字形，
+     * 才是真的会画空白。</p>
      *
      * @return 供启动横幅显示的一句话
      */
     private static String cjkStatus() {
         try {
-            FontRegistry fonts = FontLoader.load(null);
-            boolean renderable = fonts.get(fonts.resolveFamily(null, '授')).hasGlyph('授');
+            // 一页 CSV → PDF → 抽文本：能读回「授」即证明这条链真的画得出中文
+            byte[] pdf = OfficiaCells.csvToPdf("授权,探针\n");
+            boolean renderable = OfficiaPdf.extractText(pdf).contains("授");
             if (!renderable) {
                 return "不可用（中文会画成空白，请在界面上传中文 TTF）";
             }
@@ -297,7 +304,7 @@ public final class DemoServer {
                 ? "可用 —— 系统/挂载的中文 TTF"
                 : "可用 —— 未探测到中文字体，走 officia 内置兜底（字面为内置字体）";
         } catch (RuntimeException e) {
-            // 字体注册表构建失败不该拦住服务启动，如实降级显示
+            // 探测失败不该拦住服务启动，如实降级显示
             return "探测失败（" + e.getClass().getSimpleName() + "）";
         }
     }

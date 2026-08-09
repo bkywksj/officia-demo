@@ -22,16 +22,18 @@
     </properties>
 
     <dependencies>
-        <!-- 全家桶：一次引入即得全部能力模块（words/cells/slides/pdf/email/imaging/barcode） -->
+        <!--
+          全家桶：一次引入即得全部能力模块（words/cells/slides/pdf/email/imaging/barcode）
+          外加授权客户端（OfficiaLicense 门面 + 内嵌验签公钥）。
+
+          这是**唯一**需要引的 officia 依赖：Maven Central 上只发布 officia-all 这一个 artifact，
+          它是 shade 出来的 uber-jar（含 632 个类），各能力模块与 officia-license 都已打进去。
+          此前本 pom 还单列了一条 officia-license —— 那在本机 mvn install 后能解析，
+          但客户照抄就是 404（Central 上没有这个 artifact）。别再加回来。
+        -->
         <dependency>
             <groupId>plus.ruoyi</groupId>
             <artifactId>officia-all</artifactId>
-            <version>1.0.0</version>
-        </dependency>
-        <!-- 授权客户端（内嵌验签公钥 + OfficiaLicense 门面） -->
-        <dependency>
-            <groupId>plus.ruoyi</groupId>
-            <artifactId>officia-license</artifactId>
             <version>1.0.0</version>
         </dependency>
 
