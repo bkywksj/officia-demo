@@ -33,6 +33,8 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 | `.docx` | PDF | `OfficiaWords.toPdf(byte[])` | `officia-words` |
 | `.doc`（CFB 二进制） | PDF | `OfficiaWords.toPdf(byte[])`（同一入口，**自动识别**格式） | `officia-words` |
 | `.docx` 模板 + 数据 | 填好的 docx / PDF | `OfficiaWords.fillTemplate(...)` / `fillTemplateToPdf(...)` | `officia-template` |
+| Markdown 文本 / `.md` | PDF | `OfficiaWords.markdownToPdf(String)` | `officia-words` |
+| Markdown 文本 / `.md` | 可编辑 docx | `OfficiaWords.markdownToDocx(String)`（版式暂较素，见技能） | `officia-words` |
 | `.xlsx` | PDF | `OfficiaCells.toPdf(byte[])` | `officia-cells` |
 | `.xlsx` | CSV 文本 | `OfficiaCells.toCsv(byte[])` | `officia-cells` |
 | CSV 文本 | PDF | `OfficiaCells.csvToPdf(String)` | `officia-cells` |
@@ -53,6 +55,7 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 
 ```java
 OfficiaWords.toPdf(docx)                    // Word（docx / doc 自动识别）
+OfficiaWords.markdownToPdf(md)              // Markdown（版式由排版引擎定版）
 OfficiaWords.fillTemplateToPdf(tpl, data)   // 模板填充后直出 PDF（一步）
 OfficiaCells.toPdf(xlsx)                    // Excel
 OfficiaCells.csvToPdf(csvText)              // CSV

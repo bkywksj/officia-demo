@@ -3,15 +3,17 @@ name: officia-words
 description: |
   用 OfficiaWords 把 Word 转成 PDF：docx / doc（自动识别）、四种入参形态、流式转换省内存、
   取页数与耗时、ConvertOptions 配置（纸张 / 字体目录 / 字体嵌入 / 图像降采样 / 超时）。
+  也包含 Markdown → docx / PDF（Markdown 是 Words 的一种输入格式）。
 
   触发场景：
   - Word 转 PDF、docx 转 PDF、doc 转 PDF
+  - Markdown 转 Word、md 转 docx、md 转 PDF
   - 要知道转换出来几页、耗时多少
   - 大文档转换想省内存 / 直接写进 HTTP 响应流
   - 要改纸张大小、指定字体目录
   - .doc 老格式能不能转、有什么限制
 
-  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积
+  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积、Markdown、md、markdownToDocx、markdownToPdf、md转word、md转docx、md转pdf
 disable-model-invocation: false
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 ---
@@ -20,10 +22,11 @@ allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 
 ## 概述
 
-`OfficiaWords` 是 Word 处理的唯一入口，两类能力：
+`OfficiaWords` 是 Word 处理的唯一入口，三类能力：
 
 1. **转换**：`toPdf` / `convert` —— docx、doc 都走同一入口，**自动识别格式**（本技能）
-2. **模板填充 / 邮件合并**：`fillTemplate*` —— 见 `officia-template`
+2. **Markdown 输入**：`markdownToDocx` / `markdownToPdf` —— Markdown 是 Words 的一种输入格式，不是独立模块（本技能）
+3. **模板填充 / 邮件合并**：`fillTemplate*` —— 见 `officia-template`
 
 底层链路 `WordParser → DocModel(IR) → LayoutEngine → PdfRenderer` 已被门面完全屏蔽，你只管调静态方法。
 
@@ -104,6 +107,58 @@ byte[] pdf = OfficiaWords.toPdf(docx, opts);
 **`maxImageDpi` 什么时候要改**：默认 150 dpi 屏幕阅读与一般打印看不出差别，能大幅压体积——实测某 143 页设计模板 222 MB → 105 MB，耗时也从 140 s 降到 62 s。只有**高精度印刷**或产物还要**二次编辑**时才设 `0` 保留原始像素，代价是体积可能大出数倍。JPEG 源图始终走字节直通、不受该项影响。
 
 `PageSize` 尺寸（PDF 点，1pt = 1/72 英寸）：`A4` 595.32×841.92、`A5` 419.58×595.32、`A3` 841.92×1190.7、`LETTER` 612×792、`LEGAL` 612×1008。
+
+## Markdown → docx / PDF（`markdownToDocx` / `markdownToPdf`）
+
+Markdown 是 Words 的**一种输入格式**（对齐 Aspose.Words 把 Markdown 当 LoadFormat 的做法），不是独立模块——不用引新依赖，还是 `officia-words`。
+
+```java
+byte[] docx = OfficiaWords.markdownToDocx("# 标题\n\n正文**加粗**");
+byte[] pdf  = OfficiaWords.markdownToPdf ("# 标题\n\n正文**加粗**");
+```
+
+### 全部方法（核实自 `OfficiaWords` 源码）
+
+```java
+// → docx（不排版，分页交给 Word 自己算）
+byte[] markdownToDocx(String markdown)
+byte[] markdownToDocx(byte[] markdown)     // 编码自动判定
+byte[] markdownToDocx(File file)
+byte[] markdownToDocx(InputStream in)      // 不主动关闭调用方的流
+
+// → PDF（由排版引擎定版）
+byte[] markdownToPdf(String markdown)
+byte[] markdownToPdf(String markdown, ConvertOptions options)
+byte[] markdownToPdf(byte[] markdown)
+byte[] markdownToPdf(File file)
+byte[] markdownToPdf(InputStream in)
+ConvertResult convertMarkdown(String markdown, ConvertOptions options)   // 要页数 / 耗时
+
+// → PDF 流式（省内存，返回页数）
+int markdownToPdf(String markdown, OutputStream out)                     // 不关闭 out
+int markdownToPdf(String markdown, ConvertOptions options, OutputStream out)
+int markdownToPdf(File inMarkdown, File outPdf)                          // 边生成边写盘
+```
+
+**编码自动判定**（`byte[]` / `File` / `InputStream` 三种入参）：先认 BOM，无 BOM 则严格试解 UTF-8，失败退到 GBK（中文 Windows 记事本存盘的 .md 常见）。已知编码时更推荐自己解码后调 `String` 版。
+
+### 支持的语法
+
+标题（ATX `#` 与 Setext 下划线，**带大纲级别** → Word 导航窗格 / PDF 书签）、段落（中文软换行不插空格、西文插空格；行尾两空格或反斜杠为硬换行）、有序无序**任意层级嵌套列表**、围栏代码块（``` 与 ~~~）、引用块（含嵌套与惰性延续）、GFM 表格（`:---:` 三种对齐）、分隔线、YAML front matter（`title`/`author`/`subject`/`keywords`/`lang` → 文档属性）、**加粗 / 斜体 / 删除线 / 行内代码 / 链接 / 自动链接 / 反斜杠转义**。
+
+### 诚实边界（务必如实转告用户）
+
+| 项 | 状态 |
+|---|---|
+| **→ PDF 的版式** | ✅ 缩进、行距、表格边框、代码块外框**当下即可见**（PDF 由本引擎排版定版） |
+| **→ docx 的版式** | ⚠️ 段落缩进 / 边框 / 表格结构**暂不体现**——IR 里已正确表达，但 docx 写侧当前只写字符级样式（表格会被平铺为段落）。文字与字符样式（加粗 / 斜体 / 字号 / 等宽字体 / 底纹）完整。写侧补齐后自动生效，**调用方代码无需改** |
+| 列表编号 | ⚠️ 展平为文本前缀 + 悬挂缩进（不是 Word 自动编号） |
+| 图片 `![]()` | ⚠️ 降级为「[图片] 替代文字」+ 指向原地址的链接（不下载外链图，文字与地址不丢） |
+| 缩进代码块（4 空格） | ❌ 不支持，按普通段落处理（与列表嵌套缩进判定冲突；用围栏写法 ``` ） |
+| 引用式链接 `[x][ref]` / 脚注 / HTML 块 | ❌ 按字面文本输出（不丢字） |
+| 强调的交叉嵌套 | ⚠️ 用就近配对而非 CommonMark 的 delimiter run 栈；`*a **b* c**` 式写法有分歧（常规文本一致） |
+
+> 选型建议：**要成品直接看的用 `markdownToPdf`**（版式完整）；要交付可继续编辑的文稿再用 `markdownToDocx`（当前版式较素）。
 
 ## `.doc`（老二进制格式）的真实状态
 
