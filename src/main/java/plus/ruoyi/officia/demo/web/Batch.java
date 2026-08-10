@@ -92,6 +92,39 @@ final class Batch {
             return "加密 " + enc.length + " B，isEncrypted=true";
         }));
 
+        // 5.1) PDF → Word
+        cases.add(run("Pdf", "PDF → Word toWord", () -> {
+            byte[] pdf = OfficiaCells.csvToPdf("项目,金额\n服务费,12800\n合计,12800");
+            byte[] docx = OfficiaPdf.toWord(pdf);
+            if (docx.length < 4 || docx[0] != (byte) 0x50 || docx[1] != (byte) 0x4B) {
+                throw new AssertionError("产物不是 ZIP 容器（docx 必须以 PK 开头）");
+            }
+            String xml = new String(plus.ruoyi.officia.ooxml.opc.OpcPackage.load(docx)
+                    .getPartBytes("word/document.xml"), java.nio.charset.StandardCharsets.UTF_8);
+            if (!xml.contains("12800")) {
+                throw new AssertionError("转出的 Word 里丢了原文数字");
+            }
+            return "docx " + docx.length + " B，文本存活";
+        }));
+
+        // 5.2) 转出的 docx 必须是结构完整的 OOXML 包——缺一个部件 Word 就判定文件损坏
+        //
+        // 这里刻意不测"扫描件被拒绝"：评估态下 OfficiaImaging.toPdf 会给图片 PDF 加水印文字，
+        // 造不出真正无文字层的样本，硬测只会得到一个前提不成立的用例。
+        // 那条边界由单测 PdfToWordTest 覆盖（用 PdfDocument 直接造空白页，构造可控）。
+        cases.add(run("Pdf", "转 Word 产物容器完整性", () -> {
+            byte[] docx = OfficiaPdf.toWord(OfficiaCells.csvToPdf("列A,列B\n值1,值2"));
+            var pkg = plus.ruoyi.officia.ooxml.opc.OpcPackage.load(docx);
+            String[] required = {"[Content_Types].xml", "_rels/.rels", "word/document.xml",
+                    "word/_rels/document.xml.rels", "word/styles.xml"};
+            for (String part : required) {
+                if (!pkg.hasPart(part)) {
+                    throw new AssertionError("docx 缺少必需部件：" + part);
+                }
+            }
+            return required.length + " 个必需部件齐全";
+        }));
+
         // 6) 条码 Code128 + QR
         cases.add(run("BarCode", "Code128 / QR → PNG", () -> {
             assertPng(OfficiaBarCode.code128Png("OFFICIA-2026"));

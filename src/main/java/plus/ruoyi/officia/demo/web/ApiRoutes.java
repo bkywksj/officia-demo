@@ -10,6 +10,7 @@ import plus.ruoyi.officia.email.OfficiaEmail;
 import plus.ruoyi.officia.imaging.OfficiaImaging;
 import plus.ruoyi.officia.license.OfficiaLicense;
 import plus.ruoyi.officia.pdf.OfficiaPdf;
+import plus.ruoyi.officia.pdf.word.WordConvertOptions;
 import plus.ruoyi.officia.slides.OfficiaSlides;
 import plus.ruoyi.officia.words.OfficiaWords;
 
@@ -368,6 +369,29 @@ final class ApiRoutes {
                     "image/png", imgs.get(i), t0).toJson());
             }
             Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
+        });
+
+        r.add("/api/pdf/toword", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            WordConvertOptions opts = WordConvertOptions.defaults();
+            // 三个开关默认都开；关掉可看"只要文字"的产物有多小
+            if ("false".equals(q.get("images"))) {
+                opts.setExtractImages(false);
+            }
+            if ("false".equals(q.get("vectors"))) {
+                opts.setExtractVectors(false);
+            }
+            if ("false".equals(q.get("patterns"))) {
+                opts.setRasterizeVectorPatterns(false);
+            }
+            if (q.get("password") != null && !q.get("password").isEmpty()) {
+                opts.setPassword(q.get("password"));
+            }
+            long t0 = System.nanoTime();
+            byte[] out = OfficiaPdf.toWord(pdf, opts);
+            Http.json(ex, result(outName(q.get("id"), "转Word", "docx", "转出.docx"),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                out, t0).put("srcPages", OfficiaPdf.pageCount(pdf)).end());
         });
 
         r.add("/api/pdf/encrypt", (ex, q) -> {

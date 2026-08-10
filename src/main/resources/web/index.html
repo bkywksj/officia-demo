@@ -269,6 +269,17 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
           <button onclick="pdfOp('rc4')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="lock" class="w-4 h-4"></i>RC4-128</button>
           <button onclick="pdfOp('aes')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="shield" class="w-4 h-4"></i>AES-256</button>
           <button onclick="pdfOp('info')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="info" class="w-4 h-4"></i>信息</button>
+          <button onclick="pdfOp('toword')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-type-2" class="w-4 h-4"></i>转 Word</button>
+        </div>
+        <div class="mt-4 bg-slate-50 rounded-md p-3">
+          <div class="text-xs text-slate-500 mb-2">转 Word 选项（Textbox 模式：按原坐标绝对定位，版式最像原文）</div>
+          <div class="flex flex-wrap items-center gap-4 text-sm">
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="pdfWordImages" checked class="accent-primary">嵌入图片</label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="pdfWordVectors" checked class="accent-primary">表格线 / 底纹</label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="pdfWordPatterns" checked class="accent-primary">图案光栅化（公章 / 艺术字）</label>
+            <div class="flex items-center gap-1.5"><span class="text-slate-500 text-xs">加密 PDF 口令</span><input id="pdfWordPwd" placeholder="留空=未加密" class="border border-slate-300 rounded-md px-2 py-1 text-sm w-32 outline-none focus:border-primary"></div>
+          </div>
+          <div class="mt-2 text-xs text-slate-400">扫描件（无文字层）会被<b>明确拒绝</b>并提示原因——不会给一个空白文档。</div>
         </div>
         <div class="mt-4 grid grid-cols-3 gap-3 bg-slate-50 rounded-md p-3">
           <div><label class="block text-xs text-slate-500 mb-1">水印文字</label><input id="pdfWmText" value="机密 · 仅供内部" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
@@ -635,6 +646,13 @@ async function pdfOp(op){
     else if(op==='images'){j=await api('/api/pdf/images?id='+id,{method:'POST'});
       show('pdfOut','<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm">抽取图片（'+j.files.length+' 张）</div><div class="grid grid-cols-5 gap-3 p-4">'+
        (j.files.length?j.files.map(f=>'<a href="/api/result/'+f.id+'" target="_blank"><img src="/api/result/'+f.id+'" class="w-full rounded border border-slate-200 hover:border-primary transition"></a>').join(''):'<div class="col-span-5 text-center text-slate-400 text-sm py-6">该 PDF 无内嵌图片</div>')+'</div></div>');return}
+    else if(op==='toword'){
+      const p='&images='+document.getElementById('pdfWordImages').checked
+             +'&vectors='+document.getElementById('pdfWordVectors').checked
+             +'&patterns='+document.getElementById('pdfWordPatterns').checked
+             +'&password='+encodeURIComponent(document.getElementById('pdfWordPwd').value);
+      j=await api('/api/pdf/toword?id='+id+p,{method:'POST'});
+      show('pdfOut',card('PDF → Word（源 '+j.srcPages+' 页）',j));logTask('Pdf',j);toast('完成');return}
     else if(op==='info'){j=await api('/api/pdf/info?id='+id,{method:'POST'});
       const box=document.getElementById('pdfInfo');box.classList.remove('hidden');
       box.innerHTML='<div class="flex justify-between"><span class="text-slate-500">页数</span><span>'+j.pages+'</span></div>'+
