@@ -6,7 +6,7 @@
   "note": "双系统：Claude(.claude/) + Codex(.codex/ + AGENTS.md) 已镜像完成。与 ../officia 的开发者技能体系（26 技能）定位互补、不重叠。",
   "spec": "Anthropic 2025-12 Agent Skills Spec + skill-factory 4 层复用模型",
   "createdAt": "2026-07-30",
-  "updatedAt": "2026-08-04",
+  "updatedAt": "2026-08-10",
   "sourcePath": "E:/my/高级模块/officia-demo",
   "referencePaths": {
     "library_source": "E:/my/高级模块/officia",
@@ -87,7 +87,15 @@
   },
   "commands": {
     "count": 7,
-    "list": ["convert", "license", "testbench", "check", "demo", "next", "sync"]
+    "list": [
+      "convert",
+      "license",
+      "testbench",
+      "check",
+      "demo",
+      "next",
+      "sync"
+    ]
   },
   "maintenance": {
     "sync_script": "scripts/sync-codex.cjs",

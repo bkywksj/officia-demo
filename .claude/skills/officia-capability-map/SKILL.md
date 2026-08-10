@@ -42,6 +42,7 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 | 一个 PDF | 多个单页 PDF | `OfficiaPdf.split(byte[])` | `officia-pdf` |
 | PDF | 纯文本 | `OfficiaPdf.extractText(byte[])` | `officia-pdf` |
 | PDF | 内嵌图片 | `OfficiaPdf.extractImages(byte[])` | `officia-pdf` |
+| PDF（电子版） | **可编辑 Word** | `OfficiaPdf.toWord(byte[])` | `officia-pdf` |
 | 一段文本/网址 | 条码/二维码 PNG | `OfficiaBarCode.qrPng(String)` 等 | `officia-barcode` |
 | 图片字节 | 处理后图片 / PDF | `OfficiaImaging.*` | `officia-imaging` |
 | `.eml` | 结构化对象 / PDF | `OfficiaEmail.parseEml(...)` / `toPdf(...)` | `officia-email` |

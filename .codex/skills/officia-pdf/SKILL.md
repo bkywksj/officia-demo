@@ -24,6 +24,8 @@ allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 `OfficiaPdf` 是纯 PDF 操作入口（不负责"别的格式转 PDF"，那是 Words/Cells/Slides/Imaging 的活）。
 两种用法：**单次静态方法**，或**链式 `PdfEditor`**（多步操作首选）。
 
+另外它还提供**反向转换 `toWord()`**：把电子版 PDF 转成可编辑的 Word（见第六节）。
+
 ## 一、读取 / 信息
 
 ```java
@@ -163,6 +165,69 @@ editor.toFile(new File("out.pdf")); // 直写文件
 
 > **什么时候用链式**：两步以上就该用——少一轮解析与序列化，代码也更清楚。单步操作用静态方法即可。
 
+## 六、PDF → Word（`toWord`）
+
+把**电子版** PDF 转成可编辑的 `.docx`。
+
+```java
+byte[] docx = OfficiaPdf.toWord(pdf);
+byte[] docx = OfficiaPdf.toWord(pdf, "口令");                 // 加密 PDF
+byte[] docx = OfficiaPdf.toWord(new File("in.pdf"));
+byte[] docx = OfficiaPdf.toWord(inputStream);
+OfficiaPdf.toWord(new File("in.pdf"), new File("out.docx"));  // 直接写盘
+```
+
+### 选项 `WordConvertOptions`
+
+```java
+import plus.ruoyi.officia.pdf.word.WordConvertOptions;
+
+byte[] docx = OfficiaPdf.toWord(pdf, WordConvertOptions.defaults()
+    .setPassword("open")                  // 加密 PDF 口令
+    .setExtractImages(true)               // 嵌入图片（默认 true）
+    .setExtractVectors(true)              // 表格线 / 底纹（默认 true）
+    .setRasterizeVectorPatterns(true));   // 公章 / 艺术字光栅化（默认 true）
+```
+
+| 选项 | 默认 | 关掉的效果 |
+|---|---|---|
+| `extractImages` | `true` | 产物无图片，体积显著变小 |
+| `extractVectors` | `true` | 产物无表格线 / 底纹 |
+| `rasterizeVectorPatterns` | `true` | 公章、签名、艺术字轮廓**不出现**在产物里 |
+
+### 模式：`TEXTBOX`（当前唯一可用）
+
+`WordConvertOptions.Mode` 有两个值，取舍是**明摆着的**、不会悄悄替你选：
+
+| 模式 | 含义 | 状态 |
+|---|---|---|
+| `TEXTBOX`（默认） | 每个视觉文本块 = 一个绝对定位的文本框，**版式最像原文**；代价是产物在 Word 里编辑不便 | ✅ 可用 |
+| `FLOW` | 推断段落 / 标题 / 表格，还原成可自由编辑的流式文档 | ❌ **尚未实现，传入即抛异常**（不会降级成 TEXTBOX） |
+
+### 能还原什么
+
+文字 · **加粗** · 字体名 · 逐行缩进（含中文首行缩进 2 字符）· 图片（含透明通道）·
+表格线 / 单元格底纹 · **表格单元格切分**（靠竖线判断"这两段文字不在同一个格子里"）·
+公章 / 艺术字（光栅化成位图）。
+
+### 明确做不到的（不要向客户承诺）
+
+| 做不到 | 说明 |
+|---|---|
+| **扫描件 / 图片型 PDF** | 无文字层，`toWord` 会**明确抛异常**并说明需要 OCR，**不会**返回空白文档。Officia 不提供 OCR |
+| 产物是"真表格" | 表格线是逐条画出来的形状，位置精确但**不能插入行列**；真表格需要 `FLOW` 模式 |
+| 虚线样式 | 虚线会被画成实线 |
+
+```java
+// 扫描件的正确处理方式：捕获并给用户可执行的提示
+try {
+    byte[] docx = OfficiaPdf.toWord(pdf);
+} catch (OfficiaException e) {
+    // 消息里已包含"没有文字层""需要 OCR""建议先转成可搜索 PDF"
+    return ResponseEntity.badRequest().body(e.getMessage());
+}
+```
+
 ## 完整示例：批量合并 + 加水印 + 加密归档
 
 ```java
@@ -202,11 +267,15 @@ public class ArchivePdf {
 | `extractImages` 返回空 | PDF 里是矢量图形不是位图 | 属预期 |
 | 合并后体积很大 | 各源 PDF 的字体/图片资源叠加 | 属预期；需要精简请先在源头压 |
 | 输出带评估水印 | 未授权 + 门控开 | `officia-license`（与你自己加的 `watermark` 无关） |
+| `toWord` 抛"没有文字层" | 扫描件 / 图片型 PDF | 属**预期行为**，不是 bug；先用带 OCR 的工具转成可搜索 PDF |
+| `toWord` 抛"FLOW 模式尚未实现" | 传了 `Mode.FLOW` | 一期只有 `TEXTBOX`；刻意抛异常而非静默降级 |
+| 转出的 Word 里表格不能插入行列 | Textbox 模式把表格线画成形状 | 属既定取舍，见第六节 |
 
 ## 在测试台里实测
 
-面板 **「PDF 工具箱」**：合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图片·RC4-128·AES-256·信息，逐项可点。
-端点：`/api/pdf/info`、`/merge`、`/split`、`/pages`、`/rotate`、`/watermark`、`/pagenumbers`、`/text`、`/images`、`/encrypt`。
+面板 **「PDF 工具箱」**：合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图片·RC4-128·AES-256·信息·**转 Word**，逐项可点。
+「转 Word」下方有三个开关（嵌入图片 / 表格线底纹 / 图案光栅化）与加密口令输入框，可现场对比开关效果。
+端点：`/api/pdf/info`、`/merge`、`/split`、`/pages`、`/rotate`、`/watermark`、`/pagenumbers`、`/text`、`/images`、`/encrypt`、`/toword`。
 
 ## 相关技能
 
