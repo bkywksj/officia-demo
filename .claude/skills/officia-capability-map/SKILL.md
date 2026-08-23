@@ -44,7 +44,9 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 | 一个 PDF | 多个单页 PDF | `OfficiaPdf.split(byte[])` | `officia-pdf` |
 | PDF | 纯文本 | `OfficiaPdf.extractText(byte[])` | `officia-pdf` |
 | PDF | 内嵌图片 | `OfficiaPdf.extractImages(byte[])` | `officia-pdf` |
-| PDF（电子版） | **可编辑 Word** | `OfficiaPdf.toWord(byte[])` | `officia-pdf` |
+| PDF（电子版，有文字层） | **可编辑 Word** | `OfficiaPdf.toWord(byte[])` | `officia-pdf` |
+| PDF（**扫描件**，整页是图） | 可编辑 Word（OCR 认字） | `new ScannedPdfConverter().language(..).toWord(byte[])` | `officia-pdf` |
+| 图片字节 | 识别出的文字 | `OfficiaOcr.recognize(byte[], OcrOptions)` | `officia-pdf` |
 | 一段文本/网址 | 条码/二维码 PNG | `OfficiaBarCode.qrPng(String)` 等 | `officia-barcode` |
 | 图片字节 | 处理后图片 / PDF | `OfficiaImaging.*` | `officia-imaging` |
 | `.eml` | 结构化对象 / PDF | `OfficiaEmail.parseEml(...)` / `toPdf(...)` | `officia-email` |
@@ -89,6 +91,10 @@ OfficiaEmail.toPdf(eml)                     // 邮件归档 → PDF
 | DOC **内嵌字体** | ⚠️ 已知缺口 | 规范链路已核对，但字体数据为 W3C EOT 格式、该规范未归档，故不实现 |
 | `.doc` 二进制输入整体 | 🚧 主链路可用、绿测覆盖，**未宣布生产就绪** | 见 `../officia/status.json` 的 `doc_binary_input`。生产上大批量 `.doc` 前先用测试台实测一批真实样本 |
 | **大文档吞吐 / 高并发** | ⚠️ 未系统压测 | `CfbLimits` 默认值是**内存安全边界**，不是产品容量承诺。见 `officia-performance` |
+| **OCR 的版面还原** | ⚠️ 只做「行 → 段落」 | 表格、多栏、图文混排**不还原**——扫描件的版面分析属另一层能力，尚未实现 |
+| **OCR 的「认不出」输出** | ❌ 没有这个概念 | CTC 在固定字符集上永远给某个类别，超出字符集的输入会硬凑结果、**置信度反而更高**。`minConfidence` 能滤掉纯噪声区域（实测 0.0001 量级），滤不掉"认错字" |
+| **老铅印扫描件的转录质量** | ⚠️ 能读懂大意，不可直接交付 | 1990 年代铅印书实测召回 69.6%；现代清晰扫描件实测基本逐字准确。差距来自字形域差，不是 bug |
+| **OCR 语种自动判别** | ❌ 明确不做 | 必须显式指定（`OcrOptions.setLanguage` / `ScannedPdfConverter.language`）；中英两档模型分别内置。**不指定就用 `ScannedPdfConverter` 会直接抛异常**——选错语种不报错、只产出满篇噪声，所以宁可响亮失败 |
 | 图像格式 | PNG / JPEG / BMP / GIF | 基于 `javax.imageio`；WebP / AVIF 等不在其中 |
 | PDF 加密强度 | RC4-40/128、AES-256 | 见 `officia-pdf` |
 
@@ -105,8 +111,12 @@ OfficiaEmail.toPdf(eml)                     // 邮件归档 → PDF
 ├─ 输入是 Office 文件（docx/doc/xlsx/pptx）
 │   ├─ 只是要转成 PDF        → OfficiaWords/Cells/Slides.toPdf     → officia-words / cells / slides
 │   └─ 要按数据生成文档       → OfficiaWords.fillTemplate*          → officia-template
-├─ 输入/输出是 PDF          → OfficiaPdf.*（多步用 edit() 链式）    → officia-pdf
-├─ 输入是图片               → OfficiaImaging.*                     → officia-imaging
+├─ 输入/输出是 PDF
+│   ├─ 有文字层              → OfficiaPdf.*（多步用 edit() 链式）    → officia-pdf
+│   └─ 是扫描件（整页是图）   → new ScannedPdfConverter().language(..).toWord(..) → officia-pdf
+├─ 输入是图片
+│   ├─ 要处理/转换           → OfficiaImaging.*                     → officia-imaging
+│   └─ 要认出上面的字        → OfficiaOcr.recognize(..)             → officia-pdf
 ├─ 要生成条码/二维码         → OfficiaBarCode.*                     → officia-barcode
 ├─ 输入是邮件 .eml           → OfficiaEmail.*                       → officia-email
 └─ 输出有水印/被限页         → 不是 bug，是评估态                    → officia-license

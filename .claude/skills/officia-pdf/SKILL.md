@@ -214,17 +214,56 @@ byte[] docx = OfficiaPdf.toWord(pdf, WordConvertOptions.defaults()
 
 | 做不到 | 说明 |
 |---|---|
-| **扫描件 / 图片型 PDF** | 无文字层，`toWord` 会**明确抛异常**并说明需要 OCR，**不会**返回空白文档。Officia 不提供 OCR |
+| **扫描件 / 图片型 PDF 走 `toWord`** | 无文字层，`toWord` 会**明确抛异常**并说明需要 OCR，**不会**返回空白文档。这不是缺陷——扫描件有专门的路径 `ScannedPdfConverter`（见下），别硬塞进 `toWord` |
 | 产物是"真表格" | 表格线是逐条画出来的形状，位置精确但**不能插入行列**；真表格需要 `FLOW` 模式 |
 | 虚线样式 | 虚线会被画成实线 |
 
+### 扫描件走 `ScannedPdfConverter`（`officia-ocr` 模块）
+
 ```java
-// 扫描件的正确处理方式：捕获并给用户可执行的提示
+import plus.ruoyi.officia.ocr.recog.BuiltinModels.Language;
+import plus.ruoyi.officia.ocr.scan.ScannedPdfConverter;
+
+// 最简：整份扫描件 → 可编辑 DOCX（语种必填，见下方红字）
+byte[] docx = new ScannedPdfConverter()
+        .language(Language.CHINESE)
+        .toWord(pdfBytes);
+
+// 老书常见版面：扫描时页面横放、两页并排
+byte[] docx = new ScannedPdfConverter()
+        .language(Language.CHINESE)
+        .rotate(ScannedPdfConverter.Rotation.CLOCKWISE_90)
+        .splitFacingPages(true)   // 按最大空白带定位中缝，不是对半切（装订线未必居中）
+        .minConfidence(0.01)      // 滤掉插图/印章/表格线被误当文本行的噪声
+        .toWord(pdfBytes);
+```
+
+> 🔴 **`.language(...)` 是必填的，不填直接抛异常**。OCR 不做语种自动判别，
+> 而 `OcrOptions.defaults()` 的默认值是**英文**——中文扫描件走英文模型时，
+> CTC 在固定字符集上永远给某个类别，于是吐出满篇拉丁字母，**不报错、置信度还不低**。
+> 上游踩过：整本 183 页书就这么静默产出 25 万字噪声。所以现在改成响亮失败。
+
+| 能力 | 状态（2026-08-15 实测） |
+|---|---|
+| 中文识别 | ✅ **已支持**（自训 CRNN-lite，3885 类，随包内置 int8 权重 10.85 MB） |
+| 现代扫描件（清晰印刷） | 实测基本逐字准确 |
+| 1990 年代铅印扫描书 | 召回 69.6%——**能读懂大意，但不能当作可直接交付的转录** |
+| 留出字体 CER | 0.0071（7 款训练未见过的字体） |
+| 标点符号 | 书名号《》、引号“”、省略号…、破折号—、间隔号· 均可正确识别（183 页真实书实测，书名号左右各 343 完美配对） |
+
+**能力边界（如实告知客户，不要夸大）**：只做「行 → 段落」的线性还原，
+**不**还原表格、多栏、图文混排——扫描件的版面分析属另一层能力，尚未实现。
+模型也**没有「认不出」这个输出**：CTC 在固定字符集上永远给某个类别，
+超出字符集的输入会硬凑结果，**且置信度反而更高**，所以
+`minConfidence` 能滤掉纯噪声区域（实测 0.0001 量级），但滤不掉"认错字"。
+
+```java
+// 纯文本层判断仍用 toWord：它抛异常是在告诉你"这份该走 OCR"
 try {
     byte[] docx = OfficiaPdf.toWord(pdf);
 } catch (OfficiaException e) {
-    // 消息里已包含"没有文字层""需要 OCR""建议先转成可搜索 PDF"
-    return ResponseEntity.badRequest().body(e.getMessage());
+    // 消息里已包含"没有文字层""需要 OCR"——此时改走 ScannedPdfConverter
+    byte[] docx2 = new ScannedPdfConverter().language(Language.CHINESE).toWord(pdf);
 }
 ```
 
@@ -267,7 +306,7 @@ public class ArchivePdf {
 | `extractImages` 返回空 | PDF 里是矢量图形不是位图 | 属预期 |
 | 合并后体积很大 | 各源 PDF 的字体/图片资源叠加 | 属预期；需要精简请先在源头压 |
 | 输出带评估水印 | 未授权 + 门控开 | `officia-license`（与你自己加的 `watermark` 无关） |
-| `toWord` 抛"没有文字层" | 扫描件 / 图片型 PDF | 属**预期行为**，不是 bug；先用带 OCR 的工具转成可搜索 PDF |
+| `toWord` 抛"没有文字层" | 扫描件 / 图片型 PDF | 属**预期行为**，不是 bug；改走 `ScannedPdfConverter`（见第六节），不必再找外部 OCR 工具 |
 | `toWord` 抛"FLOW 模式尚未实现" | 传了 `Mode.FLOW` | 一期只有 `TEXTBOX`；刻意抛异常而非静默降级 |
 | 转出的 Word 里表格不能插入行列 | Textbox 模式把表格线画成形状 | 属既定取舍，见第六节 |
 
