@@ -1,7 +1,7 @@
 ---
 name: officia-testbench
 description: |
-  使用 officia-demo 的可视化测试台：启动方式与参数、10 个面板分别能实测什么、
+  使用 officia-demo 的可视化测试台：启动方式与参数、11 个面板分别能实测什么、
   对应的 /api 端点、一键批量回归跑了哪些用例、上传自己的字体与 License 做门控对比。
   这是"验证 officia 能不能做某件事"最快的路径。
 
@@ -46,7 +46,7 @@ java -Xmx8g -jar target/officia-demo-1.0.0.jar          # 大文件（设计型 
 
 > 前置：本地仓要有 officia。没有就先在 `../officia` 跑 `mvn install -DskipTests`，见 `officia-setup`。
 
-## 10 个面板能实测什么
+## 11 个面板能实测什么
 
 | 面板 | 可实测的能力 | 对应技能 |
 |---|---|---|
@@ -58,6 +58,7 @@ java -Xmx8g -jar target/officia-demo-1.0.0.jar          # 大文件（设计型 
 | **Imaging · 图像** | 滤镜/变换全项 + 格式转换 + 图片→PDF，**处理前后并排对比** | `officia-imaging` |
 | **BarCode · 条码** | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR（4 档纠错）+ **全码制一键预览** | `officia-barcode` |
 | **Email · EML** | EML 解析（主题/收发件/附件/正文）、邮件归档 → PDF | `officia-email` |
+| **OCR · 图片/扫描件** | 图片 → 文字（逐行文本 + 置信度 + 行框）、扫描件 PDF → Word；中/英自研权重 | `officia-pdf` |
 | **授权门控与对比** | 加载 `.lic`、模块门控矩阵、**同一份数据在门控开/关下的页数与水印并排对比** | `officia-license` |
 | **批量回归** | 用 officia 自造输入跑全能力并断言 | 见下 |
 
@@ -98,6 +99,17 @@ POST /api/pdf/info  /merge  /split  /pages  /rotate  /watermark  /pagenumbers  /
 POST /api/imaging/op    /api/imaging/topdf
 POST /api/barcode
 POST /api/email/parse   /api/email/topdf
+POST /api/ocr/recognize              图片 → 文字（lang=zh|en 必给；charWhitelist / minConfidence 可选）
+POST /api/ocr/scan2word              扫描件 PDF → Word（rotate=90|-90|180、split=1、maxPages≤20）
+
+🔴 **OCR 这两条与别的端点不同，两点要先知道：**
+1. **慢一个量级**：推理是纯 Java 跑的，实测一张 747×600 的书页（28 行）约 **40 秒**
+   （权重加载只占 0.19 s，其余全是推理）。`scan2word` 因此限 `maxPages`（默认 3、上限 20）——
+   不限的话一本 183 页的书按对开切分是 366 个半页，会把这台共享测试台占死几小时。
+2. **参数选错不会报错**：语种（`lang`）与版面（`rotate` / `split`）不对时照样返回 200，
+   只是满屏怪字。识别器在固定字符集上永远给出某个类别，没有"认不出"这一档，
+   语种选错时平均置信度反而可能更高——**别拿置信度当"对不对"的判据**。
+   实测一本页面横放 + 两页并排的书，不给版面参数转出来 5.7 KB 全是乱码。
 ```
 
 ```bash

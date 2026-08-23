@@ -38,6 +38,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
     <a data-p="pdf" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="file-cog" class="w-4 h-4 mr-3"></i>PDF 工具箱</a>
     <a data-p="img" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="image" class="w-4 h-4 mr-3"></i>Imaging · 图像</a>
     <a data-p="bar" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="scan-barcode" class="w-4 h-4 mr-3"></i>BarCode · 条码</a>
+    <a data-p="ocr" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="scan-text" class="w-4 h-4 mr-3"></i>OCR · 图片/扫描件</a>
     <div class="px-5 py-1.5 mt-2 text-xs font-medium text-slate-400">商业授权</div>
     <a data-p="lic" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="shield-check" class="w-4 h-4 mr-3"></i>授权门控与对比</a>
     <a data-p="batch" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="list-checks" class="w-4 h-4 mr-3"></i>批量回归</a>
@@ -98,6 +99,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
         <div onclick="go('img')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="image" class="w-4 h-4 text-primary"></i>Officia.Imaging</div><div class="text-xs text-slate-500 mt-1.5">格式转换 · 16 种滤镜/变换<br>文字&图片水印 · 图片→PDF</div></div>
         <div onclick="go('bar')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="scan-barcode" class="w-4 h-4 text-primary"></i>Officia.BarCode</div><div class="text-xs text-slate-500 mt-1.5">Code128/39/93 · EAN · UPC-A · ITF-14<br>QR 全 40 版本 · 4 档纠错</div></div>
         <div onclick="go('email')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="mail" class="w-4 h-4 text-primary"></i>Officia.Email</div><div class="text-xs text-slate-500 mt-1.5">EML 解析 / 生成<br>邮件归档 → PDF</div></div>
+        <div onclick="go('ocr')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="scan-text" class="w-4 h-4 text-primary"></i>Officia.OCR</div><div class="text-xs text-slate-500 mt-1.5">图片 → 文字（中/英自研权重）<br>扫描件 PDF → Word</div></div>
         <div onclick="go('lic')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="shield-check" class="w-4 h-4 text-primary"></i>License 门控</div><div class="text-xs text-slate-500 mt-1.5">加载 .lic · 模块授权查询<br>授权前后效果对比</div></div>
       </div>
     </div>
@@ -343,6 +345,47 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
     </div>
   </section>
 
+  <!-- OCR -->
+  <section id="ocr" class="panel">
+    <div class="grid grid-cols-3 gap-5">
+      <div class="space-y-4">
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="scan-text" class="w-4 h-4 text-primary"></i>输入</div>
+          <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('ocrFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'ocr')">
+            <i data-lucide="image-up" class="w-7 h-7 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">上传图片或扫描件 PDF</div><div class="text-xs text-slate-400 mt-1">PNG / JPEG / BMP · PDF</div></div>
+          <input type="file" id="ocrFile" class="hidden" accept="image/*,.pdf" onchange="upload(this.files[0],'ocr')">
+          <div id="ocrInfo" class="mt-3 text-xs text-slate-400">尚未选择文件</div>
+        </div>
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3">识别参数</div>
+          <label class="block text-xs text-slate-500 mb-1">语种（不做自动判别，必须选对）</label>
+          <select id="ocrLang" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm cursor-pointer mb-3">
+            <option value="zh">中文（含数字与常用符号）</option><option value="en">英文 / 数字</option></select>
+          <label class="block text-xs text-slate-500 mb-1">字符白名单（可空）</label>
+          <input id="ocrWhite" placeholder="如 0123456789 —— 票据号场景" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-1 outline-none focus:border-primary">
+          <div class="text-xs text-slate-400 mb-3">填了会改走<b>模板匹配</b>：候选塌缩到白名单内，票据/编号更准，通用文档反而更差。</div>
+          <label class="block text-xs text-slate-500 mb-1">最低置信度（0 = 不过滤）</label>
+          <input id="ocrMinConf" type="number" step="0.05" min="0" max="1" value="0" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-primary">
+          <button onclick="ocrRun()" class="w-full mt-3 bg-primary text-white py-2.5 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i>图片 → 文字</button>
+        </div>
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3">扫描件 PDF → Word</div>
+          <label class="block text-xs text-slate-500 mb-1">页面旋转</label>
+          <select id="ocrRotate" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm cursor-pointer mb-3">
+            <option value="">不旋转</option><option value="90">顺时针 90°</option>
+            <option value="-90">逆时针 90°</option><option value="180">180°</option></select>
+          <label class="flex items-center gap-2 text-sm cursor-pointer mb-1"><input type="checkbox" id="ocrSplit" class="rounded cursor-pointer">一页扫了两页（左右对开，先切成两页）</label>
+          <div class="text-xs text-slate-400 mb-3">古籍 / 合订本常见。<b>转出来全是怪字先调这两项</b>——文字竖着或两页糊在一起时，切分层按横排走投影会整页崩掉，而 OCR 没有"认不出"这一档，不会报错。</div>
+          <label class="block text-xs text-slate-500 mb-1">最多转前几页（1–20）</label>
+          <input id="ocrMaxPages" type="number" min="1" max="20" value="3" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-primary">
+          <div class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-2 mb-3">推理是纯 Java 跑的，<b>实测一页书约 40 秒</b>（28 行）。整本书会把这台共享测试台占死，故服务端限最多 20 页。</div>
+          <button onclick="ocrScan()" class="w-full border border-slate-300 py-2.5 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="file-output" class="w-4 h-4"></i>扫描件 → Word</button>
+        </div>
+      </div>
+      <div class="col-span-2" id="ocrOut"></div>
+    </div>
+  </section>
+
   <!-- Email -->
   <section id="email" class="panel">
     <div class="grid grid-cols-3 gap-5">
@@ -436,7 +479,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
 
 <script>
 const T={dash:'能力总览',words:'Words · DOC/DOCX',tpl:'模板填充 · 邮件合并',cells:'Cells · XLSX/CSV',slides:'Slides · PPTX',
- email:'Email · EML',pdf:'PDF 工具箱',img:'Imaging · 图像',bar:'BarCode · 条码',lic:'授权门控与对比',batch:'批量回归'};
+ email:'Email · EML',pdf:'PDF 工具箱',img:'Imaging · 图像',bar:'BarCode · 条码',ocr:'OCR · 图片/扫描件',lic:'授权门控与对比',batch:'批量回归'};
 const S={};              // 各面板选中的文件 id
 let tasks=[];            // 最近任务
 let ecc='M';
@@ -718,6 +761,68 @@ async function barAll(){
   }
   show('barOut','<div class="bg-white rounded-lg border border-slate-200 p-4"><div class="font-medium text-sm mb-3">全码制预览</div><div class="grid grid-cols-4 gap-4">'+out.join('')+'</div></div>');
 }
+// —— Email ——
+// —— OCR ——
+function ocrParams(){
+  let p='&lang='+document.getElementById('ocrLang').value;
+  const w=document.getElementById('ocrWhite').value.trim();
+  if(w)p+='&charWhitelist='+encodeURIComponent(w);
+  const c=parseFloat(document.getElementById('ocrMinConf').value||'0');
+  if(c>0)p+='&minConfidence='+c;
+  return p;
+}
+async function ocrRun(){
+  if(!need('ocr','请先上传图片'))return;
+  busy('ocrOut','识别中…（首次调用要加载权重，约几秒）');
+  try{const j=await api('/api/ocr/recognize?id='+S.ocr+ocrParams(),{method:'POST'});
+    show('ocrOut',ocrCard(j));
+    logTask('OCR',{name:'识别 '+j.lineCount+' 行',ms:j.ms});
+    toast('识别完成，'+j.lineCount+' 行');
+  }catch(e){show('ocrOut','');toast(e.message,false)}
+}
+async function ocrScan(){
+  if(!need('ocr','请先上传扫描件 PDF'))return;
+  const r=document.getElementById('ocrRotate').value;
+  const sp=document.getElementById('ocrSplit').checked?'&split=1':'';
+  const mp=Math.max(1,Math.min(20,parseInt(document.getElementById('ocrMaxPages').value||'3')));
+  busy('ocrOut','逐页识别中…（一页约 40 秒，'+mp+' 页大约 '+Math.ceil(mp*40/60)+' 分钟，别关页面）');
+  try{const j=await api('/api/ocr/scan2word?id='+S.ocr+ocrParams()+(r?'&rotate='+r:'')+sp+'&maxPages='+mp,{method:'POST'});
+    const cut=j.pagesTotal>0&&j.pagesConverted>0&&j.pagesConverted<j.pagesTotal
+      ?'<div class="px-4 py-2 bg-amber-50 border-t border-amber-100 text-xs text-amber-800">原件共 '+j.pagesTotal+' 页，本次只转了前 <b>'+j.pagesConverted+'</b> 页（不是识别丢字）。要更多请调大左侧「最多转前几页」。</div>':'';
+    show('ocrOut',card('扫描件 → Word',j,cut+
+      '<div class="px-4 py-3 text-xs text-slate-500 border-t border-slate-100">下载后用 Word 打开查看。若正文是一堆怪字，多半是版面参数没对上——回左侧改「页面旋转」/「一页扫了两页」再转一次。</div>'));
+    logTask('OCR',j);toast('已生成 Word');
+  }catch(e){show('ocrOut','');toast(e.message,false)}
+}
+/** 识别结果卡片：总分之外必须给逐行明细——OCR 崩起来是"某几行崩"，只看总分定位不到。 */
+function ocrCard(j){
+  const rows=(j.lines||[]).map(l=>{
+    const low=l.confidence<0.5;
+    return '<tr class="hover:bg-slate-50 transition-colors'+(low?' bg-amber-50/60':'')+'">'+
+      '<td class="px-3 py-1.5 '+(low?'text-amber-700':'')+'">'+esc(l.text)+'</td>'+
+      '<td class="px-3 py-1.5 text-right tabular-nums '+(low?'text-amber-700 font-medium':'text-slate-500')+'">'+l.confidence.toFixed(3)+'</td>'+
+      '<td class="px-3 py-1.5 text-right text-slate-400 tabular-nums text-xs">'+l.x+','+l.y+' · '+l.w+'×'+l.h+'</td></tr>';
+  }).join('');
+  return '<div class="bg-white rounded-lg border border-slate-200">'+
+   '<div class="px-4 py-3 border-b border-slate-100 font-medium text-sm flex items-center gap-2"><i data-lucide="file-check-2" class="w-4 h-4 text-emerald-600"></i>识别结果</div>'+
+   '<div class="grid grid-cols-4 divide-x divide-slate-100 border-b border-slate-100">'+
+    '<div class="p-3 text-center"><div class="text-xs text-slate-400">文本行</div><div class="text-lg font-semibold">'+j.lineCount+'</div></div>'+
+    '<div class="p-3 text-center"><div class="text-xs text-slate-400">平均置信度</div><div class="text-lg font-semibold">'+(j.confidence||0).toFixed(3)+'</div></div>'+
+    '<div class="p-3 text-center"><div class="text-xs text-slate-400">检测倾斜</div><div class="text-lg font-semibold">'+j.skewAngleDeg+'°</div></div>'+
+    '<div class="p-3 text-center"><div class="text-xs text-slate-400">耗时</div><div class="text-lg font-semibold">'+j.ms+' ms</div></div></div>'+
+   '<div class="px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-800 flex items-start gap-1.5">'+
+    '<i data-lucide="alert-triangle" class="w-3.5 h-3.5 mt-0.5 shrink-0"></i>'+
+    '<span>置信度<b>不是"对不对"</b>：识别器在固定字符集上永远给出某个类别，没有"认不出"这一档。'+
+    '语种选错时它照样自信输出（实测平均分反而更高），所以低分行值得查，高分行也不等于对。</span></div>'+
+   '<div class="p-4 border-b border-slate-100"><div class="text-xs text-slate-400 mb-1.5">全文</div>'+
+    '<pre class="text-sm whitespace-pre-wrap break-all max-h-72 overflow-y-auto bg-slate-50 rounded p-3">'+esc(j.text||'（未识别到文字）')+'</pre></div>'+
+   (rows?'<div class="max-h-96 overflow-y-auto"><table class="w-full text-sm"><thead class="sticky top-0"><tr class="bg-slate-50 text-slate-500">'+
+    '<th class="px-3 py-2 text-left font-medium">逐行文本</th><th class="px-3 py-2 text-right font-medium">置信度</th>'+
+    '<th class="px-3 py-2 text-right font-medium">位置 / 尺寸</th></tr></thead>'+
+    '<tbody class="divide-y divide-slate-100">'+rows+'</tbody></table></div>':'')+
+   '</div>';
+}
+
 // —— Email ——
 async function emlRun(op){
   if(!need('eml','请先上传 .eml（或在总览点"生成内置样本"）'))return;

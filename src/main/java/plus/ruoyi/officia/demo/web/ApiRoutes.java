@@ -9,6 +9,12 @@ import plus.ruoyi.officia.email.EmailMessage;
 import plus.ruoyi.officia.email.OfficiaEmail;
 import plus.ruoyi.officia.imaging.OfficiaImaging;
 import plus.ruoyi.officia.license.OfficiaLicense;
+import plus.ruoyi.officia.ocr.OcrOptions;
+import plus.ruoyi.officia.ocr.OfficiaOcr;
+import plus.ruoyi.officia.ocr.recog.BuiltinModels;
+import plus.ruoyi.officia.ocr.result.OcrLine;
+import plus.ruoyi.officia.ocr.result.OcrResult;
+import plus.ruoyi.officia.ocr.scan.ScannedPdfConverter;
 import plus.ruoyi.officia.pdf.OfficiaPdf;
 import plus.ruoyi.officia.pdf.word.WordConvertOptions;
 import plus.ruoyi.officia.slides.OfficiaSlides;
@@ -62,6 +68,7 @@ final class ApiRoutes {
         registerImaging(r);
         registerBarCode(r);
         registerEmail(r);
+        registerOcr(r);
         return r;
     }
 
@@ -599,6 +606,108 @@ final class ApiRoutes {
         return dot > 0 ? s.substring(0, dot) : s;
     }
 
+    // ==================== OCR ====================
+
+    private static void registerOcr(Router r) {
+        // 图片 → 文字。除整段文本外一并返回逐行的框与置信度：
+        // OCR 与其它能力不同，"对不对"没法只看一个总分——要能定位到是哪一行崩了
+        r.add("/api/ocr/recognize", (ex, q) -> {
+            long t0 = System.nanoTime();
+            OcrResult res = OfficiaOcr.analyze(Store.bytes(q.get("id")), ocrOptions(q));
+            double min = doubleOf(q, "minConfidence", 0);
+            if (min > 0) {
+                res = res.filterByConfidence(min);
+            }
+            List<Object> lines = new ArrayList<>();
+            for (OcrLine l : res.lines()) {
+                lines.add(Json.obj().put("text", l.text())
+                    .put("confidence", round(l.confidence(), 1000))
+                    .put("x", l.box().x()).put("y", l.box().y())
+                    .put("w", l.box().width()).put("h", l.box().height()));
+            }
+            Http.json(ex, Json.obj()
+                .put("text", res.text())
+                .put("lineCount", res.lineCount())
+                .put("confidence", round(res.confidence(), 1000))
+                .put("width", res.width()).put("height", res.height())
+                .put("skewAngleDeg", round(res.skewAngleDeg(), 100))
+                .put("lines", lines)
+                .put("ms", (System.nanoTime() - t0) / 1_000_000)
+                .end());
+        });
+
+        // 扫描件 PDF → DOCX
+        r.add("/api/ocr/scan2word", (ex, q) -> {
+            long t0 = System.nanoTime();
+            // 🔴 只转前 maxPages 页。神经网络推理是纯 Java 跑的，实测一张 747×600 的
+            // 书页 28 行要 ~40 s（权重加载只占 0.19 s，其余全是推理），一本 183 页的书
+            // 按对开切分后是 366 个半页 → 4 小时上不封顶。测试台是<b>共享</b>的，
+            // 不设上限等于让一个人把它占死，而调用方只会看到浏览器一直转圈。
+            byte[] src = Store.bytes(q.get("id"));
+            int total = pagesOrUnknown(src);
+            int max = Math.max(1, Math.min(intOf(q, "maxPages", 3), 20));
+            if (total > max) {
+                int[] head = new int[max];
+                for (int i = 0; i < max; i++) {
+                    head[i] = i;
+                }
+                src = OfficiaPdf.extractPages(src, head);
+            }
+            // 🔴 版面参数必须暴露出来。实测一本页面横放 + 两页并排扫描的书，
+            // 不传 rotate/split 转出来 5.7 KB 全是乱码（文字是竖着的，切分层按横排走投影）。
+            // 这类输入没有任何报错——CTC 在固定类别集上永远给结果，用户只会看到满屏怪字，
+            // 进而误判成"OCR 不可用"。参数摆在端点上，至少让人能试出来。
+            byte[] docx = new ScannedPdfConverter()
+                .options(ocrOptions(q))
+                .rotate(rotation(q.get("rotate")))
+                .splitFacingPages(boolOf(q, "split"))
+                .minConfidence(doubleOf(q, "minConfidence", 0.01))
+                .toWord(src);
+            Http.json(ex, result(outName(q.get("id"), "识别", "docx", "扫描件.docx"),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                docx, t0)
+                // 截断了必须说——静默只转前几页，用户会以为"后面的内容识别丢了"
+                .put("pagesTotal", total)
+                .put("pagesConverted", total < 0 ? -1 : Math.min(total, max))
+                .end());
+        });
+    }
+
+    /**
+     * 组装 OCR 选项。
+     *
+     * <p>🔴 <b>语种默认中文，与 {@link OcrOptions#defaults()} 的英文不同</b>——
+     * 这是测试台的取舍：本测试台的样本以中文文档为主，而<b>选错语种不会报错</b>，
+     * 只会产出满篇拉丁噪声，且平均置信度反而更高（骗过按置信度过滤）。
+     * 让默认贴近实际用途，比让用户从一堆乱码里反推原因好。传 {@code lang=en} 切英文。</p>
+     *
+     * <p>{@code charWhitelist} 非空会让门面<b>改走模板匹配</b>（模型的类别集训练时已固定，
+     * 给不了白名单能力）——这是票据/编号场景提准最划算的一招，但对通用中文页面反而更差。</p>
+     */
+    private static OcrOptions ocrOptions(Map<String, String> q) {
+        OcrOptions opts = OcrOptions.defaults()
+            .setLanguage("en".equalsIgnoreCase(q.getOrDefault("lang", "zh"))
+                ? BuiltinModels.Language.ENGLISH : BuiltinModels.Language.CHINESE);
+        String whitelist = q.get("charWhitelist");
+        if (whitelist != null && !whitelist.isBlank()) {
+            opts.setCharWhitelist(whitelist);
+        }
+        return opts;
+    }
+
+    /** {@code rotate} 参数 → 旋转档位；无法识别的写法按"不旋转"处理。 */
+    private static ScannedPdfConverter.Rotation rotation(String v) {
+        if (v == null) {
+            return ScannedPdfConverter.Rotation.NONE;
+        }
+        return switch (v.trim()) {
+            case "90", "cw" -> ScannedPdfConverter.Rotation.CLOCKWISE_90;
+            case "-90", "270", "ccw" -> ScannedPdfConverter.Rotation.COUNTER_CLOCKWISE_90;
+            case "180" -> ScannedPdfConverter.Rotation.HALF_TURN;
+            default -> ScannedPdfConverter.Rotation.NONE;
+        };
+    }
+
     // ==================== 小工具 ====================
 
     /** 存入产物并补齐耗时/页数，返回 Blob。 */
@@ -683,6 +792,21 @@ final class ApiRoutes {
     private static float floatOf(Map<String, String> q, String key, float def) {
         String v = q.get(key);
         return v == null || v.isBlank() ? def : Float.parseFloat(v.trim());
+    }
+
+    private static double doubleOf(Map<String, String> q, String key, double def) {
+        String v = q.get(key);
+        return v == null || v.isBlank() ? def : Double.parseDouble(v.trim());
+    }
+
+    private static boolean boolOf(Map<String, String> q, String key) {
+        String v = q.get(key);
+        return "1".equals(v) || "true".equalsIgnoreCase(v) || "on".equalsIgnoreCase(v);
+    }
+
+    /** 截断小数位，避免 JSON 里出现 0.7599999999999999 这种噪声。 */
+    private static double round(double v, int scale) {
+        return Math.round(v * scale) / (double) scale;
     }
 
     private static List<String> nz(List<String> l) {
