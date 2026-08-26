@@ -70,6 +70,7 @@ mvn -o exec:java -Dexec.mainClass=plus.ruoyi.officia.demo.Demo   # 或直接 run
 | `CellsDemoTest` | CSV→PDF、CSV 解析(RFC4180)、公式求值 `=A1+A2` |
 | `BarcodeDemoTest` | Code128 / QR → PNG |
 | `PdfDemoTest` | 多 PDF 合并、AES-256 加密 |
+| `OcrDemoTest` | 票据号识别（字符白名单）、中文 analyze（逐行文本+坐标+置信度）、扫描件 PDF→Word、**语种必填的响亮失败**、版面参数用法 |
 | `LicenseDemoTest` | 未授权评估态、无效/空 License 抛异常(不 System.exit) |
 | `EnforcementDemoTest` | 授权门控：enforcement 关=不降级 / 开+未授权=降级(水印/限页) / 开+自备 officia.lic=不降级(无 lic 自动跳过) |
 
