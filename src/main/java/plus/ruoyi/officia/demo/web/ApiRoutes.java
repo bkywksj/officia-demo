@@ -18,6 +18,8 @@ import plus.ruoyi.officia.ocr.scan.ScannedPdfConverter;
 import plus.ruoyi.officia.pdf.OfficiaPdf;
 import plus.ruoyi.officia.pdf.sign.KeyMaterial;
 import plus.ruoyi.officia.pdf.sign.SignOptions;
+import plus.ruoyi.officia.pdf.sign.SignatureInfo;
+import plus.ruoyi.officia.pdf.sign.SignatureVerification;
 import plus.ruoyi.officia.pdf.word.WordConvertOptions;
 import plus.ruoyi.officia.slides.OfficiaSlides;
 import plus.ruoyi.officia.words.OfficiaWords;
@@ -466,10 +468,123 @@ final class ApiRoutes {
                 "application/pdf", out, t0)
                 .put("signers", String.join(" → ", names))
                 .put("signatures", countSignatures(out))
-                .put("grow", (out.length - before) / 1024 + " KB（每次加签追加一个增量段，前段字节不变）")
+                // 首签走全量重写（顺带压缩内容流，体积可能反而变小），之后每一签才是增量追加；
+                // 笼统说成"每次都追加"会在这里显示成负数，自相矛盾
+                .put("grow", before / 1024 + " KB → " + out.length / 1024
+                    + " KB（首签全量重写，其后每签追加一个增量段、前段字节不变）")
                 .put("hint", "Adobe 签名面板应列出多条「修订版」，且每条都显示文档未被修改")
                 .end());
         });
+
+        // 验签（PDF32000 §12.8 + RFC 5652）。不产出文件，只回结构化结论——
+        // 业务系统据此程序化判定，不必让人开 Acrobat 肉眼看
+        r.add("/api/pdf/verify", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            SignatureVerification v = OfficiaPdf.verify(pdf);
+            Http.json(ex, verifyJson(v, (System.nanoTime() - t0) / 1_000_000).end());
+        });
+
+        // 防篡改演示：拿一份已签名的 PDF，改掉正文里的一个字节，再验一次。
+        // 这是"签名能防篡改"最直观的证明——改动前后各验一次，结论一正一反
+        r.add("/api/pdf/tamper", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            SignatureVerification before = OfficiaPdf.verify(pdf);
+            if (!before.isSigned()) {
+                Http.json(ex, Json.obj().put("error", "这份 PDF 没有签名，先用「数字签名」按钮签一份")
+                    .end());
+                return;
+            }
+            long t0 = System.nanoTime();
+            byte[] tampered = pdf.clone();
+            int at = tamperPosition(tampered, before);
+            if (at < 0) {
+                Http.json(ex, Json.obj().put("error", "未能在签名覆盖区内找到可改动的正文字符")
+                    .end());
+                return;
+            }
+            char old = (char) tampered[at];
+            tampered[at] = (byte) (old == 'X' ? 'Y' : 'X');
+
+            SignatureVerification after = OfficiaPdf.verify(tampered);
+            Http.json(ex, result(outName(q.get("id"), "篡改", "pdf", "被篡改.pdf"),
+                "application/pdf", tampered, t0)
+                .put("changedAt", "第 " + at + " 字节：'" + old + "' → '"
+                    + (char) tampered[at] + "'（只改了 1 个字节）")
+                .put("beforeValid", before.isValid())
+                .put("afterValid", after.isValid())
+                .put("beforeSummary", before.getSummary())
+                .put("afterSummary", after.getSummary())
+                .put("problem", after.getSignatures().isEmpty() ? null
+                    : after.getSignatures().get(0).getProblem())
+                .put("hint", "改动前验签通过、改动后不通过；用 Acrobat 打开产物会显示「文档已被更改或损坏」")
+                .end());
+        });
+    }
+
+    /** 把验签结果摊成 JSON。 */
+    private static Json verifyJson(SignatureVerification v, long ms) {
+        List<Object> sigs = new ArrayList<>();
+        java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        for (SignatureInfo s : v.getSignatures()) {
+            sigs.add(Json.obj()
+                .put("field", s.getFieldName())
+                .put("signer", s.getSignerName())
+                .put("time", s.getSigningTime() == null ? null : fmt.format(s.getSigningTime()))
+                .put("timestamp", s.getTimestampTime() == null ? null
+                    : fmt.format(s.getTimestampTime()))
+                .put("reason", s.getReason())
+                .put("location", s.getLocation())
+                .put("subject", s.getSubject())
+                .put("issuer", s.getIssuer())
+                .put("valid", s.isValid())
+                .put("digestMatch", s.isDigestMatch())
+                .put("signatureMatch", s.isSignatureMatch())
+                .put("certificateIntact", s.isCertificateIntact())
+                .put("coversWholeDocument", s.isCoveringWholeDocument())
+                .put("problem", s.getProblem()));
+        }
+        return Json.obj()
+            .put("signed", v.isSigned())
+            // 🔴 整体结论看 isValid()：它额外查了"最末签名是否覆盖到文件尾"，
+            // 逐个签名取与会漏掉"签完之后被追加内容"这种情形
+            .put("valid", v.isValid())
+            .put("count", v.getSignatureCount())
+            .put("fullyCovered", v.isFullyCovered())
+            .put("unsignedTailBytes", v.getUnsignedTailBytes())
+            .put("summary", v.getSummary())
+            .put("ms", ms)
+            .put("signatures", sigs);
+    }
+
+    /**
+     * 在第一个签名的覆盖区内找一个可改的正文字符。
+     *
+     * <p>挑内容流里 {@code (...)} 中的字母——改它页面上的文字会跟着变，演示效果最直观，
+     * 也不会破坏 PDF 结构导致"打不开"而非"被改过"。</p>
+     *
+     * @return 可改位置；找不到时 -1
+     */
+    private static int tamperPosition(byte[] pdf, SignatureVerification v) {
+        int[] br = v.getSignatures().get(0).getByteRange();
+        if (br.length != 4) {
+            return -1;
+        }
+        int end = Math.min(br[0] + br[1], pdf.length) - 1;
+        // 优先挑 ASCII 字母：改中文文本会命中多字节字符的半个字节，回显成 '?' 之类的乱码，
+        // 篡改效果虽同样成立，但演示时看不清"改了什么"
+        for (int i = br[0]; i < end; i++) {
+            byte b = pdf[i + 1];
+            if (pdf[i] == '(' && ((b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z'))) {
+                return i + 1;
+            }
+        }
+        for (int i = br[0]; i < end; i++) {
+            if (pdf[i] == '(' && pdf[i + 1] > 0x20) {
+                return i + 1;                       // 正文无 ASCII 字母时的退路
+            }
+        }
+        return -1;
     }
 
     /** 数文档里的签名数——/ByteRange 是签名字典的必需条目（PDF32000 Table 252）。 */

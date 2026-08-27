@@ -274,6 +274,8 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
           <button onclick="pdfOp('toword')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-type-2" class="w-4 h-4"></i>转 Word</button>
           <button onclick="pdfOp('sign')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-signature" class="w-4 h-4"></i>数字签名</button>
           <button onclick="pdfOp('multisign')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="users" class="w-4 h-4"></i>三人会签</button>
+          <button onclick="pdfOp('verify')" class="border border-emerald-300 bg-emerald-50 text-emerald-700 rounded-md p-2.5 text-sm hover:border-emerald-500 transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="shield-check" class="w-4 h-4"></i>验证签名</button>
+          <button onclick="pdfOp('tamper')" class="border border-rose-300 bg-rose-50 text-rose-700 rounded-md p-2.5 text-sm hover:border-rose-500 transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-warning" class="w-4 h-4"></i>篡改演示</button>
         </div>
         <div class="mt-4 bg-slate-50 rounded-md p-3">
           <div class="text-xs text-slate-500 mb-2">数字签名（PDF32000 §12.8）——签完的文档在阅读器里打开即显示是否被篡改</div>
@@ -285,6 +287,12 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
             🔴 产物需用 <b>Adobe Acrobat</b> 打开才看得到效果——浏览器内置阅读器多数不验证签名。
             测试台用的是现场生成的<b>自签名</b>证书，会提示"签署人身份未知"，但"文档未被修改"仍为绿；
             消除该提示需私有 CA 或公共 CA 证书。<b>三人会签</b>走增量更新，前面每个人的签名都不失效。
+          </div>
+          <div class="mt-2 text-xs text-slate-400 border-t border-slate-200 pt-2">
+            <b>验证签名</b>不需要 Acrobat——<code class="bg-slate-200 px-1 rounded">OfficiaPdf.verify</code>
+            直接给出结构化结论，业务系统可据此程序化判定。<b>篡改演示</b>会把签名件的正文改掉
+            <b>一个字节</b>再验一次，改动前后结论一正一反，是"防篡改"最直观的证明。
+            <br>推荐流程：先<b>数字签名</b>或<b>三人会签</b> → 把产物重新上传 → <b>验证签名</b> → <b>篡改演示</b>。
           </div>
         </div>
         <div class="mt-4 bg-slate-50 rounded-md p-3">
@@ -697,6 +705,22 @@ async function pdfOp(op){
     else if(op==='pagenumbers'){j=await api('/api/pdf/pagenumbers?id='+id+'&format='+encodeURIComponent(document.getElementById('pdfPnFmt').value)+font,{method:'POST'});show('pdfOut',card('页码结果',j))}
     else if(op==='rc4'){j=await api('/api/pdf/encrypt?id='+id+'&bits=128&user=open&owner=owner',{method:'POST'});show('pdfOut',card('RC4-128 加密',j))}
     else if(op==='aes'){j=await api('/api/pdf/encrypt?id='+id+'&bits=256&user=open&owner=owner',{method:'POST'});show('pdfOut',card('AES-256 加密',j))}
+    else if(op==='verify'){
+      j=await api('/api/pdf/verify?id='+id,{method:'POST'});
+      show('pdfOut',verifyCard(j));logTask('Pdf',j);toast('完成');return}
+    else if(op==='tamper'){
+      j=await api('/api/pdf/tamper?id='+id,{method:'POST'});
+      if(j.error){show('pdfOut','<div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">'+esc(j.error)+'</div>');toast('无签名');return}
+      show('pdfOut',card('篡改演示产物（可下载后用 Acrobat 核对）',j)+
+        '<div class="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 leading-relaxed">'+
+        '<div class="font-medium mb-2">只改了 1 个字节，签名立刻失效</div>'+
+        '<div class="text-xs mb-2">'+esc(j.changedAt)+'</div>'+
+        '<div class="grid grid-cols-2 gap-3 text-xs">'+
+        '<div class="rounded border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800"><div class="font-medium mb-1">改动前 '+(j.beforeValid?'✅ 验签通过':'❌ 不通过')+'</div>'+esc(j.beforeSummary)+'</div>'+
+        '<div class="rounded border border-rose-300 bg-white p-2.5 text-rose-800"><div class="font-medium mb-1">改动后 '+(j.afterValid?'✅ 验签通过':'❌ 不通过')+'</div>'+esc(j.afterSummary)+
+        (j.problem?'<div class="mt-1 text-rose-600">'+esc(j.problem)+'</div>':'')+'</div>'+
+        '</div></div>');
+      logTask('Pdf',j);toast('完成');return}
     else if(op==='sign'||op==='multisign'){
       const single=op==='sign';
       const who=document.getElementById('pdfSigners').value.trim()||'张三,李四,王五';
@@ -712,6 +736,7 @@ async function pdfOp(op){
         '证书是现场生成的<b>自签名</b>证书，故会提示"签署人身份未知"（黄标）——'+
         '这是预期的，下面那行"文档未被修改"仍是绿的。消除黄标需私有 CA 或公共 CA 证书。'+
         (single?'':'<br>三个签名走的是<b>增量更新</b>：'+j.grow+'，所以前面每个人的签名都不会失效。')+
+        '<br>想不开 Acrobat 也能看结果：把产物重新上传后点<b>验证签名</b>，会逐条列出每个签名的校验项。'+
         '</div>');
       logTask('Pdf',j);toast('完成');return}
     else if(op==='text'){j=await api('/api/pdf/text?id='+id,{method:'POST'});
@@ -952,6 +977,47 @@ async function loadSamples(){
   }catch(e){toast(e.message,false)}
 }
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+// 验签结果卡片。整体结论一律取后端的 valid（它已把"签名后被追加内容"算进去了），
+// 不要在前端拿各签名的 valid 取与——那样会漏掉追加型篡改，给出危险的假绿
+function verifyCard(j){
+  if(!j.signed) return '<div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">'+
+    '<i data-lucide="file-x" class="w-5 h-5 inline-block mb-1"></i><div>这份 PDF 没有数字签名</div>'+
+    '<div class="text-xs text-slate-400 mt-1">先用「数字签名」或「三人会签」签一份，把产物重新上传再来验</div></div>';
+  const ok=j.valid;
+  const head=ok?['emerald','shield-check','签名有效']:['rose','shield-alert','签名校验未通过'];
+  const chk=(v,t)=>'<span class="'+(v?'text-emerald-600':'text-rose-600')+'">'+(v?'✅':'❌')+' '+t+'</span>';
+  return '<div class="bg-white rounded-lg border border-slate-200">'+
+   '<div class="px-4 py-3 border-b border-slate-100 flex items-center gap-2 bg-'+head[0]+'-50">'+
+    '<i data-lucide="'+head[1]+'" class="w-4 h-4 text-'+head[0]+'-600"></i>'+
+    '<span class="font-medium text-sm text-'+head[0]+'-800">'+head[2]+'</span>'+
+    '<span class="text-xs text-slate-500 ml-auto">'+esc(j.summary)+' · '+(j.ms||0)+' ms</span>'+
+   '</div>'+
+   (j.fullyCovered?'':'<div class="px-4 py-2 bg-rose-50 border-b border-rose-100 text-xs text-rose-800">'+
+     '🔴 <b>签名之后文件被追加了 '+j.unsignedTailBytes+' 字节</b>——这段内容不受任何签名保护，'+
+     '却会照常显示给读者。下面各签名本身仍然有效，但整份文档不可信。</div>')+
+   '<div class="divide-y divide-slate-100">'+
+   j.signatures.map(s=>'<div class="px-4 py-3">'+
+     '<div class="flex items-center gap-2 text-sm">'+
+      '<span class="font-medium">'+esc(s.signer||'（未署名）')+'</span>'+
+      '<span class="text-xs text-slate-400">'+esc(s.field||'')+'</span>'+
+      '<span class="text-xs text-slate-500 ml-auto">'+esc(s.time||'时间未知')+'</span></div>'+
+     (s.reason||s.location?'<div class="text-xs text-slate-500 mt-0.5">'+esc(s.reason||'')+
+       (s.location?' · '+esc(s.location):'')+'</div>':'')+
+     '<div class="text-xs mt-1.5 flex flex-wrap gap-x-4 gap-y-1">'+
+      chk(s.digestMatch,'内容未被改')+chk(s.signatureMatch,'签名值有效')+
+      chk(s.certificateIntact,'证书完好')+
+      '<span class="'+(s.coversWholeDocument?'text-slate-500':'text-slate-400')+'">'+
+      (s.coversWholeDocument?'✅ 覆盖至文件尾':'○ 未覆盖文件尾（多签时前序签名如此属正常）')+'</span></div>'+
+     (s.problem?'<div class="text-xs text-rose-600 mt-1">'+esc(s.problem)+'</div>':'')+
+     '<div class="text-xs text-slate-400 mt-1 truncate" title="'+esc(s.subject||'')+'">证书主体：'+esc(s.subject||'—')+'</div>'+
+    '</div>').join('')+
+   '</div>'+
+   '<div class="px-4 py-2 bg-slate-50 text-xs text-slate-400 border-t border-slate-100">'+
+    '身份是否可信需传入受信任的根证书（<code>OfficiaPdf.verify(pdf, trustAnchors)</code>）；'+
+    '本页只做密码学验证，自签名证书同样可以"有效"——它证明内容没被改过，不证明签署人是谁。</div>'+
+  '</div>';
+}
 
 lucide.createIcons();refreshLic();loadLimits();
 </script>
