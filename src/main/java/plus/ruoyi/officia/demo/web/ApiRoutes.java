@@ -16,6 +16,8 @@ import plus.ruoyi.officia.ocr.result.OcrLine;
 import plus.ruoyi.officia.ocr.result.OcrResult;
 import plus.ruoyi.officia.ocr.scan.ScannedPdfConverter;
 import plus.ruoyi.officia.pdf.OfficiaPdf;
+import plus.ruoyi.officia.pdf.sign.KeyMaterial;
+import plus.ruoyi.officia.pdf.sign.SignOptions;
 import plus.ruoyi.officia.pdf.word.WordConvertOptions;
 import plus.ruoyi.officia.slides.OfficiaSlides;
 import plus.ruoyi.officia.words.OfficiaWords;
@@ -413,6 +415,78 @@ final class ApiRoutes {
                 "application/pdf", out, t0)
                 .put("algo", bits == 256 ? "AES-256 (AESV3)" : "RC4-" + bits).end());
         });
+
+        // 数字签名（PDF32000 §12.8）。产物要用 Adobe Acrobat 打开才看得到防篡改状态——
+        // 浏览器内置的 PDF 查看器多数不做签名验证，看不出区别，这一点在页面上也标注了
+        r.add("/api/pdf/sign", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            String signer = q.getOrDefault("signer", "张三");
+            String reason = q.getOrDefault("reason", "审批通过");
+            String location = q.getOrDefault("location", "北京");
+            String field = q.getOrDefault("field", "Signature1");
+
+            long t0 = System.nanoTime();
+            // 现场生成自签名身份：阅读器会提示"签署人身份未知"，但"文档未被修改"照样是绿的。
+            // 要消除该提示需私有 CA 或公共 CA 证书，那属部署环节、不在测试台演示范围
+            KeyMaterial id = KeyMaterial.selfSigned(signer, "Officia 测试台", 3650);
+            byte[] out = OfficiaPdf.sign(pdf, id, SignOptions.defaults()
+                .name(signer).reason(reason).location(location).fieldName(field));
+
+            Http.json(ex, result(outName(q.get("id"), "签名", "pdf", "已签名.pdf"),
+                "application/pdf", out, t0)
+                .put("signer", signer)
+                .put("signatures", countSignatures(out))
+                .put("certSubject", id.getSubject())
+                .put("hint", "用 Adobe Acrobat 打开看签名面板；浏览器内置阅读器多数不验签名")
+                .end());
+        });
+
+        // 多人依次签字：一次演示三个人，验证增量更新下前序签名不失效
+        r.add("/api/pdf/multisign", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            String[] names = q.getOrDefault("signers", "张三,李四,王五").split(",");
+            String[] reasons = {"部门经理审批", "财务复核", "总经理批准"};
+
+            long t0 = System.nanoTime();
+            byte[] out = pdf;
+            int before = out.length;
+            for (int i = 0; i < names.length; i++) {
+                String who = names[i].trim();
+                if (who.isEmpty()) {
+                    continue;
+                }
+                KeyMaterial id = KeyMaterial.selfSigned(who, "Officia 测试台", 3650);
+                out = OfficiaPdf.sign(out, id, SignOptions.defaults()
+                    .name(who)
+                    .reason(i < reasons.length ? reasons[i] : "审批通过")
+                    // 🔴 各人域名必须不同，重名会导致阅读器只认出一个签名
+                    .fieldName("Signature" + (i + 1)));
+            }
+            Http.json(ex, result(outName(q.get("id"), "多人签名", "pdf", "三人签名.pdf"),
+                "application/pdf", out, t0)
+                .put("signers", String.join(" → ", names))
+                .put("signatures", countSignatures(out))
+                .put("grow", (out.length - before) / 1024 + " KB（每次加签追加一个增量段，前段字节不变）")
+                .put("hint", "Adobe 签名面板应列出多条「修订版」，且每条都显示文档未被修改")
+                .end());
+        });
+    }
+
+    /** 数文档里的签名数——/ByteRange 是签名字典的必需条目（PDF32000 Table 252）。 */
+    private static int countSignatures(byte[] pdf) {
+        byte[] mark = "/ByteRange".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+        int count = 0;
+        outer:
+        for (int i = 0; i <= pdf.length - mark.length; i++) {
+            for (int j = 0; j < mark.length; j++) {
+                if (pdf[i + j] != mark[j]) {
+                    continue outer;
+                }
+            }
+            count++;
+            i += mark.length - 1;
+        }
+        return count;
     }
 
     // ==================== Imaging ====================

@@ -272,6 +272,20 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
           <button onclick="pdfOp('aes')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="shield" class="w-4 h-4"></i>AES-256</button>
           <button onclick="pdfOp('info')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="info" class="w-4 h-4"></i>信息</button>
           <button onclick="pdfOp('toword')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-type-2" class="w-4 h-4"></i>转 Word</button>
+          <button onclick="pdfOp('sign')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-signature" class="w-4 h-4"></i>数字签名</button>
+          <button onclick="pdfOp('multisign')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="users" class="w-4 h-4"></i>三人会签</button>
+        </div>
+        <div class="mt-4 bg-slate-50 rounded-md p-3">
+          <div class="text-xs text-slate-500 mb-2">数字签名（PDF32000 §12.8）——签完的文档在阅读器里打开即显示是否被篡改</div>
+          <div class="flex flex-wrap items-center gap-4 text-sm">
+            <div class="flex items-center gap-1.5"><span class="text-slate-500 text-xs">签署人</span><input id="pdfSigners" value="张三,李四,王五" placeholder="逗号分隔；单签取第一个" class="border border-slate-300 rounded-md px-2 py-1 text-sm w-48 outline-none focus:border-primary"></div>
+            <div class="flex items-center gap-1.5"><span class="text-slate-500 text-xs">签署原因</span><input id="pdfSignReason" value="部门经理审批通过" class="border border-slate-300 rounded-md px-2 py-1 text-sm w-44 outline-none focus:border-primary"></div>
+          </div>
+          <div class="mt-2 text-xs text-slate-400">
+            🔴 产物需用 <b>Adobe Acrobat</b> 打开才看得到效果——浏览器内置阅读器多数不验证签名。
+            测试台用的是现场生成的<b>自签名</b>证书，会提示"签署人身份未知"，但"文档未被修改"仍为绿；
+            消除该提示需私有 CA 或公共 CA 证书。<b>三人会签</b>走增量更新，前面每个人的签名都不失效。
+          </div>
         </div>
         <div class="mt-4 bg-slate-50 rounded-md p-3">
           <div class="text-xs text-slate-500 mb-2">转 Word 选项（Textbox 模式：按原坐标绝对定位，版式最像原文）</div>
@@ -683,6 +697,23 @@ async function pdfOp(op){
     else if(op==='pagenumbers'){j=await api('/api/pdf/pagenumbers?id='+id+'&format='+encodeURIComponent(document.getElementById('pdfPnFmt').value)+font,{method:'POST'});show('pdfOut',card('页码结果',j))}
     else if(op==='rc4'){j=await api('/api/pdf/encrypt?id='+id+'&bits=128&user=open&owner=owner',{method:'POST'});show('pdfOut',card('RC4-128 加密',j))}
     else if(op==='aes'){j=await api('/api/pdf/encrypt?id='+id+'&bits=256&user=open&owner=owner',{method:'POST'});show('pdfOut',card('AES-256 加密',j))}
+    else if(op==='sign'||op==='multisign'){
+      const single=op==='sign';
+      const who=document.getElementById('pdfSigners').value.trim()||'张三,李四,王五';
+      const p=single?('&signer='+encodeURIComponent(who.split(',')[0].trim())
+                      +'&reason='+encodeURIComponent(document.getElementById('pdfSignReason').value))
+                    :('&signers='+encodeURIComponent(who));
+      j=await api('/api/pdf/'+(single?'sign':'multisign')+'?id='+id+p,{method:'POST'});
+      show('pdfOut',card(single?'数字签名':'多人依次签字',j)+
+        '<div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 leading-relaxed">'+
+        '<div class="font-medium mb-1">⚠️ 要用 Adobe Acrobat 打开才看得到效果</div>'+
+        '共 '+j.signatures+' 个签名。浏览器内置的 PDF 查看器多数不验证数字签名，看不出区别。'+
+        '用 Adobe 打开后：顶部状态栏显示是否被篡改，左侧签名面板逐条列出签署人、时间与原因。<br>'+
+        '证书是现场生成的<b>自签名</b>证书，故会提示"签署人身份未知"（黄标）——'+
+        '这是预期的，下面那行"文档未被修改"仍是绿的。消除黄标需私有 CA 或公共 CA 证书。'+
+        (single?'':'<br>三个签名走的是<b>增量更新</b>：'+j.grow+'，所以前面每个人的签名都不会失效。')+
+        '</div>');
+      logTask('Pdf',j);toast('完成');return}
     else if(op==='text'){j=await api('/api/pdf/text?id='+id,{method:'POST'});
       show('pdfOut','<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm">文本抽取（'+j.pages+' 页）</div><div class="p-4 space-y-3 max-h-[520px] overflow-auto">'+
        j.text.map((t,i)=>'<div><div class="text-xs text-slate-400 mb-1">第 '+(i+1)+' 页</div><pre class="bg-slate-50 rounded p-3 text-xs whitespace-pre-wrap">'+esc(t)+'</pre></div>').join('')+'</div></div>');return}
