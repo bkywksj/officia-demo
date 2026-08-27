@@ -45,6 +45,7 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 | PDF | 纯文本 | `OfficiaPdf.extractText(byte[])` | `officia-pdf` |
 | PDF | 内嵌图片 | `OfficiaPdf.extractImages(byte[])` | `officia-pdf` |
 | PDF（电子版，有文字层） | **可编辑 Word** | `OfficiaPdf.toWord(byte[])` | `officia-pdf` |
+| PDF | **带防篡改数字签名的 PDF**（支持多人依次签字） | `OfficiaPdf.sign(byte[], KeyMaterial)` | `officia-pdf` |
 | PDF（**扫描件**，整页是图） | 可编辑 Word（OCR 认字） | `new ScannedPdfConverter().language(..).toWord(byte[])` | `officia-pdf` |
 | 图片字节 | 识别出的文字 | `OfficiaOcr.recognize(byte[], OcrOptions)` | `officia-pdf` |
 | 一段文本/网址 | 条码/二维码 PNG | `OfficiaBarCode.qrPng(String)` 等 | `officia-barcode` |
@@ -87,6 +88,8 @@ OfficiaEmail.toPdf(eml)                     // 邮件归档 → PDF
 | **加密的 `.doc`**（XOR / RC4 / CryptoAPI 加密） | ❌ 明确不支持 | 属显式拒绝范围。加密 DOC 请先用 Word 另存为解密版本 |
 | DOC 内的 **WMF / EMF / PICT / CMYK JPEG** 图片负载 | ⚠️ 不解码，**退化为空白占位** | 2026-07-31 起：不再因一张画不出的图否决整份文档——该图位置保留版面尺寸的空白占位，后文不上移、环绕仍成立，**整篇照常转出**。不猜测解码、不外调转码器 |
 | DOC 内 **宏 / OLE / 数字签名负载**的内部解析 | ❌ 明确不支持 | 只跳过，不解析其内容 |
+| 数字签名的**可信时间戳**（RFC 3161 TSA） | ❌ 不含 | 签名时间取自签名机本地时钟、**可被改**。要不可篡改的时间需外接 TSA 服务 |
+| 数字签名的**可见签章**（页面红章 / 手写签名图） | ❌ 不含 | 当前为不可见签名，只在阅读器签名面板可见 |
 | **竖排文本**与 **RTL 文本框** | ⚠️ 已知缺口 | 排版层未覆盖 |
 | DOC **内嵌字体** | ⚠️ 已知缺口 | 规范链路已核对，但字体数据为 W3C EOT 格式、该规范未归档，故不实现 |
 | `.doc` 二进制输入整体 | 🚧 主链路可用、绿测覆盖，**未宣布生产就绪** | 见 `../officia/status.json` 的 `doc_binary_input`。生产上大批量 `.doc` 前先用测试台实测一批真实样本 |

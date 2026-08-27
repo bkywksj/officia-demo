@@ -141,6 +141,7 @@
       "OfficiaWords 16 个 fillTemplate* 重载；模板九类占位符语法（取自 Wml*/Template* 实现类注释）",
       "FormulaEngine 支持的 34 个 Excel 函数（grep case \"XXX\" 实得）",
       "PDF 加密 bits 取值 40/128/256 与各自 /V /R 规格；PdfEditor 全部链式方法",
+      "PDF 数字签名（PDF32000 §12.8 adbe.pkcs7.detached）：OfficiaPdf.sign 两个重载、KeyMaterial 的 .p12/自签名两条身份来源、SignOptions 五项；签名是终结操作故刻意不进 PdfEditor 链式",
       "BarCode 各码制输入位数约束与自动补校验位规则；默认 moduleWidth=2 heightPx=60 quiet=10（EAN/UPC=11）、QR module=4 quiet=4",
       "CfbLimits.defaults() 十项真实上限（maxInputBytes=256MiB 等）",
       "BuildFlags.ENFORCED_BY_DEFAULT 是构建期常量：默认 false（开发构建不降级），mvn -Prelease 为 true（发布版门控恒开不可关）",
@@ -155,7 +156,11 @@
       "已知缺口：竖排与 RTL 文本框、DOC 内嵌字体(EOT 规范未归档)",
       "大文档吞吐与高并发未系统压测；CfbLimits 是内存安全边界而非容量承诺",
       "流式 API 只省输出侧内存，输入与排版仍需整篇在内存",
-      "过时注释已标注：words/template/package-info.java 的『骨架预留』与实际实现不符"
+      "过时注释已标注：words/template/package-info.java 的『骨架预留』与实际实现不符",
+      "数字签名：单人与多人依次签字均可用，经 Adobe 实测认可（三签文件签名面板列出三条修订版、各自显示未被修改）；首签走全量重写，加签自动转增量更新（PDF32000 §7.5.6，原字节不动故前签存活）",
+      "数字签名：多人签字时各人 fieldName 必须不同（默认都是 Signature1），重名会导致表单域冲突；每次加签追加约 17KB 增量段，文件随人数线性增长",
+      "数字签名：自签名证书能证明『文档未被改过』但不能证明签署人身份（阅读器提示身份未知）；不含 RFC 3161 可信时间戳，签名时间取自签名机本地时钟；不含可见签章",
+      "数字签名尚未接入 demo 测试台面板，只能用代码调用验证（且需用 Adobe Acrobat 打开才看得到签名状态）"
     ]
   },
   "not_included": {
