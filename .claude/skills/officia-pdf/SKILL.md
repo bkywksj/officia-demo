@@ -178,6 +178,15 @@ KeyMaterial id = ca.issue("张三", "研发部", 365);
 
 `fromPkcs12` 不指定别名时取**第一个带私钥的条目**。CN 支持中文。
 
+> 🔴 **`.p12` 口令必须是 ASCII 字符**。JDK 的 PKCS#12 实现不接受非 ASCII 口令，
+> 用中文口令会抛 `UnrecoverableKeyException: Password is not ASCII`。
+> 这是 JDK 的限制不是 officia 的，但国内用户习惯用中文密码，很容易撞上——
+> 向 CA 申请证书、或自己导出 `.p12` 时就该注意。
+
+> ℹ️ **统一社会信用代码**放在证书主体的 `serialNumber` 字段（OID 2.5.4.5），这是国内 CA 的惯例。
+> 自建 CA 时用 `createRoot(cn, o, 统一社会信用代码, days)` 与 `issue(cn, o, 统一社会信用代码, days)`
+> 这两个重载写入。（欧盟 eIDAS 用的是 organizationIdentifier 2.5.4.97，国内验签方认前者。）
+
 > ℹ️ **证书链会整条嵌入签名**。CA 签发的证书通常是「你的证书 → 中间 CA → 根 CA」，
 > officia 取 `.p12` 里的完整链一并写进 PKCS#7——只送签署人证书的话，验证方本地
 > 若没有那张中间 CA，就接不到受信任的根，**正版证书也会被判"身份未知"**。

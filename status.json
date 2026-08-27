@@ -165,7 +165,9 @@
       "数字签名：不含可见签章（页面上的红章/手写签名图），当前为不可见签名，只在阅读器签名面板可见；不含验签 API（能签不能验，业务系统需程序化判断有效性时尚无入口）",
       "数字签名：评估版不限签名数量，只在每个签名的 /Reason 追加评估标记（与 Words/Cells 限页+水印、OCR 截断行数同为『降级但可用』）；标记在签名覆盖区内，改动即令签名失效",
       "数字签名已接入 demo 测试台面板（PDF 工具箱 → 数字签名 / 三人会签）；但产物仍需用 Adobe Acrobat 打开才看得到签名状态，浏览器内置阅读器多数不验签名",
-      "私有 CA（CertAuthority）：只做建根证书与签发终端实体证书两件事；不含证书吊销（CRL/OCSP）、密钥托管、自动续期、多级中间 CA。根证书 pathLen=0，结构上锁死为两层"
+      "私有 CA（CertAuthority）：只做建根证书与签发终端实体证书两件事；不含证书吊销（CRL/OCSP）、密钥托管、自动续期、多级中间 CA。根证书 pathLen=0，结构上锁死为两层",
+      "🔴 .p12 口令必须是 ASCII —— JDK 的 PKCS#12 实现不接受非 ASCII 口令，用中文口令抛 UnrecoverableKeyException: Password is not ASCII。是 JDK 限制非 officia 的，但国内用户习惯中文密码，实测撞到过",
+      "统一社会信用代码写入证书主体的 serialNumber 字段（OID 2.5.4.5，国内 CA 惯例；欧盟 eIDAS 用 organizationIdentifier 2.5.4.97）；createRoot 与 issue 各有带该参数的重载"
     ]
   },
   "not_included": {
