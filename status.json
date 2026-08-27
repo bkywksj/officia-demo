@@ -141,7 +141,8 @@
       "OfficiaWords 16 个 fillTemplate* 重载；模板九类占位符语法（取自 Wml*/Template* 实现类注释）",
       "FormulaEngine 支持的 34 个 Excel 函数（grep case \"XXX\" 实得）",
       "PDF 加密 bits 取值 40/128/256 与各自 /V /R 规格；PdfEditor 全部链式方法",
-      "PDF 数字签名（PDF32000 §12.8 adbe.pkcs7.detached）：OfficiaPdf.sign 两个重载、KeyMaterial 的 .p12/自签名两条身份来源、SignOptions 五项；签名是终结操作故刻意不进 PdfEditor 链式",
+      "PDF 数字签名（PDF32000 §12.8 adbe.pkcs7.detached）：OfficiaPdf.sign 两个重载、KeyMaterial 的 .p12/自签名/私有CA签发三条身份来源、SignOptions 六项（含 timestampProvider）；签名是终结操作故刻意不进 PdfEditor 链式",
+      "私有 CA（CertAuthority）：createRoot 建根、issue 签发下级、exportRootCertificate 导出根证书供内网分发、exportPkcs12/load 离线保管；签发的 KeyMaterial 自带完整证书链，可直接交给 OfficiaPdf.sign",
       "BarCode 各码制输入位数约束与自动补校验位规则；默认 moduleWidth=2 heightPx=60 quiet=10（EAN/UPC=11）、QR module=4 quiet=4",
       "CfbLimits.defaults() 十项真实上限（maxInputBytes=256MiB 等）",
       "BuildFlags.ENFORCED_BY_DEFAULT 是构建期常量：默认 false（开发构建不降级），mvn -Prelease 为 true（发布版门控恒开不可关）",
@@ -159,8 +160,12 @@
       "过时注释已标注：words/template/package-info.java 的『骨架预留』与实际实现不符",
       "数字签名：单人与多人依次签字均可用，经 Adobe 实测认可（三签文件签名面板列出三条修订版、各自显示未被修改）；首签走全量重写，加签自动转增量更新（PDF32000 §7.5.6，原字节不动故前签存活）",
       "数字签名：多人签字时各人 fieldName 必须不同（默认都是 Signature1），重名会导致表单域冲突；每次加签追加约 17KB 增量段，文件随人数线性增长",
-      "数字签名：自签名证书能证明『文档未被改过』但不能证明签署人身份（阅读器提示身份未知）；不含 RFC 3161 可信时间戳，签名时间取自签名机本地时钟；不含可见签章",
-      "数字签名尚未接入 demo 测试台面板，只能用代码调用验证（且需用 Adobe Acrobat 打开才看得到签名状态）"
+      "数字签名：自签名证书能证明『文档未被改过』但不能证明签署人身份（阅读器提示身份未知）；消除提示有两条路——CertAuthority 自建私有 CA 把根证书分发到内网（内网全绿勾、无年费、信任不出内网），或改用有资质公共 CA 签发的证书",
+      "数字签名：支持 RFC 3161 时间戳，但 officia 不做网络调用——由 SignOptions.timestampProvider 回调把 HTTP 交给调用方，officia 只构造请求与嵌入响应；不设该回调时签名时间仍取自签名机本地时钟、可被篡改",
+      "数字签名：不含可见签章（页面上的红章/手写签名图），当前为不可见签名，只在阅读器签名面板可见；不含验签 API（能签不能验，业务系统需程序化判断有效性时尚无入口）",
+      "数字签名：评估版不限签名数量，只在每个签名的 /Reason 追加评估标记（与 Words/Cells 限页+水印、OCR 截断行数同为『降级但可用』）；标记在签名覆盖区内，改动即令签名失效",
+      "数字签名已接入 demo 测试台面板（PDF 工具箱 → 数字签名 / 三人会签）；但产物仍需用 Adobe Acrobat 打开才看得到签名状态，浏览器内置阅读器多数不验签名",
+      "私有 CA（CertAuthority）：只做建根证书与签发终端实体证书两件事；不含证书吊销（CRL/OCSP）、密钥托管、自动续期、多级中间 CA。根证书 pathLen=0，结构上锁死为两层"
     ]
   },
   "not_included": {
