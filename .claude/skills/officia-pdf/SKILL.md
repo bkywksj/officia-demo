@@ -340,12 +340,70 @@ SignOptions opts = SignOptions.defaults()
 > ⚠️ 回调抛异常时签名会**明确失败**而非静默跳过——拿到一份"自以为有可信时间、
 > 实则没有"的签名，比签名失败危险得多。
 
+### 验证签名 `OfficiaPdf.verify`
+
+签名的对侧。让业务系统**程序化**判定一份文档是否仍然可信，不必让人开 Acrobat 肉眼看：
+
+```java
+SignatureVerification v = OfficiaPdf.verify(pdf);
+
+if (!v.isSigned()) {
+    reject("这份文件没有签名");
+} else if (v.isValid()) {
+    for (SignatureInfo s : v.getSignatures()) {
+        log.info("{} 于 {} 签署，理由：{}", s.getSignerName(), s.getSigningTime(), s.getReason());
+    }
+} else {
+    log.warn("签名校验未通过：{}", v.getSummary());   // 如「3 个签名，全部有效，签名后被追加了 76 字节」
+}
+```
+
+> 🔴 **判"这份文档可信吗"一律看 `v.isValid()`，不要自己遍历各签名的 `isValid()` 取与。**
+> 整体结论额外查了一条：**最末一个签名的覆盖区是否延伸到文件末尾**。签完之后被追加的内容
+> 不受任何签名保护，却会照常显示给读者——此时每个签名单独验都是"有效"，
+> 漏掉这一条会得到危险的假绿。`v.getUnsignedTailBytes()` 给出被追加的字节数。
+
+**验证 ≠ 信任**。默认只做密码学验证；要一并核验签署人身份，传入受信任的根证书：
+
+```java
+X509Certificate root = (X509Certificate) CertificateFactory.getInstance("X.509")
+        .generateCertificate(new ByteArrayInputStream(rootCerBytes));   // CA.exportRootCertificate()
+SignatureVerification v = OfficiaPdf.verify(pdf, List.of(root));
+boolean ok = v.isValid() && v.isTrusted();       // 内容没被改 + 签署人可信
+```
+
+`SignatureInfo` 的四项独立结论，各查一段、互不替代：
+
+| 方法 | 回答什么 | false 意味着 |
+|---|---|---|
+| `isDigestMatch()` | 被签内容还是原样吗 | 签名后有人改了正文 |
+| `isSignatureMatch()` | 摘要声明真是持私钥者作出的吗 | 签名值被替换或容器被改造 |
+| `isCertificateIntact()` | 证书本身没被动过吗 | **证书被冒名改写**（见下） |
+| `isCoveringWholeDocument()` | 覆盖区到文件尾了吗 | 多签时前序签名如此**属正常**，看整体结论 |
+
+> 🔴 **`isCertificateIntact()` 为什么不能省**：签名值签的是 signedAttrs，证书只是公钥的容器。
+> 篡改者若只改证书里的主体名（把"张三"改成"李四"），公钥、signedAttrs、签名值三者都没动，
+> 前两项检查**照样全绿**——只有验证证书自身被其签发者签的那道签名才能发现。
+> `isValid()` 已包含这一项，直接用它即可。
+
+其余可读字段：`getFieldName()` / `getSignerName()` / `getSigningTime()` / `getTimestampTime()` /
+`getReason()` / `getLocation()` / `getContactInfo()` / `getSignerCertificate()` /
+`getCertificateChain()` / `getSubject()` / `getIssuer()` / `getProblem()`（失败原因）。
+
+> ℹ️ `getSigningTime()` 优先取 PKCS#7 signedAttrs 里的时间（在签名覆盖范围内，改不了），
+> 缺失时才退回签名字典的 `/M`（**不在**保护内）。两者都来自签名机本地时钟；
+> 要不可否认的时间看 `getTimestampTime()`（第三方 TSA 出具）。
+
+> ℹ️ **验签不受授权门控**：它是纯读取操作，且要验的往往是**别人**发来的文档。
+> 生产签名才是受控能力。
+
 ### 当前限制（不要向客户承诺）
 
 | 做不到 | 说明 |
 |---|---|
-| **验签 API** | 目前**能签不能验**。业务系统要程序化判断"这份文件有没有被改过、谁签的"，尚无入口——只能靠人在阅读器里看 |
 | 可见签章（页面上的红章 / 手写签名图） | 当前是**不可见签名**（`/Rect [0 0 0 0]`），只在签名面板可见 |
+| 验签时的**证书吊销检查**（CRL / OCSP） | `verify` 不查吊销；私有 CA 也不具备吊销设施 |
+| 只嵌叶子证书时的**证书完整性**判定 | 容器里没有签发者证书就验不了那一项，此时 `isCertificateIntact()` 返回 true（"没验成"不等于"验失败"），身份完整性改由信任锚兜底 |
 | 保留原文档的书签 / XMP 元数据 | **仅首次签名**有此影响（走全量重写，不保留 `/Outlines`、`/Metadata`，与 `watermark` 等一致）；后续加签走增量更新，原文档内容分毫不动 |
 | 证书吊销（CRL / OCSP） | 私有 CA 不提供；签发出去的证书在有效期内无法作废 |
 
@@ -538,6 +596,10 @@ public class ArchivePdf {
 | 多人签字后只认出一个签名 | 几个人的 `fieldName` 重名 | 每人给不同的 `.fieldName("SignatureN")`，默认值都是 `Signature1` |
 | 多签后文件明显变大 | 每次加签追加一个增量段（约 17 KB） | 属**预期**——原字节不动是"前签不失效"的前提，这部分开销无法优化掉 |
 | `KeyMaterial.fromPkcs12` 抛"口令错误或容器损坏" | 口令不对 / 文件不是 PKCS#12 | 核对口令；`.pfx` 与 `.p12` 是同一格式，都可直接传 |
+| `verify` 各签名都 `isValid()` 但整体 `isValid()` 为 false | 签完之后有人往文件尾追加了内容 | **不是误报**——看 `getUnsignedTailBytes()`。那段内容不受签名保护却照常显示，整份文档不可信 |
+| `verify` 里某个签名 `isCoveringWholeDocument()` 为 false | 多签时的前序签名 | **属正常**，不是缺陷。增量更新下先签者的覆盖区天然不含后追加的段；判文档可信看整体 `isValid()` |
+| `verify` 说"签署人证书自身的签名验证不通过" | 证书内容被篡改（典型是冒名改主体） | 该文档不可信。公钥没变所以签名值仍验得过，正是这一项把它挡下来的 |
+| `verify` 的 `isTrusted()` 恒为 false | 没传信任锚 | 那表示"没验过"而非"验过不可信"。要判身份用 `verify(pdf, List.of(rootCert))` |
 
 ## 在测试台里实测
 
@@ -545,13 +607,18 @@ public class ArchivePdf {
 「转 Word」下方有三个开关（嵌入图片 / 表格线底纹 / 图案光栅化）与加密口令输入框，可现场对比开关效果。
 端点：`/api/pdf/info`、`/merge`、`/split`、`/pages`、`/rotate`、`/watermark`、`/pagenumbers`、`/text`、`/images`、`/encrypt`、`/toword`。
 
-**数字签名**面板内已有「数字签名」与「三人会签」两个按钮（端点 `/api/pdf/sign`、`/api/pdf/multisign`），
-可填签署人与签署原因。
+**数字签名**面板内有四个按钮：「数字签名」「三人会签」「验证签名」「篡改演示」
+（端点 `/api/pdf/sign`、`/multisign`、`/verify`、`/tamper`），可填签署人与签署原因。
 
-> ⚠️ **产物必须用 Adobe Acrobat 打开才看得到效果**——浏览器内置的 PDF 查看器多数不验证
-> 数字签名，页面上看不出任何区别。点完按钮请下载产物，用 Adobe 打开看顶部状态栏与签名面板。
-> 测试台用的是现场生成的自签名证书，会提示"签署人身份未知"（属预期），
-> 但"文档未被修改"仍为绿。
+推荐演示流程：**签名 → 把产物重新上传 → 验证签名 → 篡改演示**。
+「篡改演示」会把签名件正文改掉**一个字节**再验一次，页面上并排显示改动前后的结论
+（一正一反），是"防篡改"最直观的证明，且**不需要 Acrobat**。
+
+> ⚠️ **要看阅读器里的效果则必须用 Adobe Acrobat**——浏览器内置的 PDF 查看器多数不验证
+> 数字签名，页面上看不出区别。测试台用的是现场生成的自签名证书，
+> 会提示"签署人身份未知"（属预期），但"文档未被修改"仍为绿。
+>
+> 「验证签名」按钮走的是 `OfficiaPdf.verify`，**不依赖阅读器**，直接给结构化结论。
 
 ## 相关技能
 

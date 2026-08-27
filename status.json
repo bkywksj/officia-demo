@@ -142,6 +142,7 @@
       "FormulaEngine 支持的 34 个 Excel 函数（grep case \"XXX\" 实得）",
       "PDF 加密 bits 取值 40/128/256 与各自 /V /R 规格；PdfEditor 全部链式方法",
       "PDF 数字签名（PDF32000 §12.8 adbe.pkcs7.detached）：OfficiaPdf.sign 两个重载、KeyMaterial 的 .p12/自签名/私有CA签发三条身份来源、SignOptions 六项（含 timestampProvider）；签名是终结操作故刻意不进 PdfEditor 链式",
+      "PDF 验签：OfficiaPdf.verify 两个重载（可选传 List<X509Certificate> 信任锚做 PKIX 路径验证）；结果类型 SignatureVerification + SignatureInfo，均为只读 DTO（Date 与 int[] 出参做防御性拷贝）",
       "私有 CA（CertAuthority）：createRoot 建根、issue 签发下级、exportRootCertificate 导出根证书供内网分发、exportPkcs12/load 离线保管；签发的 KeyMaterial 自带完整证书链，可直接交给 OfficiaPdf.sign",
       "BarCode 各码制输入位数约束与自动补校验位规则；默认 moduleWidth=2 heightPx=60 quiet=10（EAN/UPC=11）、QR module=4 quiet=4",
       "CfbLimits.defaults() 十项真实上限（maxInputBytes=256MiB 等）",
@@ -149,7 +150,7 @@
       "License 自动加载顺序：-Dofficia.license → OFFICIA_LICENSE → classpath /officia.lic → ./officia.lic",
       "officia-all 已聚合 officia-license（demo pom 单独再引属显式冗余）",
       "异常消息前缀分布可作故障域路标（MS-DOC 719 / CFB 105 / MS-ODRAW 85 / MS-OLEPS 53 …）",
-      "demo 测试台 32 个 /api 端点与 Batch.run() 的 10 个回归用例"
+      "demo 测试台 39 个 /api 端点与 Batch.run() 的 10 个回归用例（端点数以 /api/health 的 endpoints 字段为准，勿抄本行）"
     ],
     "honest_disclaimers_carried": [
       "doc 二进制输入：主链路可用且绿测覆盖，但未宣布生产就绪",
@@ -162,9 +163,13 @@
       "数字签名：多人签字时各人 fieldName 必须不同（默认都是 Signature1），重名会导致表单域冲突；每次加签追加约 17KB 增量段，文件随人数线性增长",
       "数字签名：自签名证书能证明『文档未被改过』但不能证明签署人身份（阅读器提示身份未知）；消除提示有两条路——CertAuthority 自建私有 CA 把根证书分发到内网（内网全绿勾、无年费、信任不出内网），或改用有资质公共 CA 签发的证书",
       "数字签名：支持 RFC 3161 时间戳，但 officia 不做网络调用——由 SignOptions.timestampProvider 回调把 HTTP 交给调用方，officia 只构造请求与嵌入响应；不设该回调时签名时间仍取自签名机本地时钟、可被篡改",
-      "数字签名：不含可见签章（页面上的红章/手写签名图），当前为不可见签名，只在阅读器签名面板可见；不含验签 API（能签不能验，业务系统需程序化判断有效性时尚无入口）",
+      "数字签名：不含可见签章（页面上的红章/手写签名图），当前为不可见签名，只在阅读器签名面板可见",
+      "验签 API（OfficiaPdf.verify，2026-08-28 补齐）：返回 SignatureVerification，含每个签名的 digestMatch/signatureMatch/certificateIntact/coversWholeDocument 四项独立结论 + 签署人/时间/理由/证书链；不受授权门控（纯读取，且要验的往往是别人发来的文档）",
+      "🔴 验签的整体结论必须看 SignatureVerification.isValid()，它额外查了「最末签名是否覆盖到文件尾」——签完之后被追加的内容不受任何签名保护却照常显示，此时每个签名单独验都有效，自己遍历取与会得到危险的假绿",
+      "🔴 验签含证书自身签名的校验（isCertificateIntact）：签名值签的是 signedAttrs，证书只是公钥容器，只改证书主体名（冒名）时公钥/signedAttrs/签名值都没动、前两项检查照样全绿，只有验证书自身那道签名才能发现",
+      "验签不做证书吊销检查（CRL/OCSP）；容器只嵌叶子证书时无从校验证书完整性，此时 isCertificateIntact 返回 true（「没验成」不等于「验失败」），身份完整性改由信任锚 PKIX 路径验证兜底",
       "数字签名：评估版不限签名数量，只在每个签名的 /Reason 追加评估标记（与 Words/Cells 限页+水印、OCR 截断行数同为『降级但可用』）；标记在签名覆盖区内，改动即令签名失效",
-      "数字签名已接入 demo 测试台面板（PDF 工具箱 → 数字签名 / 三人会签）；但产物仍需用 Adobe Acrobat 打开才看得到签名状态，浏览器内置阅读器多数不验签名",
+      "数字签名已接入 demo 测试台面板（PDF 工具箱 → 数字签名 / 三人会签 / 验证签名 / 篡改演示）。「验证签名」走 OfficiaPdf.verify 不依赖阅读器；「篡改演示」改 1 个字节再验一次，并排显示改动前后结论。要看阅读器内的效果仍需 Adobe Acrobat，浏览器内置阅读器多数不验签名",
       "私有 CA（CertAuthority）：只做建根证书与签发终端实体证书两件事；不含证书吊销（CRL/OCSP）、密钥托管、自动续期、多级中间 CA。根证书 pathLen=0，结构上锁死为两层",
       "🔴 .p12 口令必须是 ASCII —— JDK 的 PKCS#12 实现不接受非 ASCII 口令，用中文口令抛 UnrecoverableKeyException: Password is not ASCII。是 JDK 限制非 officia 的，但国内用户习惯中文密码，实测撞到过",
       "统一社会信用代码写入证书主体的 serialNumber 字段（OID 2.5.4.5，国内 CA 惯例；欧盟 eIDAS 用 organizationIdentifier 2.5.4.97）；createRoot 与 issue 各有带该参数的重载"
