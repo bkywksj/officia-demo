@@ -32,6 +32,7 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 |---|---|---|---|
 | `.docx` | PDF | `OfficiaWords.toPdf(byte[])` | `officia-words` |
 | `.doc`（CFB 二进制） | PDF | `OfficiaWords.toPdf(byte[])`（同一入口，**自动识别**格式） | `officia-words` |
+| `.docx` / `.doc` | **图片（一页一张 PNG/JPEG）** | `OfficiaWords.toImages(byte[])` → `List<byte[]>` | `officia-words` |
 | `.docx` 模板 + 数据 | 填好的 docx / PDF | `OfficiaWords.fillTemplate(...)` / `fillTemplateToPdf(...)` | `officia-template` |
 | Markdown 文本 / `.md` | PDF | `OfficiaWords.markdownToPdf(String)` | `officia-words` |
 | Markdown 文本 / `.md` | 可编辑 docx | `OfficiaWords.markdownToDocx(String)`（版式暂较素，见技能） | `officia-words` |
@@ -70,11 +71,18 @@ OfficiaImaging.toPdf(List<byte[]> images)   // 多张图片 → 一份 PDF
 OfficiaEmail.toPdf(eml)                     // 邮件归档 → PDF
 ```
 
+出**图片**的入口（目前只有 Words 一条）：
+
+```java
+OfficiaWords.toImages(docx)                 // → List<byte[]>，一页一张 PNG
+```
+
 ## 同类方法怎么选（歧义点集中回答）
 
 | 分岔口 | 选 A | 选 B | 判据 |
 |---|---|---|---|
 | Words 输出形态 | `toPdf(byte[])` → `byte[]` | `toPdf(byte[], OutputStream)` → 页数 | 大文档 / 直写 HTTP 响应用 B（省一份整份 PDF 的内存），普通用 A |
+| 要在浏览器里给人看文档 | `toPdf` 出 PDF | `toImages` 出图片 | **移动端 webview / 微信内置浏览器对 PDF 支持差** → 用 B；桌面浏览器都内置 PDF 阅读器（**不需要插件**）→ A 更省体积、文字可选中可搜索 |
 | Words 要不要页数耗时 | `toPdf(...)` | `convert(...)` → `ConvertResult` | 需要 `getPageCount()` / `getCostMillis()` 用 B |
 | PDF 多步操作 | 逐个静态方法 | `OfficiaPdf.edit(pdf).xxx().yyy().toBytes()` | 两步以上用链式 `PdfEditor`，少一轮解析/序列化 |
 | Cells 公式求值 | `evaluateFormula(Map, ref)` | `evaluateXlsxCell(xlsx, ref)` | 没有 xlsx、只想算一张散列表用 A；对真实 xlsx 实算用 B |

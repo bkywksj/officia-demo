@@ -13,7 +13,7 @@ description: |
   - 要改纸张大小、指定字体目录
   - .doc 老格式能不能转、有什么限制
 
-  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积、Markdown、md、markdownToDocx、markdownToPdf、md转word、md转docx、md转pdf
+  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积、Markdown、md、markdownToDocx、markdownToPdf、md转word、md转docx、md转pdf、转图片、toImages、一页一张、文档预览、在线预览、PNG、DPI、ImageRenderOptions
 disable-model-invocation: false
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 ---
@@ -77,6 +77,80 @@ int toPdf(File inDocx, File outPdf)                               // 边生成�
 > **输入 docx 与排版仍需整篇在内存**——这是格式与排版的本质，不是这个方法能优化的。
 
 选型：输出 PDF 大 / 要直写文件或 HTTP 响应 → 用流式；否则用 `byte[]` 版本更简单。详见 `officia-performance`。
+
+### 转图片（一页一张）
+
+```java
+List<byte[]> toImages(byte[] docx)                                          // 默认 96 DPI PNG
+List<byte[]> toImages(byte[] docx, ConvertOptions options, ImageRenderOptions image)
+List<byte[]> toImages(InputStream in)                                       // 不主动关闭
+List<byte[]> toImages(File file)
+```
+
+**用途是文档在线预览**：图片在任何浏览器与移动端 webview 里都能直接 `<img>` 显示，
+不依赖 PDF 阅读器。返回的顺序**就是页码顺序**。
+
+```java
+List<byte[]> pages = OfficiaWords.toImages(docx);       // 一页一张 PNG
+
+// 指定 DPI 与格式
+List<byte[]> jpgs = OfficiaWords.toImages(docx, null,
+        ImageRenderOptions.defaults().dpi(150).format("jpg"));
+```
+
+`ImageRenderOptions`（`plus.ruoyi.officia.render.image`）：
+
+| 方法 | 默认 | 说明 |
+|---|---|---|
+| `dpi(int)` | 96 | 取值 **36–600**，越界抛异常不静默降级。600dpi 下 A4 单页约 4958×7017 像素 |
+| `format(String)` | `png` | `png` / `jpg` / `jpeg`。⚠️ JPEG 无透明通道且有压缩伪影，文档预览建议 PNG |
+| `backgroundRgb(int)` | 白 | 页面底色。位图没有"白纸"这层默认，不铺底色会得到全黑 |
+| `antiAlias(boolean)` | true | 关掉只在逐像素比对的测试场景有意义 |
+| `watermark(String)` / `watermark(WatermarkOptions)` | 无 | 自定义水印，**烧进像素**，另存后仍在 |
+
+**自定义水印** `WatermarkOptions`：
+
+```java
+// 最简：对角灰字
+OfficiaWords.toImages(docx, null,
+        ImageRenderOptions.defaults().watermark("机密 · 仅供内部"));
+
+// 平铺：防止截图裁掉水印
+OfficiaWords.toImages(docx, null, ImageRenderOptions.defaults()
+        .watermark(WatermarkOptions.text("张三 · 2026-08-28 · 禁止外传")
+                .tile(true)
+                .fontSizePt(13)
+                .opacity(0.13f)));
+```
+
+| 方法 | 默认 | 说明 |
+|---|---|---|
+| `text(String)` | 必填 | 空字符串抛异常 |
+| `fontSizePt(float)` | `0`=自动 | 自动时：单个按页宽 1/14，平铺按 1/40。上限 400 |
+| `colorRgb(int)` | `0x808080` 灰 | 0xRRGGBB |
+| `opacity(float)` | `0.15` | 0–1，越界抛异常 |
+| `rotationDegrees(float)` | `-38` | 逆时针为正；`0` 为水平 |
+| `tile(boolean)` | `false` | true=整页平铺。**用途是防截图裁剪**——单个居中水印很容易被截掉 |
+| `fontFamily(String)` | 自动 | 不指定时按水印文字走**字形级回退**挑字体；中文水印无需操心 |
+
+> ℹ️ **水印为什么由渲染器画，而不是出图后叠**：officia 内置的中文兜底字体在库内部，
+> 调用方拿不到。若走"出图后调 `OfficiaImaging.textWatermark`"，你必须自备中文 TTF，
+> 否则水印是一片方框。渲染期画还让水印坐标按 **pt** 给（换 DPI 不用重算）、
+> 省一轮编解码（JPEG 不会二次压缩）。
+>
+> 若你要给**非 officia 产出的图片**加水印，那才用 `OfficiaImaging.textWatermark`
+> （注意它用 AWT 默认字体、不能指定字体文件）。
+
+> ℹ️ **体积参考**（实测 A4 三页合同，含表格与中英混排）：96dpi 约 109 KB/页、
+> 150dpi 约 198 KB/页；同内容 PDF 全文 145 KB。**图片按页计费体积远大于 PDF**，
+> 在线预览要考虑懒加载。
+
+> ⚠️ **尚未覆盖的图元**（如实标注，勿当已支持）：图案填充的真实平铺（当前按等效纯色近似）、
+> 下划线 / 删除线 / 高亮、行内图片、图片旋转裁剪变换、水平分隔线。
+> 文本、纯色填充、表格边框、内嵌图片、定位文本框已覆盖。
+
+> ℹ️ **自定义水印**见下方 `WatermarkOptions`；它与未授权评估水印互不影响——
+> 评估水印永远画在最上层，盖不掉。
 
 ## `ConvertOptions` 配置
 
@@ -189,6 +263,9 @@ byte[] pdf = OfficiaWords.toPdf(bytes);   // 自动识别 DOCX(OOXML) / DOC(CFB)
 |---|---|---|
 | 中文变方块 / 空白 | 找不到中文字体 | 设 `fontDirectory`，见 `officia-chinese-font` |
 | PDF 有"评估"水印、页数被截断 | 未加载授权且门控已开 | 见 `officia-license`（**不是转换失败**） |
+| `toImages` 出的图带对角水印、只有 30 页 | 同上——**图片与 PDF 同一套门控口径** | 见 `officia-license`；加载授权后即完整输出 |
+| `toImages` 返回的图片比预期大很多 | 位图按页计费体积，与 PDF 不是一个量级 | 属预期。降 DPI 或改 jpg；在线预览建议懒加载 |
+| `toImages` 抛"DPI 越界" | 传了 &lt;36 或 &gt;600 | 刻意抛异常而非静默钳位——600dpi 下 A4 单页已近 140MB，再高会撑爆堆 |
 | 抛 `OfficiaException` | 输入为空 / 非 Word 文档 / 加密 doc | 见 `officia-troubleshooting` |
 | 大文档 OOM | 输入与排版需整篇在内存 | 用流式输出 + 调 JVM 堆，见 `officia-performance` |
 | 版式与 Word 里不完全一致 | 排版为自研引擎，非 Word 逐像素复刻 | 先用测试台实测评估；复杂版式差异属预期 |
