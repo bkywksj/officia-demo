@@ -13,7 +13,7 @@ description: |
   - 读 PDF 页数 / 版本 / 标题作者等元数据
   - 要连续做好几步 PDF 操作
 
-  触发词：PDF、合并、拆分、抽页、删页、旋转、水印、页码、抽文字、提取文字、抽图片、加密、解密、口令、密码、AES、元数据、页数、PdfEditor、数字签名、签名、防篡改、篡改、验签、证书、p12、pfx、PKCS12、签字、审批留痕、溯源
+  触发词：PDF、合并、拆分、抽页、删页、旋转、水印、页码、抽文字、提取文字、抽图片、加密、解密、口令、密码、AES、元数据、页数、PdfEditor、数字签名、签名、防篡改、篡改、验签、证书、p12、pfx、PKCS12、签字、审批留痕、溯源、PDF转图片、toImages、扫描件转图片、一页一张、在线预览
 disable-model-invocation: false
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 ---
@@ -447,6 +447,47 @@ editor.toFile(new File("out.pdf")); // 直写文件
 
 > **什么时候用链式**：两步以上就该用——少一轮解析与序列化，代码也更清楚。单步操作用静态方法即可。
 
+## 六点五、扫描件 PDF → 图片（`toImages`）
+
+把**扫描件** PDF 转成每页一张的图片，用于**文档在线预览**——图片在任何浏览器与
+移动端 webview 里都能直接 `<img>` 显示，不依赖 PDF 阅读器。
+
+```java
+List<byte[]> pages = OfficiaPdf.toImages(scannedPdf);          // 顺序即页码
+
+// 加水印（防止读者直接拿到干净原件）
+List<byte[]> pages = OfficiaPdf.toImages(scannedPdf,
+        ImageRenderOptions.defaults()
+                .watermark(WatermarkOptions.text("内部资料").tile(true)));
+```
+
+> 🔴 **只支持「整页就是一张扫描图」的 PDF**。带文字层的 PDF 会**明确抛异常并指路**，
+> 不返回半成品——与 `toWord` 遇到扫描件时的处理对称，两边都宁可响亮失败，
+> 也不产出一份看着完整、实则缺了正文的东西。**通用 PDF 渲染尚未实现。**
+>
+> 判据是「每个非空页必须有一张覆盖整页（≥80%）的图」，**不是**「有没有文字层」——
+> 后者在文字抽取本身失败时会给出反向结论。实测一份 281 页政府报告：它确有文字但
+> 抽不出来，用旧判据会静默输出 281 张只有插图、丢失正文的图。
+
+> ℹ️ **默认跟随源图，不做无谓转换**：
+> - **分辨率**保持扫描件原始像素（通常 200–300 DPI）。只有显式调过 `dpi(...)` 才重采样——
+>   拿默认的 96 去采样会把扫描件毁掉。
+> - **格式**跟随源图（源是 JPEG 就出 JPEG）。只有显式调过 `format(...)` 才换——
+>   实测一份 29 页扫描书硬转 PNG 是 226 MB，跟随源格式只有 38 MB、且快 237 倍
+>   （命中原样输出快路，不解码不重编码）。
+
+**若源文件本是 Word/Excel/PPT，别绕道 PDF** —— 直接 `OfficiaWords.toImages(docx)`
+保真更好，也无需渲染 PDF。
+
+### 何时该用哪条路
+
+| 你手上的 PDF | 用什么 |
+|---|---|
+| 扫描件（整页是图） | `OfficiaPdf.toImages` ✅ |
+| 电子版（有文字层） | ❌ 尚不支持转图片；要可编辑就用 `toWord` |
+| 源文件是 Office | `OfficiaWords.toImages` 等，别经 PDF |
+| 扫描件且要**文字** | `ScannedPdfConverter`（OCR，见第七节末） |
+
 ## 七、PDF → Word（`toWord`）
 
 把**电子版** PDF 转成可编辑的 `.docx`。
@@ -581,6 +622,11 @@ public class ArchivePdf {
 
 | 现象 | 原因 | 处置 |
 |---|---|---|
+| `toImages` 抛"含文字层" | 这是电子版 PDF，不是扫描件 | **属预期，不是 bug**。通用 PDF 渲染尚未实现；源文件是 Office 就用 `OfficiaWords.toImages` |
+| `toImages` 抛"没有一张覆盖整页" | 图文混排文档（插图只占一小块） | 同上。这条判据存在的意义就是拦住它——否则会输出只有插图、丢失正文的图集 |
+| `toImages` 抛"疑似裹在 Form XObject 里…数量对不上" | 页面内容包在 Form XObject 里，且图数与页数不等 | 已知缺口，根治要等通用渲染。数量对不上时刻意拒绝，避免错位输出 |
+| `toImages` 产物比预期大很多 | 显式指定了 `format("png")` 而源图是 JPEG | 去掉 `format(...)` 让它跟随源图；实测 226 MB → 38 MB |
+| `toImages` 出的图糊了 | 显式指定了低 DPI | 去掉 `dpi(...)`，默认就保持扫描件原分辨率 |
 | 中文水印 / 页码是方块或空白 | 没传 `fontTtf` | 传中文 TTF 字节，见 `officia-chinese-font` |
 | 读加密 PDF 抛异常 | 没传口令 | 用 `extractText(pdf, pwd)` / `pageCount(pdf, pwd)` / `metadata(pdf, pwd)` |
 | 抽页抽错了 | 索引以为是 1-based | **0-based**：第 1 页传 `0` |

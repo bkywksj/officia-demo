@@ -33,6 +33,7 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 | `.docx` | PDF | `OfficiaWords.toPdf(byte[])` | `officia-words` |
 | `.doc`（CFB 二进制） | PDF | `OfficiaWords.toPdf(byte[])`（同一入口，**自动识别**格式） | `officia-words` |
 | `.docx` / `.doc` | **图片（一页一张 PNG/JPEG）** | `OfficiaWords.toImages(byte[])` → `List<byte[]>` | `officia-words` |
+| **扫描件** `.pdf`（整页是图） | 图片（一页一张） | `OfficiaPdf.toImages(byte[])` → `List<byte[]>` | `officia-pdf` |
 | `.docx` 模板 + 数据 | 填好的 docx / PDF | `OfficiaWords.fillTemplate(...)` / `fillTemplateToPdf(...)` | `officia-template` |
 | Markdown 文本 / `.md` | PDF | `OfficiaWords.markdownToPdf(String)` | `officia-words` |
 | Markdown 文本 / `.md` | 可编辑 docx | `OfficiaWords.markdownToDocx(String)`（版式暂较素，见技能） | `officia-words` |
@@ -71,11 +72,15 @@ OfficiaImaging.toPdf(List<byte[]> images)   // 多张图片 → 一份 PDF
 OfficiaEmail.toPdf(eml)                     // 邮件归档 → PDF
 ```
 
-出**图片**的入口（目前只有 Words 一条）：
+出**图片**的入口：
 
 ```java
-OfficiaWords.toImages(docx)                 // → List<byte[]>，一页一张 PNG
+OfficiaWords.toImages(docx)                 // Office → 一页一张 PNG（任何 docx/doc）
+OfficiaPdf.toImages(scannedPdf)             // 扫描件 PDF → 一页一张（仅「整页是图」的）
 ```
+
+> ⚠️ **电子版 PDF（有文字层）转图片尚未实现**——通用 PDF 渲染是独立工程。
+> 若源文件本是 Office，直接走 `OfficiaWords.toImages`，别绕道 PDF。
 
 ## 同类方法怎么选（歧义点集中回答）
 
