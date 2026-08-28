@@ -152,6 +152,22 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
             <option value="bytes">字节数组 toPdf(byte[])</option><option value="stream">流式直写 toPdf(in,out) — 大文档省内存</option></select>
           <button onclick="wordsRun()" class="w-full bg-primary text-white py-2.5 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i>开始转换</button>
         </div>
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-1 flex items-center gap-2"><i data-lucide="images" class="w-4 h-4 text-emerald-600"></i>3 · 转图片（一页一张）</div>
+          <div class="text-xs text-slate-400 mb-3">用于<b>文档在线预览</b>：图片在任何浏览器与移动端 webview 都能直接显示，不依赖 PDF 阅读器</div>
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <div><label class="block text-xs text-slate-500 mb-1">DPI（36–600）</label>
+              <select id="wordsDpi" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm cursor-pointer">
+                <option value="72">72 · 最省体积</option><option value="96" selected>96 · 屏幕默认</option><option value="150">150 · 清晰</option><option value="220">220 · 打印级</option></select></div>
+            <div><label class="block text-xs text-slate-500 mb-1">格式</label>
+              <select id="wordsImgFmt" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm cursor-pointer">
+                <option value="png">PNG · 无损（推荐）</option><option value="jpg">JPEG · 体积小</option></select></div>
+          </div>
+          <div class="mb-2"><label class="block text-xs text-slate-500 mb-1">自定义水印（留空=不加）</label>
+            <input id="wordsWm" placeholder="如：机密 · 仅供内部" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm outline-none focus:border-primary"></div>
+          <label class="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer mb-3"><input type="checkbox" id="wordsWmTile" class="accent-primary">整页平铺（防截图裁掉水印）</label>
+          <button onclick="wordsImages()" class="w-full border border-emerald-300 bg-emerald-50 text-emerald-700 py-2.5 rounded-md text-sm hover:border-emerald-500 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="images" class="w-4 h-4"></i>转成图片</button>
+        </div>
       </div>
       <div class="col-span-2 space-y-4" id="wordsOut"></div>
     </div>
@@ -626,6 +642,27 @@ async function wordsRun(){
   busy('wordsOut','转换中…');
   try{const j=await api('/api/words/topdf?id='+S.words+'&mode='+document.getElementById('wordsMode').value,{method:'POST'});
     show('wordsOut',card('转换结果',j));logTask('Words',j);toast('转换完成，'+j.pages+' 页');
+  }catch(e){show('wordsOut','');toast(e.message,false)}
+}
+async function wordsImages(){
+  if(!need('words','请先上传 .doc / .docx'))return;
+  busy('wordsOut','出图中…');
+  const wm=document.getElementById('wordsWm').value.trim();
+  const p='&dpi='+document.getElementById('wordsDpi').value
+         +'&format='+document.getElementById('wordsImgFmt').value
+         +(wm?'&watermark='+encodeURIComponent(wm)+'&tile='+(document.getElementById('wordsWmTile').checked?'1':'0'):'');
+  try{const j=await api('/api/words/toimages?id='+S.words+p,{method:'POST'});
+    show('wordsOut','<div class="bg-white rounded-lg border border-slate-200">'+
+      '<div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">'+
+        '<span class="font-medium text-sm flex items-center gap-2"><i data-lucide="images" class="w-4 h-4 text-emerald-600"></i>转图片结果</span>'+
+        '<span class="text-xs text-slate-500">'+j.pages+' 页 · '+j.dpi+' DPI · '+j.ms+' ms · 平均 '+j.avgKb+' KB/页</span></div>'+
+      '<div class="grid grid-cols-3 gap-3 p-4 max-h-[560px] overflow-auto">'+
+      j.files.map((f,i)=>'<a href="/api/result/'+f.id+'" target="_blank" class="block border border-slate-200 rounded hover:border-primary transition">'+
+        '<img src="/api/result/'+f.id+'" loading="lazy" class="w-full">'+
+        '<div class="px-2 py-1.5 text-xs text-slate-500 flex items-center justify-between"><span>第 '+(i+1)+' 页</span><span>'+fmt(f.size)+'</span></div></a>').join('')+
+      '</div>'+
+      '<div class="px-4 py-2 bg-slate-50 text-xs text-slate-400 border-t border-slate-100">'+esc(j.hint)+'</div></div>');
+    logTask('Words转图片',{name:j.pages+' 张',ms:j.ms});toast('出图完成，'+j.pages+' 页');
   }catch(e){show('wordsOut','');toast(e.message,false)}
 }
 // —— 模板 ——

@@ -21,6 +21,8 @@ import plus.ruoyi.officia.pdf.sign.SignOptions;
 import plus.ruoyi.officia.pdf.sign.SignatureInfo;
 import plus.ruoyi.officia.pdf.sign.SignatureVerification;
 import plus.ruoyi.officia.pdf.word.WordConvertOptions;
+import plus.ruoyi.officia.render.image.ImageRenderOptions;
+import plus.ruoyi.officia.render.image.WatermarkOptions;
 import plus.ruoyi.officia.slides.OfficiaSlides;
 import plus.ruoyi.officia.words.OfficiaWords;
 
@@ -179,6 +181,45 @@ final class ApiRoutes {
             }
             Http.json(ex, result(outName(q.get("id"), "pdf", "words.pdf"),
                 "application/pdf", pdf, t0).end());
+        });
+
+        // docx/doc → 一页一张图片（文档在线预览）。与 topdf 共用前段，只换输出后端
+        r.add("/api/words/toimages", (ex, q) -> {
+            byte[] src = Store.bytes(q.get("id"));
+            ImageRenderOptions opts = ImageRenderOptions.defaults()
+                .dpi(Integer.parseInt(q.getOrDefault("dpi", "96")))
+                .format(q.getOrDefault("format", "png"));
+
+            String wmText = q.get("watermark");
+            if (wmText != null && !wmText.isBlank()) {
+                WatermarkOptions wm = WatermarkOptions.text(wmText);
+                if ("1".equals(q.get("tile"))) {
+                    wm.tile(true).fontSizePt(13).opacity(0.13f);
+                }
+                opts.watermark(wm);
+            }
+
+            long t0 = System.nanoTime();
+            List<byte[]> images = OfficiaWords.toImages(src, null, opts);
+            long ms = (System.nanoTime() - t0) / 1_000_000;
+
+            List<Object> arr = new ArrayList<>();
+            long total = 0;
+            String ext = opts.getFormat().equals("png") ? "png" : "jpg";
+            String mime = opts.getFormat().equals("png") ? "image/png" : "image/jpeg";
+            for (int i = 0; i < images.size(); i++) {
+                arr.add(store(outName(q.get("id"), "第" + (i + 1) + "页", ext, "页面." + ext),
+                    mime, images.get(i), t0).toJson());
+                total += images.get(i).length;
+            }
+            Http.json(ex, Json.obj().put("multi", true).put("files", arr)
+                .put("pages", images.size())
+                .put("ms", ms)
+                .put("dpi", opts.getDpi())
+                .put("avgKb", images.isEmpty() ? 0 : total / 1024 / images.size())
+                .put("hint", "图片可直接在浏览器/移动端 webview 显示，不依赖 PDF 阅读器；"
+                    + "体积按页计费远大于 PDF，线上预览建议懒加载")
+                .end());
         });
 
         r.add("/api/words/template", (ex, q) -> {
