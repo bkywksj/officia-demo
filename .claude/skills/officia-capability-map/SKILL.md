@@ -33,7 +33,7 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 | `.docx` | PDF | `OfficiaWords.toPdf(byte[])` | `officia-words` |
 | `.doc`（CFB 二进制） | PDF | `OfficiaWords.toPdf(byte[])`（同一入口，**自动识别**格式） | `officia-words` |
 | `.docx` / `.doc` | **图片（一页一张 PNG/JPEG）** | `OfficiaWords.toImages(byte[])` → `List<byte[]>` | `officia-words` |
-| **扫描件** `.pdf`（整页是图） | 图片（一页一张） | `OfficiaPdf.toImages(byte[])` → `List<byte[]>` | `officia-pdf` |
+| `.pdf`（扫描件与电子版均可） | 图片（一页一张） | `OfficiaPdf.toImages(byte[])` → `List<byte[]>` | `officia-pdf` |
 | `.docx` 模板 + 数据 | 填好的 docx / PDF | `OfficiaWords.fillTemplate(...)` / `fillTemplateToPdf(...)` | `officia-template` |
 | Markdown 文本 / `.md` | PDF | `OfficiaWords.markdownToPdf(String)` | `officia-words` |
 | Markdown 文本 / `.md` | 可编辑 docx | `OfficiaWords.markdownToDocx(String)`（版式暂较素，见技能） | `officia-words` |
@@ -76,11 +76,13 @@ OfficiaEmail.toPdf(eml)                     // 邮件归档 → PDF
 
 ```java
 OfficiaWords.toImages(docx)                 // Office → 一页一张 PNG（任何 docx/doc）
-OfficiaPdf.toImages(scannedPdf)             // 扫描件 PDF → 一页一张（仅「整页是图」的）
+OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选路：扫描件走抽图快路，其余走通用渲染）
 ```
 
-> ⚠️ **电子版 PDF（有文字层）转图片尚未实现**——通用 PDF 渲染是独立工程。
-> 若源文件本是 Office，直接走 `OfficiaWords.toImages`，别绕道 PDF。
+> ⚠️ **PDF 通用渲染的字形是近似的**——用 officia 自己的字体栈画字，不光栅化 PDF 里嵌入的
+> 字体程序。版面位置精确、表格数字正确，但笔画细节与原文件不同，符号字体可能画错。
+> **若源文件本是 Office，直接走 `OfficiaWords.toImages`**（字形是真的），别绕道 PDF。
+> 详见 `officia-pdf` 第六点五的失真表。
 
 ## 同类方法怎么选（歧义点集中回答）
 

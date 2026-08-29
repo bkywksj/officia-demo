@@ -50,11 +50,11 @@ java -Xmx8g -jar target/officia-demo-1.0.0.jar          # 大文件（设计型 
 
 | 面板 | 可实测的能力 | 对应技能 |
 |---|---|---|
-| **Words · DOC/DOCX** | 上传 `.doc`（CFB）/`.docx`（OOXML）→ PDF，**自动识别格式**；字节 / 流式两种输出 | `officia-words` |
+| **Words · DOC/DOCX** | 上传 `.doc`（CFB）/`.docx`（OOXML）→ PDF，**自动识别格式**；字节 / 流式两种输出；**转图片（一页一张，可加水印）** | `officia-words` |
 | **模板填充 · 邮件合并** | 模板 + JSON → 单条 / 合并一份 / 每条一份 / 只填 docx | `officia-template` |
 | **Cells · XLSX/CSV** | XLSX→PDF、XLSX→CSV、CSV→PDF、CSV 解析、单元格公式求值、整表重算 | `officia-cells` |
 | **Slides · PPTX** | PPTX→PDF（版式保真），看页数 / 耗时 / 体积并内嵌预览 | `officia-slides` |
-| **PDF 工具箱** | 合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图片·RC4-128·AES-256·信息·**转 Word** | `officia-pdf` |
+| **PDF 工具箱** | 合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图片·RC4-128·AES-256·信息·**转 Word**·**转图片**·**数字签名 / 会签 / 验签 / 篡改演示** | `officia-pdf` |
 | **Imaging · 图像** | 滤镜/变换全项 + 格式转换 + 图片→PDF，**处理前后并排对比** | `officia-imaging` |
 | **BarCode · 条码** | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR（4 档纠错）+ **全码制一键预览** | `officia-barcode` |
 | **Email · EML** | EML 解析（主题/收发件/附件/正文）、邮件归档 → PDF | `officia-email` |
@@ -91,11 +91,14 @@ POST /api/license/reset              复位授权
 POST /api/license/enforce            开关门控（用于并排对比）
 
 POST /api/words/topdf                Word → PDF
+POST /api/words/toimages             Word → 一页一张图片（dpi / format / watermark / tile）
 POST /api/words/template             模板填充（mode=single|merged|each|docx）
 
 POST /api/cells/topdf   /tocsv   /csvtopdf   /parsecsv   /formula   /recalc
 POST /api/slides/topdf
 POST /api/pdf/info  /merge  /split  /pages  /rotate  /watermark  /pagenumbers  /text  /images  /encrypt  /toword
+POST /api/pdf/toimages               PDF → 一页一张图片（dpi / format 留空=跟随源图，见下）
+POST /api/pdf/sign  /multisign  /verify  /tamper      数字签名 · 会签 · 验签 · 篡改演示
 POST /api/imaging/op    /api/imaging/topdf
 POST /api/barcode
 POST /api/email/parse   /api/email/topdf
@@ -117,6 +120,11 @@ POST /api/ocr/scan2word              扫描件 PDF → Word（rotate=90|-90|180�
    | `rotate=90` + `split=1` | 285.8 KB | 9330 段、17.6 万字，正文可读 |
 
    **50 倍差距，而失败那次返回 200、没有任何报错。**
+
+⚠️ **`/api/pdf/toimages` 的 `dpi` 与 `format` 默认留空，别顺手填上**：
+留空时扫描件走抽图快路**原样输出源图**（不解码不重编码）；一旦显式给值就被逼成
+重采样 + 重编码——实测一份 29 页扫描书，跟随源图 38 MB / 0.2 s，硬转 PNG 是
+226 MB / 49.5 s。电子版 PDF 不受此影响（本来就要渲染），留空时按 96 DPI / PNG。
 ```
 
 ```bash

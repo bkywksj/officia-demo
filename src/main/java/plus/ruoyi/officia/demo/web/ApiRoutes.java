@@ -423,6 +423,51 @@ final class ApiRoutes {
             Http.json(ex, Json.obj().put("multi", true).put("files", arr).end());
         });
 
+        // PDF → 一页一张图片（在线预览）。自动选路：扫描件走抽图快路，其余走通用渲染。
+        // 不传 dpi/format 就不传给 options —— 扫描件快路据此决定"原样输出"还是重采样重编码，
+        // 传了默认值 96/png 反而会把 200-300DPI 的扫描件毁掉、体积暴涨（实测 38MB → 226MB）
+        r.add("/api/pdf/toimages", (ex, q) -> {
+            byte[] pdf = Store.bytes(q.get("id"));
+            ImageRenderOptions opts = ImageRenderOptions.defaults();
+            if (q.get("dpi") != null && !q.get("dpi").isBlank()) {
+                opts.dpi(Integer.parseInt(q.get("dpi")));
+            }
+            if (q.get("format") != null && !q.get("format").isBlank()) {
+                opts.format(q.get("format"));
+            }
+
+            String wmText = q.get("watermark");
+            if (wmText != null && !wmText.isBlank()) {
+                WatermarkOptions wm = WatermarkOptions.text(wmText);
+                if ("1".equals(q.get("tile"))) {
+                    wm.tile(true).fontSizePt(13).opacity(0.13f);
+                }
+                opts.watermark(wm);
+            }
+
+            long t0 = System.nanoTime();
+            List<byte[]> images = OfficiaPdf.toImages(pdf, opts);
+            long ms = (System.nanoTime() - t0) / 1_000_000;
+
+            List<Object> arr = new ArrayList<>();
+            long total = 0;
+            for (int i = 0; i < images.size(); i++) {
+                // 扫描件快路可能原样吐出 JPEG，与 opts.getFormat() 不一定一致 —— 按字节嗅探
+                boolean jpg = isJpeg(images.get(i));
+                String ext = jpg ? "jpg" : "png";
+                arr.add(store(outName(q.get("id"), "第" + (i + 1) + "页", ext, "页面." + ext),
+                    jpg ? "image/jpeg" : "image/png", images.get(i), t0).toJson());
+                total += images.get(i).length;
+            }
+            Http.json(ex, Json.obj().put("multi", true).put("files", arr)
+                .put("pages", images.size())
+                .put("ms", ms)
+                .put("avgKb", images.isEmpty() ? 0 : total / 1024 / images.size())
+                .put("hint", "扫描件走抽图快路（又快又无损），电子版走通用渲染——"
+                    + "后者字形是近似的（不光栅化嵌入字体），版面位置精确")
+                .end());
+        });
+
         r.add("/api/pdf/toword", (ex, q) -> {
             byte[] pdf = Store.bytes(q.get("id"));
             WordConvertOptions opts = WordConvertOptions.defaults();
@@ -960,6 +1005,16 @@ final class ApiRoutes {
         } catch (RuntimeException ignore) {
             return -1;
         }
+    }
+
+    /**
+     * 按 SOI 标记（FF D8 FF）判定是否 JPEG。
+     * PDF 转图片时扫描件快路会原样吐出源图，格式不一定等于 ImageRenderOptions 里的设置，
+     * 只能按字节嗅探才能给对扩展名与 MIME。
+     */
+    private static boolean isJpeg(byte[] img) {
+        return img.length >= 3 && (img[0] & 0xFF) == 0xFF
+                && (img[1] & 0xFF) == 0xD8 && (img[2] & 0xFF) == 0xFF;
     }
 
     /** 逗号分隔的 id 列表 → 字节列表（多输入操作用）。 */

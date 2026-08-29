@@ -288,6 +288,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
           <button onclick="pdfOp('aes')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="shield" class="w-4 h-4"></i>AES-256</button>
           <button onclick="pdfOp('info')" class="border border-slate-200 rounded-md p-2.5 text-sm hover:border-primary hover:text-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="info" class="w-4 h-4"></i>信息</button>
           <button onclick="pdfOp('toword')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-type-2" class="w-4 h-4"></i>转 Word</button>
+          <button onclick="pdfOp('toimages')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="images" class="w-4 h-4"></i>转图片</button>
           <button onclick="pdfOp('sign')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="file-signature" class="w-4 h-4"></i>数字签名</button>
           <button onclick="pdfOp('multisign')" class="border border-primary/40 bg-primary/5 text-primary rounded-md p-2.5 text-sm hover:border-primary transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="users" class="w-4 h-4"></i>三人会签</button>
           <button onclick="pdfOp('verify')" class="border border-emerald-300 bg-emerald-50 text-emerald-700 rounded-md p-2.5 text-sm hover:border-emerald-500 transition cursor-pointer flex flex-col items-center gap-1"><i data-lucide="shield-check" class="w-4 h-4"></i>验证签名</button>
@@ -320,6 +321,23 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
             <div class="flex items-center gap-1.5"><span class="text-slate-500 text-xs">加密 PDF 口令</span><input id="pdfWordPwd" placeholder="留空=未加密" class="border border-slate-300 rounded-md px-2 py-1 text-sm w-32 outline-none focus:border-primary"></div>
           </div>
           <div class="mt-2 text-xs text-slate-400">扫描件（无文字层）会被<b>明确拒绝</b>并提示原因——不会给一个空白文档。</div>
+        </div>
+        <div class="mt-4 bg-slate-50 rounded-md p-3">
+          <div class="text-xs text-slate-500 mb-2">转图片选项（自动选路：扫描件走抽图快路，电子版走通用渲染）</div>
+          <div class="flex flex-wrap items-center gap-4 text-sm">
+            <div class="flex items-center gap-1.5"><span class="text-slate-500 text-xs">DPI</span>
+              <select id="pdfImgDpi" class="border border-slate-300 rounded-md px-2 py-1 text-sm cursor-pointer">
+                <option value="" selected>跟随源图 / 96</option><option value="96">96 · 屏幕</option><option value="150">150 · 清晰</option><option value="220">220 · 打印级</option></select></div>
+            <div class="flex items-center gap-1.5"><span class="text-slate-500 text-xs">格式</span>
+              <select id="pdfImgFmt" class="border border-slate-300 rounded-md px-2 py-1 text-sm cursor-pointer">
+                <option value="" selected>跟随源图 / PNG</option><option value="png">PNG</option><option value="jpg">JPEG</option></select></div>
+            <div class="flex items-center gap-1.5"><span class="text-slate-500 text-xs">水印</span><input id="pdfImgWm" placeholder="留空=不加" class="border border-slate-300 rounded-md px-2 py-1 text-sm w-36 outline-none focus:border-primary"></div>
+            <label class="flex items-center gap-1.5 cursor-pointer text-xs"><input type="checkbox" id="pdfImgWmTile" class="accent-primary">整页平铺</label>
+          </div>
+          <div class="mt-2 text-xs text-slate-400">
+            两项都<b>默认留空</b>：扫描件据此原样输出源图（又快又无损；硬转 PNG 实测 38MB→226MB）。
+            电子版走通用渲染时字形是<b>近似</b>的（不光栅化 PDF 内嵌字体），版面位置精确。
+          </div>
         </div>
         <div class="mt-4 grid grid-cols-3 gap-3 bg-slate-50 rounded-md p-3">
           <div><label class="block text-xs text-slate-500 mb-1">水印文字</label><input id="pdfWmText" value="机密 · 仅供内部" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
@@ -789,6 +807,24 @@ async function pdfOp(op){
              +'&password='+encodeURIComponent(document.getElementById('pdfWordPwd').value);
       j=await api('/api/pdf/toword?id='+id+p,{method:'POST'});
       show('pdfOut',card('PDF → Word（源 '+j.srcPages+' 页）',j));logTask('Pdf',j);toast('完成');return}
+    else if(op==='toimages'){
+      const wm=document.getElementById('pdfImgWm').value.trim();
+      // dpi/format 留空就不传 —— 让扫描件快路能走"原样输出"，别被默认值逼成重编码
+      const p='&dpi='+document.getElementById('pdfImgDpi').value
+             +'&format='+document.getElementById('pdfImgFmt').value
+             +(wm?'&watermark='+encodeURIComponent(wm)+'&tile='+(document.getElementById('pdfImgWmTile').checked?'1':'0'):'');
+      j=await api('/api/pdf/toimages?id='+id+p,{method:'POST'});
+      show('pdfOut','<div class="bg-white rounded-lg border border-slate-200">'+
+        '<div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">'+
+          '<span class="font-medium text-sm flex items-center gap-2"><i data-lucide="images" class="w-4 h-4 text-emerald-600"></i>PDF → 图片</span>'+
+          '<span class="text-xs text-slate-500">'+j.pages+' 页 · '+j.ms+' ms · 平均 '+j.avgKb+' KB/页</span></div>'+
+        '<div class="grid grid-cols-3 gap-3 p-4 max-h-[560px] overflow-auto">'+
+        j.files.map((f,i)=>'<a href="/api/result/'+f.id+'" target="_blank" class="block border border-slate-200 rounded hover:border-primary transition">'+
+          '<img src="/api/result/'+f.id+'" loading="lazy" class="w-full">'+
+          '<div class="px-2 py-1.5 text-xs text-slate-500 flex items-center justify-between"><span>第 '+(i+1)+' 页</span><span>'+fmt(f.size)+'</span></div></a>').join('')+
+        '</div>'+
+        '<div class="px-4 py-2 bg-slate-50 text-xs text-slate-400 border-t border-slate-100">'+esc(j.hint)+'</div></div>');
+      logTask('PDF转图片',{name:j.pages+' 张',ms:j.ms});toast('出图完成，'+j.pages+' 页');return}
     else if(op==='info'){j=await api('/api/pdf/info?id='+id,{method:'POST'});
       const box=document.getElementById('pdfInfo');box.classList.remove('hidden');
       box.innerHTML='<div class="flex justify-between"><span class="text-slate-500">页数</span><span>'+j.pages+'</span></div>'+
