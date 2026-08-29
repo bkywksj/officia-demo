@@ -79,10 +79,11 @@ OfficiaWords.toImages(docx)                 // Office → 一页一张 PNG（任
 OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选路：扫描件走抽图快路，其余走通用渲染）
 ```
 
-> ⚠️ **PDF 通用渲染的字形是近似的**——用 officia 自己的字体栈画字，不光栅化 PDF 里嵌入的
-> 字体程序。版面位置精确、表格数字正确，但笔画细节与原文件不同，符号字体可能画错。
-> **若源文件本是 Office，直接走 `OfficiaWords.toImages`**（字形是真的），别绕道 PDF。
-> 详见 `officia-pdf` 第六点五的失真表。
+> ⚠️ **PDF 通用渲染的字形分两档**：内嵌 TrueType 的走**精确字形**（直接光栅化 PDF 里那份
+> 字体程序，约占实测字体的一半）；没内嵌、或内嵌 CFF/Type1 的走**近似字形**（笔画细节
+> 与原文件不同，但版面位置精确）。同一份文档里两档可以混着出现。
+> **若源文件本是 Office，直接走 `OfficiaWords.toImages`**，别绕道 PDF。
+> 详见 `officia-pdf` 第六点五的字形表。
 
 ## 同类方法怎么选（歧义点集中回答）
 
