@@ -63,6 +63,11 @@ List<String> byPage = OfficiaPdf.extractTextByPage(pdf);     // 逐页文本
 List<byte[]> images = OfficiaPdf.extractImages(pdf);         // 内嵌图片
 ```
 
+> ℹ️ **老 PDF 也读得了**：流过滤器覆盖 `FlateDecode` / `LZWDecode` / `ASCII85Decode` /
+> `ASCIIHexDecode` / `RunLengthDecode`。**LZW 对 1990 年代前后的 PDF 很关键**——
+> `FlateDecode` 到 PDF 1.2 才引入，更早的生成器只有 LZW 可用。
+> 实测一份 1988 年的 ITU-T 规范（PDF 1.2，正文全是 LZW）可正常抽文字与转图片。
+
 ## 二、页面操作
 
 ```java
