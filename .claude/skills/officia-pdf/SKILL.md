@@ -63,6 +63,12 @@ List<String> byPage = OfficiaPdf.extractTextByPage(pdf);     // 逐页文本
 List<byte[]> images = OfficiaPdf.extractImages(pdf);         // 内嵌图片
 ```
 
+> ℹ️ **用标准 14 号字体的 PDF 不再叠字**：`Helvetica` / `Times-Roman` / `Courier` /
+> `Symbol` / `ZapfDingbats` 按规范**允许不写字宽表**（实测 13 份真实 PDF 里
+> 190 个简单字体有 18 个如此）。officia 改用替换字体量宽——宽度是**近似**的，
+> 但版面不会再把同一行的文字叠在一起。
+> （2026-08-31 前有此缺陷：推进量恒为 0，一行字全压在同一位置。）
+
 > ℹ️ **表单类 PDF（对账单 / 申报表 / 回执单）也读得对**：这类文档的字段值画在
 > **表单域外观流**（Form XObject）里、字体登记在它自己的 `/Resources` 中。
 > officia 展开时会把这些字体一并纳入解码与字形查找，字段值不会退化成乱码。
