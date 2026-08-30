@@ -63,6 +63,12 @@ List<String> byPage = OfficiaPdf.extractTextByPage(pdf);     // 逐页文本
 List<byte[]> images = OfficiaPdf.extractImages(pdf);         // 内嵌图片
 ```
 
+> ℹ️ **表单类 PDF（对账单 / 申报表 / 回执单）也读得对**：这类文档的字段值画在
+> **表单域外观流**（Form XObject）里、字体登记在它自己的 `/Resources` 中。
+> officia 展开时会把这些字体一并纳入解码与字形查找，字段值不会退化成乱码。
+> （2026-08-30 前有此缺陷：双字节 CID 会被逐字节当 Latin-1 读，
+> 公司名之类的字段抽出来是 `\x00+\x00X\x00R...`。升级即修复。）
+
 > ℹ️ **老 PDF 也读得了**：流过滤器覆盖 `FlateDecode` / `LZWDecode` / `ASCII85Decode` /
 > `ASCIIHexDecode` / `RunLengthDecode`。**LZW 对 1990 年代前后的 PDF 很关键**——
 > `FlateDecode` 到 PDF 1.2 才引入，更早的生成器只有 LZW 可用。
