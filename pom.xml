@@ -16,6 +16,9 @@
 
     <properties>
         <java.version>17</java.version>
+        <!-- officia 版本只写这一处：依赖坐标与页面上显示的版本号都取它，避免两边各自漂移
+             （曾出现页面写死 1.0.0、实际跑 1.1.2，排查线上问题时误导了判断） -->
+        <officia.version>1.1.2</officia.version>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -34,7 +37,7 @@
         <dependency>
             <groupId>plus.ruoyi</groupId>
             <artifactId>officia-all</artifactId>
-            <version>1.1.2</version>
+            <version>${officia.version}</version>
         </dependency>
 
         <!-- 测试 -->
@@ -53,6 +56,20 @@
     </dependencies>
 
     <build>
+        <!-- 只对 version.properties 开变量替换：整目录开过滤会破坏字体等二进制资源 -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes><include>version.properties</include></includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes><exclude>version.properties</exclude></excludes>
+            </resource>
+        </resources>
+
         <pluginManagement>
             <plugins>
                 <!-- 固定已缓存版本，保证离线可跑（与 officia 父 pom 一致） -->

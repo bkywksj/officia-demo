@@ -59,6 +59,27 @@ final class ApiRoutes {
     }
 
     /** 已注册端点数（自检用）。 */
+    /**
+     * 本次构建实际引用的 officia 版本，构建期由 Maven 注入 {@code version.properties}。
+     *
+     * <p>页面左下角显示它。此前那里写死着版本号，与 pom 各自漂移——线上排查问题时
+     * 「界面说 1.0.0、实际跑 1.1.2」会直接把判断带偏，所以改成同一个来源。</p>
+     */
+    private static final String OFFICIA_VERSION = readOfficiaVersion();
+
+    private static String readOfficiaVersion() {
+        try (java.io.InputStream in = ApiRoutes.class.getResourceAsStream("/version.properties")) {
+            if (in == null) {
+                return "unknown";
+            }
+            java.util.Properties props = new java.util.Properties();
+            props.load(in);
+            return props.getProperty("officia", "unknown");
+        } catch (Exception e) {
+            return "unknown";   // 版本号显示不出来不该影响测试台可用
+        }
+    }
+
     static int endpointCount() {
         return ROUTER.size();
     }
@@ -88,6 +109,7 @@ final class ApiRoutes {
             .put("ok", true).put("blobs", Store.size()).put("bytes", Store.bytesUsed())
             .put("endpoints", endpointCount())
             .put("maxUpload", Http.MAX_BODY_BYTES)
+            .put("officia", OFFICIA_VERSION)
             .put("maxHeap", Runtime.getRuntime().maxMemory()).end()));
 
         r.add("/api/upload", (ex, q) -> {

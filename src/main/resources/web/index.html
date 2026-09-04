@@ -44,7 +44,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
     <a data-p="batch" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="list-checks" class="w-4 h-4 mr-3"></i>批量回归</a>
   </div>
   <div class="border-t border-slate-100 p-3 text-xs text-slate-400">
-    <div class="flex items-center gap-1.5"><i data-lucide="package" class="w-3.5 h-3.5"></i>officia-all 1.0.0</div>
+    <div class="flex items-center gap-1.5"><i data-lucide="package" class="w-3.5 h-3.5"></i>officia-all <span id="verTag">…</span></div>
     <div class="flex items-center gap-1.5 mt-1"><i data-lucide="shield-off" class="w-3.5 h-3.5"></i>运行时零第三方依赖</div>
     <div class="mt-2.5 pt-2.5 border-t border-slate-100 space-y-1.5">
       <a href="https://officia.ruoyi.plus" target="_blank" rel="noopener"
@@ -269,6 +269,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
         <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('pdfFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'pdf')">
           <i data-lucide="file-up" class="w-7 h-7 text-slate-400 mx-auto"></i><div class="text-sm mt-2 text-slate-600">上传 PDF</div></div>
         <input type="file" id="pdfFile" class="hidden" accept=".pdf" multiple onchange="uploadMulti(this.files,'pdf')">
+        <input type="file" id="rerunFile" class="hidden">
         <div id="pdfList" class="mt-3 space-y-1.5 text-xs text-slate-400">尚未选择文件</div>
         <div id="pdfInfo" class="mt-3 pt-3 border-t border-slate-100 text-xs space-y-1 hidden"></div>
       </div>
@@ -592,7 +593,11 @@ async function api(path,opt){
 // 单次上传上限（字节），启动时从 /api/health 取真实值；取不到就按服务端的下限 64 MB 保守估
 let MAX_UPLOAD=64*1048576;
 async function loadLimits(){
-  try{const j=await api('/api/health');if(j.maxUpload)MAX_UPLOAD=j.maxUpload}catch(e){}
+  try{const j=await api('/api/health');
+    if(j.maxUpload)MAX_UPLOAD=j.maxUpload;
+    // 版本号取自服务端（构建期注入），不在页面里写死——写死过一次，线上排查时误导了判断
+    const v=document.getElementById('verTag');if(v)v.textContent=j.officia||'unknown';
+  }catch(e){}
 }
 /** 发请求前拦下超限文件：超限的请求发出去只会得到无意义的 "Failed to fetch"。 */
 function tooLarge(file){
@@ -612,7 +617,12 @@ async function upload(file,key){
     toast('已上传 '+j.name);
   }catch(e){toast(e.message,false)}
 }
+/** 各多选面板是否「追加」上传（默认否＝新一批替换旧的，避免列表越积越长）。 */
+const APPEND={};
 async function uploadMulti(files,key){
+  // 默认替换：同一面板反复试不同文件时，旧的留在列表里只会让人分不清哪个在用。
+  // 要合并多份 PDF 就一次多选，或勾上「追加」。
+  if(!APPEND[key])S[key+'s']=[];
   S[key+'s']=S[key+'s']||[];
   for(const f of files){
     if(tooLarge(f))continue;
@@ -624,10 +634,65 @@ async function uploadMulti(files,key){
 function renderList(key){
   const box=document.getElementById(key==='pdf'?'pdfList':'imgInfo');if(!box)return;
   const arr=S[key+'s']||[];
-  box.innerHTML=arr.length?arr.map(b=>'<div class="flex items-center justify-between bg-slate-50 rounded px-2.5 py-1.5"><span>'+b.name+'</span><span class="text-slate-400">'+(b.pages?b.pages+' 页':fmt(b.size))+'</span></div>').join(''):'尚未选择文件';
-  toast('共 '+arr.length+' 个文件');
+  if(!arr.length){box.innerHTML='尚未选择文件';return}
+  // 单文件操作用的是 S[key]（当前文件），这里显式标出来——此前只能靠「哪个是最后传的」去猜
+  const rows=arr.map(b=>{
+    const cur=b.id===S[key];
+    return '<div class="flex items-center justify-between rounded px-2.5 py-1.5 '
+      +(cur?'bg-primary/10 border border-primary/30':'bg-slate-50')+'">'
+      +'<span class="flex items-center gap-1.5 min-w-0">'
+      +(cur?'<span class="text-[10px] text-primary border border-primary/40 rounded px-1 shrink-0">当前</span>'
+           :'<button onclick="useBlob(\''+key+'\',\''+b.id+'\')" class="text-[10px] text-slate-400 border border-slate-300 rounded px-1 shrink-0 hover:border-primary hover:text-primary">选中</button>')
+      +'<span class="truncate">'+esc(b.name)+'</span></span>'
+      +'<span class="flex items-center gap-2 shrink-0"><span class="text-slate-400">'+(b.pages?b.pages+' 页':fmt(b.size))+'</span>'
+      +'<button onclick="dropBlob(\''+key+'\',\''+b.id+'\')" title="移除" class="text-slate-400 hover:text-rose-500">&#10005;</button></span></div>';
+  }).join('');
+  box.innerHTML='<div class="flex items-center justify-between text-xs text-slate-500 mb-1.5">'
+    +'<label class="flex items-center gap-1 cursor-pointer" title="默认新上传替换旧列表；要逐个攒多份再合并时勾上">'
+    +'<input type="checkbox" '+(APPEND[key]?'checked':'')+' onchange="APPEND[\''+key+'\']=this.checked"> 追加</label>'
+    +'<button onclick="clearList(\''+key+'\')" class="hover:text-rose-500">清空</button></div>'+rows;
 }
+/** 把某个文件设为当前（单文件操作作用于它）。 */
+function useBlob(key,id){S[key]=id;renderList(key)}
+/** 从列表移除一个文件；移掉的正好是当前文件时，当前顺延到列表末尾。 */
+function dropBlob(key,id){
+  S[key+'s']=(S[key+'s']||[]).filter(b=>b.id!==id);
+  const arr=S[key+'s'];
+  if(S[key]===id)S[key]=arr.length?arr[arr.length-1].id:null;
+  renderList(key);
+}
+function clearList(key){S[key+'s']=[];S[key]=null;renderList(key)}
 function need(key,msg){if(!S[key]){toast(msg||'请先上传文件',false);return false}return true}
+
+// —— 「换个文件再来一次」——
+// 换一份文件重测时，原本要滚回页面上方重新选文件、再把参数看一遍、再点一次按钮。
+// 这里把这三步收进结果卡片：选完文件就用【当前面板的参数】重跑，页面不动。
+const ACCEPT={words:'.doc,.docx',tpl:'.docx',cells:'.xlsx,.csv',slides:'.pptx',
+  pdf:'.pdf',img:'image/*',ocr:'image/*,.pdf',eml:'.eml'};
+let RERUN=null;
+/** 各面板动作在开头登记自己，供结果卡片重跑。 */
+function again(key,fn,arg){RERUN={key:key,fn:fn,arg:arg}}
+function rerunBar(){
+  if(!RERUN)return '';
+  return '<div class="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60 flex items-center gap-2">'
+    +'<button onclick="rerunWithNewFile()" class="border border-slate-300 bg-white px-3 py-1.5 rounded-md text-xs hover:border-primary hover:text-primary transition cursor-pointer flex items-center gap-1">'
+    +'<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>换个文件再来一次</button>'
+    +'<span class="text-xs text-slate-400">沿用当前参数，不用回到上方</span></div>';
+}
+async function rerunWithNewFile(){
+  if(!RERUN)return;
+  const r=RERUN,inp=document.getElementById('rerunFile');
+  inp.accept=ACCEPT[r.key]||'';
+  inp.multiple=(r.key==='pdf'||r.key==='img');
+  inp.onchange=async function(){
+    const files=this.files;this.value='';
+    if(!files||!files.length)return;
+    if(r.key==='pdf'||r.key==='img')await uploadMulti(files,r.key);else await upload(files[0],r.key);
+    if(!S[r.key])return;                    // 上传失败（超限等）已 toast，不再往下跑
+    await r.fn(r.arg);
+  };
+  inp.click();
+}
 
 // —— 结果卡片 ——
 function card(title,j,extra){
@@ -644,7 +709,7 @@ function card(title,j,extra){
     '<div class="p-3 text-center"><div class="text-xs text-slate-400">耗时</div><div class="text-lg font-semibold">'+(j.ms||0)+' ms</div></div>'+
     '<div class="p-3 text-center"><div class="text-xs text-slate-400">体积</div><div class="text-lg font-semibold">'+fmt(j.size)+'</div></div>'+
     '<div class="p-3 text-center"><div class="text-xs text-slate-400">授权态</div><div class="text-lg font-semibold '+(deg?'text-amber-600':'text-emerald-600')+'">'+(deg?'评估降级':(j.evaluation?'未授权':'已授权'))+'</div></div>'+
-   '</div>'+preview(j)+(extra||'')+'</div>';
+   '</div>'+preview(j)+(extra||'')+rerunBar()+'</div>';
 }
 function preview(j){
   if(j.mime==='application/pdf')return '<iframe src="/api/result/'+j.id+'" class="w-full h-[520px] bg-slate-100"></iframe>';
@@ -669,6 +734,7 @@ function busy(target,text){show(target,'<div class="bg-white rounded-lg border b
 
 // —— Words ——
 async function wordsRun(){
+  again('words',wordsRun);
   if(!need('words','请先上传 .doc / .docx'))return;
   busy('wordsOut','转换中…');
   try{const j=await api('/api/words/topdf?id='+S.words+'&mode='+document.getElementById('wordsMode').value,{method:'POST'});
@@ -676,6 +742,7 @@ async function wordsRun(){
   }catch(e){show('wordsOut','');toast(e.message,false)}
 }
 async function wordsImages(){
+  again('words',wordsImages);
   if(!need('words','请先上传 .doc / .docx'))return;
   busy('wordsOut','出图中…');
   const wm=document.getElementById('wordsWm').value.trim();
@@ -698,6 +765,7 @@ async function wordsImages(){
 }
 // —— 模板 ——
 async function tplRun(){
+  again('tpl',tplRun);
   if(!need('tpl','请先上传模板 .docx'))return;
   const mode=document.querySelector('input[name=tm]:checked').value;
   busy('tplOut','填充中…');
@@ -712,6 +780,7 @@ async function tplRun(){
 }
 // —— Cells ——
 async function cellsRun(op){
+  again('cells',cellsRun,op);
   if(!need('cells','请先上传 .xlsx'))return;
   busy('cellsOut','处理中…');
   try{
@@ -733,6 +802,7 @@ async function cellsFormula(){
   }catch(e){toast(e.message,false)}
 }
 async function csvToPdf(){
+  again('cells',csvToPdf);
   busy('cellsOut','转换中…');
   try{const j=await api('/api/cells/csvtopdf',{method:'POST',body:document.getElementById('csvText').value});
     show('cellsOut',card('CSV → PDF',j));logTask('Cells',j);toast('完成');
@@ -748,6 +818,7 @@ async function csvParse(){
 }
 // —— Slides ——
 async function slidesRun(){
+  again('slides',slidesRun);
   if(!need('slides','请先上传 .pptx'))return;
   busy('slidesOut','转换中…');
   try{const j=await api('/api/slides/topdf?id='+S.slides,{method:'POST'});
@@ -756,10 +827,13 @@ async function slidesRun(){
 }
 // —— PDF ——
 async function pdfOp(op){
+  again('pdf',pdfOp,op);
   const ids=(S.pdfs||[]).map(b=>b.id);
   if(!ids.length){toast('请先上传 PDF',false);return}
   busy('pdfOut','处理中…');
-  const id=ids[ids.length-1];const font=S.font?'&fontId='+S.font:'';
+  // 用当前选中的那份（列表里带「当前」标记的），不再固定取最后一个
+  const id=S.pdf&&ids.indexOf(S.pdf)>=0?S.pdf:ids[ids.length-1];
+  const font=S.font?'&fontId='+S.font:'';
   try{
     let j;
     if(op==='merge'){if(ids.length<2){toast('合并需要至少 2 个 PDF',false);show('pdfOut','');return}
@@ -865,6 +939,7 @@ const IMG_OPS=[['grayscale','灰度'],['sepia','棕褐'],['invert','反色'],['b
  ['brightness','亮度'],['contrast','对比度'],['posterize','色阶'],['resize','缩放'],['crop','裁剪'],['rotate','旋转'],['flipH','水平翻转'],['flipV','垂直翻转'],['textmark','文字水印']];
 document.getElementById('imgOps').innerHTML=IMG_OPS.map(([k,n])=>'<button onclick="imgOp(\''+k+'\')" class="border border-slate-200 rounded px-2 py-1.5 hover:border-primary hover:text-primary transition cursor-pointer">'+n+'</button>').join('');
 async function imgOp(op){
+  again('img',imgOp,op);
   if(!need('img','请先上传图片'))return;
   busy('imgOut','处理中…');
   try{const j=await api('/api/imaging/op?id='+S.img+'&op='+op+(op==='convert'?'&format=jpg':''),{method:'POST'});
@@ -875,6 +950,7 @@ async function imgOp(op){
   }catch(e){show('imgOut','');toast(e.message,false)}
 }
 async function imgToPdf(){
+  again('img',imgToPdf);
   const ids=(S.imgs||[]).map(b=>b.id);
   if(!ids.length){toast('请先上传图片',false);return}
   busy('imgOut','生成中…');
@@ -927,6 +1003,7 @@ function ocrParams(){
   return p;
 }
 async function ocrRun(){
+  again('ocr',ocrRun);
   if(!need('ocr','请先上传图片'))return;
   busy('ocrOut','识别中…（首次调用要加载权重，约几秒）');
   try{const j=await api('/api/ocr/recognize?id='+S.ocr+ocrParams(),{method:'POST'});
@@ -936,6 +1013,7 @@ async function ocrRun(){
   }catch(e){show('ocrOut','');toast(e.message,false)}
 }
 async function ocrScan(){
+  again('ocr',ocrScan);
   if(!need('ocr','请先上传扫描件 PDF'))return;
   const r=document.getElementById('ocrRotate').value;
   const sp=document.getElementById('ocrSplit').checked?'&split=1':'';
@@ -980,6 +1058,7 @@ function ocrCard(j){
 
 // —— Email ——
 async function emlRun(op){
+  again('eml',emlRun,op);
   if(!need('eml','请先上传 .eml（或在总览点"生成内置样本"）'))return;
   busy('emlOut','处理中…');
   try{
