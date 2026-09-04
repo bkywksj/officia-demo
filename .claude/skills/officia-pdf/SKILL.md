@@ -61,6 +61,7 @@ String text = OfficiaPdf.extractText(inputStream);
 String text = OfficiaPdf.extractText(new File("in.pdf"));
 List<String> byPage = OfficiaPdf.extractTextByPage(pdf);     // 逐页文本
 List<byte[]> images = OfficiaPdf.extractImages(pdf);         // 内嵌图片
+PdfReader.ImageExtraction det = OfficiaPdf.extractImagesDetailed(pdf);  // 带跳过统计
 ```
 
 > ℹ️ **用标准 14 号字体的 PDF 不再叠字**：`Helvetica` / `Times-Roman` / `Courier` /
@@ -233,7 +234,9 @@ byte[] signed = OfficiaPdf.sign(pdf, id);                       // 用默认选�
 byte[] signed = OfficiaPdf.sign(pdf, id, SignOptions.defaults()
         .name("张三")
         .reason("部门经理审批通过")
-        .location("北京·财务部"));
+        .location("北京·财务部")
+        .contactInfo("zhangsan@example.com")   // 写入 /ContactInfo
+        .fieldName("Signature1"));             // 会签时区分签名域
 ```
 
 ### 签名身份 `KeyMaterial`：两条来源
@@ -761,7 +764,7 @@ public class ArchivePdf {
 | 读加密 PDF 抛异常 | 没传口令 | 用 `extractText(pdf, pwd)` / `pageCount(pdf, pwd)` / `metadata(pdf, pwd)` |
 | 抽页抽错了 | 索引以为是 1-based | **0-based**：第 1 页传 `0` |
 | 加密后老阅读器打不开 | 用了 AES-256 | 兼容优先降到 128；安全优先保持 256 |
-| `extractImages` 返回空 | PDF 里是矢量图形不是位图 | 属预期 |
+| `extractImages` 返回空或偏少 | 矢量图形不是位图；或图用了尚未支持的编码（`JBIG2Decode`/`CCITTFaxDecode`/`JPXDecode`，老书数字化常见） | 改用 `extractImagesDetailed(pdf)`：`hasSkipped()` 告诉你结果是否完整，`describeSkipped()` 给人可读说明。只看 `extractImages` 的话，「只有 3 张图」和「有 10 张但 7 张没解出来」长得一模一样 |
 | 合并后体积很大 | 各源 PDF 的字体/图片资源叠加 | 属预期；需要精简请先在源头压 |
 | 输出带评估水印 | 未授权 + 门控开 | `officia-license`（与你自己加的 `watermark` 无关） |
 | `toWord` 抛"没有文字层" | 扫描件 / 图片型 PDF | 属**预期行为**，不是 bug；改走 `ScannedPdfConverter`（见第七节），不必再找外部 OCR 工具 |
