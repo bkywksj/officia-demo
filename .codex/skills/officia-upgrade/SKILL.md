@@ -66,7 +66,7 @@ cat ../officia/status.json
 <dependency>
   <groupId>plus.ruoyi</groupId>
   <artifactId>officia-all</artifactId>
-  <version>1.1.0</version>   <!-- 改这里 -->
+  <version>1.1.3</version>   <!-- 改这里 -->
 </dependency>
 ```
 
