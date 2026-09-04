@@ -47,9 +47,11 @@ PdfMetadata md = OfficiaPdf.metadata(pdf);
 PdfMetadata md = OfficiaPdf.metadata(pdf, "口令");
 md.getTitle(); md.getAuthor(); md.getSubject(); md.getKeywords();
 md.getCreator(); md.getProducer(); md.getCreationDate(); md.getModDate();
-md.get("自定义键");  md.all();   // Map<String,String>
+md.get("自定义键");  md.all();   // Map<String,String>（只读视图）
 
-byte[] out = OfficiaPdf.setMetadata(pdf, Map.of("Title", "月度报表", "Author", "财务部"));
+byte[] out = OfficiaPdf.setMetadata(pdf,
+        new PdfMetadata().title("月度报表").author("财务部"));   // 1.1.2 起收 PdfMetadata，不再收 Map
+// 自定义键走 set()；读出来改几项再写回：new PdfMetadata(md.all()).title("新标题")
 ```
 
 ### 提取内容
