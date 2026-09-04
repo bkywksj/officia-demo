@@ -385,12 +385,41 @@ final class ApiRoutes {
                 "application/pdf", out, t0).end());
         });
 
+        // 水印：不传样式参数时保持老行为（页心 45° 灰字），传了任一样式参数就走参数化 API。
+        // 这样老的调用方（含批量回归里的断言）不受影响，新面板能把全套参数拖出来看效果。
         r.add("/api/pdf/watermark", (ex, q) -> {
             byte[] pdf = Store.bytes(q.get("id"));
             String text = q.getOrDefault("text", "CONFIDENTIAL");
             byte[] font = fontBytes(q.get("fontId"));
+            boolean styled = q.containsKey("tile") || q.containsKey("size")
+                || q.containsKey("opacity") || q.containsKey("rotate")
+                || q.containsKey("color") || q.containsKey("gap") || q.containsKey("behind");
             long t0 = System.nanoTime();
-            byte[] out = font != null ? OfficiaPdf.watermark(pdf, text, font) : OfficiaPdf.watermark(pdf, text);
+            byte[] out;
+            if (styled) {
+                WatermarkOptions wm = WatermarkOptions.text(text)
+                    .tile("1".equals(q.get("tile")))
+                    .behindText("1".equals(q.get("behind")));
+                if (q.containsKey("size")) {
+                    wm.fontSizePt(Float.parseFloat(q.get("size")));
+                }
+                if (q.containsKey("opacity")) {
+                    wm.opacity(Float.parseFloat(q.get("opacity")));
+                }
+                if (q.containsKey("rotate")) {
+                    wm.rotationDegrees(Float.parseFloat(q.get("rotate")));
+                }
+                if (q.containsKey("color")) {
+                    wm.colorRgb(Integer.parseInt(q.get("color").replace("#", ""), 16));
+                }
+                if (q.containsKey("gap")) {
+                    wm.tileGapRatio(Float.parseFloat(q.get("gap")));
+                }
+                out = OfficiaPdf.watermark(pdf, wm, font);
+            } else {
+                out = font != null ? OfficiaPdf.watermark(pdf, text, font)
+                    : OfficiaPdf.watermark(pdf, text);
+            }
             Http.json(ex, result(outName(q.get("id"), "水印", "pdf", "水印.pdf"),
                 "application/pdf", out, t0).end());
         });

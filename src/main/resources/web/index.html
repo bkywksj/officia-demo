@@ -340,7 +340,17 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
           </div>
         </div>
         <div class="mt-4 grid grid-cols-3 gap-3 bg-slate-50 rounded-md p-3">
-          <div><label class="block text-xs text-slate-500 mb-1">水印文字</label><input id="pdfWmText" value="机密 · 仅供内部" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
+          <div><label class="block text-xs text-slate-500 mb-1">水印文字<span class="text-slate-400">（可用 {datetime} {date} {time} {page} {pages}）</span></label><input id="pdfWmText" value="机密 · 仅供内部" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
+          <div class="grid grid-cols-3 gap-2 text-xs">
+            <label class="flex items-center gap-1.5 text-slate-600"><input type="checkbox" id="pdfWmTile"> 整页平铺</label>
+            <label class="flex items-center gap-1.5 text-slate-600"><input type="checkbox" id="pdfWmBehind"> 画在正文下</label>
+            <div class="flex items-center gap-1"><span class="text-slate-500">颜色</span><input type="color" id="pdfWmColor" value="#808080" class="h-6 w-10 border border-slate-300 rounded"></div>
+            <div><span class="text-slate-500">字号 pt</span><input id="pdfWmSize" type="number" min="6" max="200" step="1" placeholder="自动" class="w-full border border-slate-300 rounded px-2 py-1 outline-none focus:border-primary"></div>
+            <div><span class="text-slate-500">透明度</span><input id="pdfWmOpacity" type="number" min="0.02" max="1" step="0.01" value="0.15" class="w-full border border-slate-300 rounded px-2 py-1 outline-none focus:border-primary"></div>
+            <div><span class="text-slate-500">旋转°</span><input id="pdfWmRotate" type="number" min="-90" max="90" step="1" value="-38" class="w-full border border-slate-300 rounded px-2 py-1 outline-none focus:border-primary"></div>
+            <div class="col-span-3"><span class="text-slate-500">平铺间距系数（越大越稀疏，1.0~8.0）</span><input id="pdfWmGap" type="number" min="1" max="8" step="0.1" value="1.6" class="w-full border border-slate-300 rounded px-2 py-1 outline-none focus:border-primary"></div>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">中文水印需在上方选中文字体；平铺走 PDF 规范的平铺图案（§8.7.3），一页几十个水印与一个体积相当。</p>
           <div><label class="block text-xs text-slate-500 mb-1">页码格式</label><input id="pdfPnFmt" value="第 {page} 页 / 共 {total} 页" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
           <div><label class="block text-xs text-slate-500 mb-1">页码索引（抽/删，从0起）</label><input id="pdfPages" value="0,1" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
         </div>
@@ -756,7 +766,17 @@ async function pdfOp(op){
        j.files.map(f=>'<a href="/api/result/'+f.id+'" target="_blank" class="border border-slate-200 rounded p-3 text-center text-sm hover:border-primary transition cursor-pointer">'+f.name+'<div class="text-xs text-slate-400 mt-1">'+fmt(f.size)+'</div></a>').join('')+'</div></div>');return}
     else if(op==='extract'||op==='remove'){j=await api('/api/pdf/pages?id='+id+'&op='+(op==='remove'?'remove':'extract')+'&pages='+encodeURIComponent(document.getElementById('pdfPages').value),{method:'POST'});show('pdfOut',card(op==='remove'?'删页结果':'抽页结果',j))}
     else if(op==='rotate'){j=await api('/api/pdf/rotate?id='+id+'&deg=90',{method:'POST'});show('pdfOut',card('旋转 90°',j))}
-    else if(op==='watermark'){j=await api('/api/pdf/watermark?id='+id+'&text='+encodeURIComponent(document.getElementById('pdfWmText').value)+font,{method:'POST'});show('pdfOut',card('水印结果',j))}
+    else if(op==='watermark'){
+      const g=x=>document.getElementById(x);
+      let qs='/api/pdf/watermark?id='+id+'&text='+encodeURIComponent(g('pdfWmText').value)+font
+        +'&tile='+(g('pdfWmTile').checked?'1':'0')
+        +'&behind='+(g('pdfWmBehind').checked?'1':'0')
+        +'&opacity='+g('pdfWmOpacity').value
+        +'&rotate='+g('pdfWmRotate').value
+        +'&gap='+g('pdfWmGap').value
+        +'&color='+encodeURIComponent(g('pdfWmColor').value.replace('#',''));
+      if(g('pdfWmSize').value) qs+='&size='+g('pdfWmSize').value;
+      j=await api(qs,{method:'POST'});show('pdfOut',card('水印结果',j))}
     else if(op==='pagenumbers'){j=await api('/api/pdf/pagenumbers?id='+id+'&format='+encodeURIComponent(document.getElementById('pdfPnFmt').value)+font,{method:'POST'});show('pdfOut',card('页码结果',j))}
     else if(op==='rc4'){j=await api('/api/pdf/encrypt?id='+id+'&bits=128&user=open&owner=owner',{method:'POST'});show('pdfOut',card('RC4-128 加密',j))}
     else if(op==='aes'){j=await api('/api/pdf/encrypt?id='+id+'&bits=256&user=open&owner=owner',{method:'POST'});show('pdfOut',card('AES-256 加密',j))}
