@@ -612,8 +612,9 @@ async function upload(file,key){
   try{
     const j=await api('/api/upload?name='+encodeURIComponent(file.name),{method:'POST',body:file});
     S[key]=j.id;
-    const el=document.getElementById(key+'Info')||document.getElementById(key==='font'?'fontInfo':key+'Info');
-    if(el)el.innerHTML='<span class="text-slate-700">'+j.name+'</span> · '+fmt(j.size)+(j.pages?' · '+j.pages+' 页':'');
+    S[key+'Blob']=j;                 // 留着给探测回来后重绘信息行用
+    probePdf(j);
+    renderInfo(key);
     toast('已上传 '+j.name);
   }catch(e){toast(e.message,false)}
 }
@@ -627,7 +628,7 @@ async function uploadMulti(files,key){
   for(const f of files){
     if(tooLarge(f))continue;
     try{const j=await api('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:f});
-      S[key+'s'].push(j);S[key]=j.id;}catch(e){toast(e.message,false)}
+      S[key+'s'].push(j);S[key]=j.id;probePdf(j);}catch(e){toast(e.message,false)}
   }
   renderList(key);
 }
@@ -643,7 +644,7 @@ function renderList(key){
       +'<span class="flex items-center gap-1.5 min-w-0">'
       +(cur?'<span class="text-[10px] text-primary border border-primary/40 rounded px-1 shrink-0">当前</span>'
            :'<button onclick="useBlob(\''+key+'\',\''+b.id+'\')" class="text-[10px] text-slate-400 border border-slate-300 rounded px-1 shrink-0 hover:border-primary hover:text-primary">选中</button>')
-      +'<span class="truncate">'+esc(b.name)+'</span></span>'
+      +'<span class="truncate">'+esc(b.name)+'</span>'+kindTag(b.id)+'</span>'
       +'<span class="flex items-center gap-2 shrink-0"><span class="text-slate-400">'+(b.pages?b.pages+' 页':fmt(b.size))+'</span>'
       +'<button onclick="dropBlob(\''+key+'\',\''+b.id+'\')" title="移除" class="text-slate-400 hover:text-rose-500">&#10005;</button></span></div>';
   }).join('');
@@ -663,6 +664,44 @@ function dropBlob(key,id){
 }
 function clearList(key){S[key+'s']=[];S[key]=null;renderList(key)}
 function need(key,msg){if(!S[key]){toast(msg||'请先上传文件',false);return false}return true}
+
+// —— 「这份 PDF 是什么」——
+// 上传 PDF 后台探测有无文字层，把结论直接标在文件行上。
+// 否则用户得先知道里面是文字还是图片，才知道该点「抽文字」还是「OCR」——
+// 而这恰恰是他上传前无从判断的事。
+const PROFILE={};                                  // blobId -> {kind,pages,textPages,chars}
+const KIND_LABEL={TEXT:'电子版·有文字层',SCANNED:'扫描件·无文字层',
+  MIXED:'混合（部分页无文字层）',EMPTY:'空白/无可提取内容'};
+const KIND_STYLE={TEXT:'text-emerald-600 border-emerald-200 bg-emerald-50',
+  SCANNED:'text-amber-600 border-amber-200 bg-amber-50',
+  MIXED:'text-sky-600 border-sky-200 bg-sky-50',
+  EMPTY:'text-slate-500 border-slate-200 bg-slate-50'};
+function kindTag(id){
+  const p=PROFILE[id];
+  if(p===undefined)return '';
+  if(p===null)return '<span class="text-[10px] text-slate-400 border border-slate-200 rounded px-1">探测中…</span>';
+  if(p.error)return '';
+  let t=KIND_LABEL[p.kind]||p.kind;
+  if(p.kind==='MIXED')t='混合（'+(p.pages-p.textPages)+'/'+p.pages+' 页无文字层）';
+  return '<span class="text-[10px] border rounded px-1 shrink-0 '+(KIND_STYLE[p.kind]||'')+'">'+t+'</span>';
+}
+/** 单文件面板的信息行（含探测标签）；探测是异步回来的，所以要能重绘。 */
+function renderInfo(key){
+  const j=S[key+'Blob'];if(!j)return;
+  const el=document.getElementById(key==='font'?'fontInfo':key+'Info');if(!el)return;
+  el.innerHTML='<span class="text-slate-700">'+esc(j.name)+'</span> · '+fmt(j.size)
+    +(j.pages?' · '+j.pages+' 页':'')+' '+kindTag(j.id);
+}
+/** 后台探测；失败只是没有标签，不打断任何操作。 */
+async function probePdf(blob){
+  if(!blob||!/\.pdf$/i.test(blob.name||''))return;
+  if(PROFILE[blob.id]!==undefined)return;
+  PROFILE[blob.id]=null;
+  try{PROFILE[blob.id]=await api('/api/pdf/profile?id='+blob.id,{method:'POST'});}
+  catch(e){PROFILE[blob.id]={error:true}}
+  renderList('pdf');renderList('img');
+  ['ocr','pdf','img'].forEach(renderInfo);      // 单文件面板（OCR 就是其一）也要跟着更新
+}
 
 // —— 「换个文件再来一次」——
 // 换一份文件重测时，原本要滚回页面上方重新选文件、再把参数看一遍、再点一次按钮。
@@ -1002,9 +1041,56 @@ function ocrParams(){
   if(c>0)p+='&minConfidence='+c;
   return p;
 }
+/**
+ * OCR 前的选路提示：这份文件已探测出有文字层时，先告诉用户有更快更准的路。
+ *
+ * 不直接替他决定——文字层本身可能是坏的（别的工具 OCR 过、层是乱码），
+ * 那种情况下重跑 OCR 才是对的。所以给结论 + 两个按钮，让他选。
+ * 返回 true 表示"已拦下，别继续"。
+ */
+function ocrGuard(target){
+  const p=PROFILE[S.ocr];
+  if(!p||p.error||p.kind==='SCANNED')return false;      // 扫描件正是该走 OCR 的
+  if(p.kind==='EMPTY')return false;
+  const scanned=p.pages-p.textPages;
+  const why=p.kind==='TEXT'
+    ? '这份 PDF <b>本身就带文字层</b>（'+p.pages+' 页共 '+p.chars+' 字）'
+    : '这份 PDF 是<b>混合</b>的：'+p.textPages+'/'+p.pages+' 页带文字层，'+scanned+' 页没有';
+  show(target,'<div class="bg-white rounded-lg border border-sky-200">'
+    +'<div class="px-4 py-3 border-b border-sky-100 flex items-center gap-2 text-sm font-medium text-sky-700">'
+    +'<i data-lucide="info" class="w-4 h-4"></i>先别急着 OCR</div>'
+    +'<div class="p-4 text-sm text-slate-600 space-y-3">'
+    +'<div>'+why+'。直接抽取<b>又快又准</b>（毫秒级、原样还原）；'
+    +'OCR 要逐页识别，慢一个量级，且识别永远有错字。</div>'
+    +'<div class="text-xs text-slate-400">若这份文字层本身是坏的（比如别的工具 OCR 出来的乱码），'
+    +'那就该用 OCR 重来——所以这里不替你决定。</div>'
+    +'<div class="flex gap-2">'
+    +'<button onclick="ocrUseTextLayer()" class="bg-primary text-white px-3 py-1.5 rounded-md text-xs cursor-pointer flex items-center gap-1">'
+    +'<i data-lucide="type" class="w-3.5 h-3.5"></i>直接抽取文字（推荐）</button>'
+    +'<button onclick="OCR_FORCE=true;'+(target==='ocrOut'?'ocrRun':'ocrScan')+'()" '
+    +'class="border border-slate-300 px-3 py-1.5 rounded-md text-xs hover:border-primary hover:text-primary cursor-pointer">仍然用 OCR</button>'
+    +'</div></div></div>');
+  return true;
+}
+let OCR_FORCE=false;
+/** 走文字层：调 PDF 抽文字，结果就地展示在 OCR 面板，不用让用户自己换面板。 */
+async function ocrUseTextLayer(){
+  busy('ocrOut','抽取中…');
+  try{const j=await api('/api/pdf/text?id='+S.ocr,{method:'POST'});
+    const txt=(j.text||[]).map((t,i)=>'— 第 '+(i+1)+' 页 —\n'+t).join('\n\n');
+    show('ocrOut','<div class="bg-white rounded-lg border border-slate-200">'
+      +'<div class="px-4 py-3 border-b border-slate-100 text-sm font-medium flex items-center gap-2">'
+      +'<i data-lucide="type" class="w-4 h-4 text-emerald-600"></i>文字层抽取结果（'+j.pages+' 页）</div>'
+      +'<pre class="p-4 text-xs whitespace-pre-wrap max-h-[520px] overflow-auto">'+esc(txt)+'</pre></div>');
+    logTask('Pdf',{name:'抽文字 '+j.pages+' 页'});
+    toast('已从文字层抽取 '+j.pages+' 页');
+  }catch(e){show('ocrOut','');toast(e.message,false)}
+}
 async function ocrRun(){
   again('ocr',ocrRun);
   if(!need('ocr','请先上传图片'))return;
+  if(!OCR_FORCE&&ocrGuard('ocrOut'))return;
+  OCR_FORCE=false;
   busy('ocrOut','识别中…（首次调用要加载权重，约几秒）');
   try{const j=await api('/api/ocr/recognize?id='+S.ocr+ocrParams(),{method:'POST'});
     show('ocrOut',ocrCard(j));
@@ -1015,6 +1101,8 @@ async function ocrRun(){
 async function ocrScan(){
   again('ocr',ocrScan);
   if(!need('ocr','请先上传扫描件 PDF'))return;
+  if(!OCR_FORCE&&ocrGuard('ocrOut'))return;
+  OCR_FORCE=false;
   const r=document.getElementById('ocrRotate').value;
   const sp=document.getElementById('ocrSplit').checked?'&split=1':'';
   const mp=Math.max(1,Math.min(20,parseInt(document.getElementById('ocrMaxPages').value||'3')));

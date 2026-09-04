@@ -80,6 +80,29 @@ final class ApiRoutes {
         }
     }
 
+    /**
+     * 判定「这一页算有文字层」的最少可见字符数。
+     *
+     * <p>不取 1 是因为扫描件常常带零星文字层——页眉页码、水印、装订线上的编号，
+     * 纯按「有没有字」判会把整本扫描书判成电子版，用户照此去点「抽文字」只会拿到几个页码。
+     * 10 这个数没有规范依据，是权衡：正文页普遍远超它，而页码类残留普遍低于它。</p>
+     */
+    private static final int TEXT_PAGE_MIN_CHARS = 10;
+
+    /** 数可见字符（不含空白）——空白多少不说明这页有没有内容。 */
+    private static int visibleChars(String text) {
+        if (text == null) {
+            return 0;
+        }
+        int n = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (!Character.isWhitespace(text.charAt(i))) {
+                n++;
+            }
+        }
+        return n;
+    }
+
     static int endpointCount() {
         return ROUTER.size();
     }
@@ -120,6 +143,54 @@ final class ApiRoutes {
                 b.withPages(pagesOrUnknown(data));
             }
             Http.json(ex, b.toJson().end());
+        });
+
+        // 上传的 PDF 到底是电子版还是扫描件——让界面替用户判断，而不是让用户先知道。
+        // 只用现成公开 API（extractTextByPage + extractImagesDetailed），不依赖未发布的能力。
+        r.add("/api/pdf/profile", (ex, q) -> {
+            long t0 = System.nanoTime();
+            byte[] pdf = Store.bytes(q.get("id"));
+            List<String> pageTexts = OfficiaPdf.extractTextByPage(pdf);
+            int pages = pageTexts.size();
+            int textPages = 0;
+            long chars = 0;
+            List<Object> perPage = new ArrayList<>();
+            for (String t : pageTexts) {
+                int n = visibleChars(t);
+                chars += n;
+                if (n >= TEXT_PAGE_MIN_CHARS) {
+                    textPages++;
+                }
+                perPage.add(n);
+            }
+            // 只有存在「没文字的页」时才去抽图——纯电子版（最常见）因此完全不付这份开销
+            int images = -1;
+            if (textPages < pages) {
+                try {
+                    images = OfficiaPdf.extractImagesDetailed(pdf).images().size();
+                } catch (Exception e) {
+                    images = -1;                    // 抽图失败不影响判定，如实标未知
+                }
+            }
+            String kind;
+            if (pages == 0) {
+                kind = "EMPTY";
+            } else if (textPages == pages) {
+                kind = "TEXT";
+            } else if (textPages == 0) {
+                kind = images == 0 ? "EMPTY" : "SCANNED";
+            } else {
+                kind = "MIXED";
+            }
+            Http.json(ex, Json.obj()
+                .put("kind", kind)
+                .put("pages", pages)
+                .put("textPages", textPages)
+                .put("chars", chars)
+                .put("images", images)
+                .put("perPageChars", perPage)
+                .put("ms", (System.nanoTime() - t0) / 1_000_000)
+                .end());
         });
 
         r.add("/api/samples", (ex, q) -> samples(ex));
@@ -947,6 +1018,14 @@ final class ApiRoutes {
         // OCR 与其它能力不同，"对不对"没法只看一个总分——要能定位到是哪一行崩了
         r.add("/api/ocr/recognize", (ex, q) -> {
             long t0 = System.nanoTime();
+            // 这个端点只吃图片。收到 PDF 时若直接往下走，用户会看到
+            // 「无法识别的图像格式（ImageIO 无对应读取器）」——技术上没错，但对使用者毫无用处。
+            Store.Blob blob = Store.get(q.get("id"));
+            if (blob != null && blob.name() != null && blob.name().toLowerCase().endsWith(".pdf")) {
+                throw new IllegalArgumentException(
+                    "这是 PDF，不是图片。若它是扫描件，请用「扫描件 → Word」；"
+                        + "若它本就带文字层，用 PDF 工具箱的「抽文字」更快也更准。");
+            }
             OcrResult res = OfficiaOcr.analyze(Store.bytes(q.get("id")), ocrOptions(q));
             double min = doubleOf(q, "minConfidence", 0);
             if (min > 0) {
