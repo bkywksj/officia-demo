@@ -391,15 +391,23 @@ final class ApiRoutes {
             byte[] pdf = Store.bytes(q.get("id"));
             String text = q.getOrDefault("text", "CONFIDENTIAL");
             byte[] font = fontBytes(q.get("fontId"));
-            boolean styled = q.containsKey("tile") || q.containsKey("size")
+            // imgId 指向 Blob 仓里的一张图（印章/LOGO）：给了就走图片水印，text 被忽略
+            byte[] wmImage = q.get("imgId") == null ? null : Store.bytes(q.get("imgId"));
+            boolean styled = wmImage != null || q.containsKey("tile") || q.containsKey("size")
                 || q.containsKey("opacity") || q.containsKey("rotate")
-                || q.containsKey("color") || q.containsKey("gap") || q.containsKey("behind");
+                || q.containsKey("color") || q.containsKey("gap") || q.containsKey("behind")
+                || q.containsKey("annot") || q.containsKey("imgw");
             long t0 = System.nanoTime();
             byte[] out;
             if (styled) {
-                WatermarkOptions wm = WatermarkOptions.text(text)
+                WatermarkOptions wm = (wmImage != null
+                    ? WatermarkOptions.image(wmImage) : WatermarkOptions.text(text))
                     .tile("1".equals(q.get("tile")))
-                    .behindText("1".equals(q.get("behind")));
+                    .behindText("1".equals(q.get("behind")))
+                    .annotation("1".equals(q.get("annot")));
+                if (q.containsKey("imgw")) {
+                    wm.imageWidthPt(Float.parseFloat(q.get("imgw")));
+                }
                 if (q.containsKey("size")) {
                     wm.fontSizePt(Float.parseFloat(q.get("size")));
                 }

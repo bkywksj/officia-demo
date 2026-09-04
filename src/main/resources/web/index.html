@@ -349,6 +349,9 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
             <div><span class="text-slate-500">透明度</span><input id="pdfWmOpacity" type="number" min="0.02" max="1" step="0.01" value="0.15" class="w-full border border-slate-300 rounded px-2 py-1 outline-none focus:border-primary"></div>
             <div><span class="text-slate-500">旋转°</span><input id="pdfWmRotate" type="number" min="-90" max="90" step="1" value="-38" class="w-full border border-slate-300 rounded px-2 py-1 outline-none focus:border-primary"></div>
             <div class="col-span-3"><span class="text-slate-500">平铺间距系数（越大越稀疏，1.0~8.0）</span><input id="pdfWmGap" type="number" min="1" max="8" step="0.1" value="1.6" class="w-full border border-slate-300 rounded px-2 py-1 outline-none focus:border-primary"></div>
+            <label class="col-span-3 flex items-center gap-1.5 text-slate-600"><input type="checkbox" id="pdfWmAnnot"> 用水印注解承载（可被阅读器隐藏／编辑器删除，仅适合提示性水印）</label>
+            <div class="col-span-2"><span class="text-slate-500">图片水印（印章/LOGO，填已上传图片的 id，留空=文字水印）</span><input id="pdfWmImgId" placeholder="如 b2" class="w-full border border-slate-300 rounded px-2 py-1 outline-none focus:border-primary"></div>
+            <div><span class="text-slate-500">图片宽 pt</span><input id="pdfWmImgW" type="number" min="10" max="600" step="5" placeholder="自动" class="w-full border border-slate-300 rounded px-2 py-1 outline-none focus:border-primary"></div>
           </div>
           <p class="text-xs text-slate-400 leading-relaxed">中文水印需在上方选中文字体；平铺走 PDF 规范的平铺图案（§8.7.3），一页几十个水印与一个体积相当。</p>
           <div><label class="block text-xs text-slate-500 mb-1">页码格式</label><input id="pdfPnFmt" value="第 {page} 页 / 共 {total} 页" class="w-full border border-slate-300 rounded-md px-3 py-1.5 text-sm outline-none focus:border-primary"></div>
@@ -776,6 +779,9 @@ async function pdfOp(op){
         +'&gap='+g('pdfWmGap').value
         +'&color='+encodeURIComponent(g('pdfWmColor').value.replace('#',''));
       if(g('pdfWmSize').value) qs+='&size='+g('pdfWmSize').value;
+      if(g('pdfWmAnnot').checked) qs+='&annot=1';
+      if(g('pdfWmImgId').value.trim()) qs+='&imgId='+encodeURIComponent(g('pdfWmImgId').value.trim());
+      if(g('pdfWmImgW').value) qs+='&imgw='+g('pdfWmImgW').value;
       j=await api(qs,{method:'POST'});show('pdfOut',card('水印结果',j))}
     else if(op==='pagenumbers'){j=await api('/api/pdf/pagenumbers?id='+id+'&format='+encodeURIComponent(document.getElementById('pdfPnFmt').value)+font,{method:'POST'});show('pdfOut',card('页码结果',j))}
     else if(op==='rc4'){j=await api('/api/pdf/encrypt?id='+id+'&bits=128&user=open&owner=owner',{method:'POST'});show('pdfOut',card('RC4-128 加密',j))}
