@@ -38,12 +38,12 @@ Officia 以标准 Maven 产物发布，坐标前缀 `plus.ruoyi`。**运行时�
 <dependency>
   <groupId>plus.ruoyi</groupId>
   <artifactId>officia-all</artifactId>
-  <version>1.1.0</version>
+  <version>1.1.1</version>
 </dependency>
 ```
 
 ```groovy
-implementation 'plus.ruoyi:officia-all:1.1.0'
+implementation 'plus.ruoyi:officia-all:1.1.1'
 ```
 
 **`officia-all` 已聚合以下模块**（核实自 `../officia/officia-all/pom.xml`）：
@@ -58,16 +58,16 @@ implementation 'plus.ruoyi:officia-all:1.1.0'
 
 ```
 Could not resolve dependencies
-  → plus.ruoyi:officia-license:jar:1.1.0 was not found in https://repo1.maven.org/maven2
+  → plus.ruoyi:officia-license:jar:1.1.1 was not found in https://repo1.maven.org/maven2
 ```
 
 核实命令（自己验一下，别信记忆）：
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" \
-  https://repo1.maven.org/maven2/plus/ruoyi/officia-all/1.1.0/officia-all-1.1.0.pom      # 200
+  https://repo1.maven.org/maven2/plus/ruoyi/officia-all/1.1.1/officia-all-1.1.1.pom      # 200
 curl -s -o /dev/null -w "%{http_code}\n" \
-  https://repo1.maven.org/maven2/plus/ruoyi/officia-license/1.1.0/officia-license-1.1.0.pom  # 404
+  https://repo1.maven.org/maven2/plus/ruoyi/officia-license/1.1.1/officia-license-1.1.1.pom  # 404
 ```
 
 > 本 demo 的 `pom.xml` 曾多写一条 `officia-license`——本机 `mvn install` 后能解析，客户照抄就 404。
@@ -81,7 +81,7 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 <dependency>
   <groupId>plus.ruoyi</groupId>
   <artifactId>officia-pdf</artifactId>   <!-- 仅本地 install 后可用，Central 上是 404 -->
-  <version>1.1.0</version>
+  <version>1.1.1</version>
 </dependency>
 ```
 
@@ -107,7 +107,7 @@ Maven 会自动带上该模块依赖的底座（如 `officia-pdf` → `officia-r
 
 ## 二、让本地仓库有 officia
 
-**通常不用做这一步**——`officia-all:1.1.0` 自 2026-08-09 起已在 Maven Central，
+**通常不用做这一步**——`officia-all:1.1.1` 自 2026-08-09 起已在 Maven Central，
 `mvn package` 会自动拉取（首次需联网）。
 
 本节适用于两种情况：**① 要用本地构建版本**（如 dev 版：门控可开关、未混淆，便于做授权前后对比）；
@@ -118,21 +118,21 @@ Maven 会自动带上该模块依赖的底座（如 `officia-pdf` → `officia-r
 mvn install -DskipTests
 
 # 验证
-ls ~/.m2/repository/plus/ruoyi/officia-all/1.1.0/
+ls ~/.m2/repository/plus/ruoyi/officia-all/1.1.1/
 ```
 
 装完后，你的项目 `mvn -o package`（离线模式）就能解析到。
 
 ### 离线 / 内网环境
 
-`mvn install` 需要下载插件时会卡住。绕过办法：用 JDK 自带 `jar` 手工把各模块 `target/classes` 打成 jar，按 Maven 仓库布局拷进 `~/.m2/repository/plus/ruoyi/<artifactId>/1.1.0/`，并补一个 `.pom` 文件（可从源码模块的 `pom.xml` 拷贝）。
+`mvn install` 需要下载插件时会卡住。绕过办法：用 JDK 自带 `jar` 手工把各模块 `target/classes` 打成 jar，按 Maven 仓库布局拷进 `~/.m2/repository/plus/ruoyi/<artifactId>/1.1.1/`，并补一个 `.pom` 文件（可从源码模块的 `pom.xml` 拷贝）。
 
 布局要求：
 
 ```
-~/.m2/repository/plus/ruoyi/officia-all/1.1.0/
-├── officia-all-1.1.0.jar
-└── officia-all-1.1.0.pom
+~/.m2/repository/plus/ruoyi/officia-all/1.1.1/
+├── officia-all-1.1.1.jar
+└── officia-all-1.1.1.pom
 ```
 
 > 内网私服（Nexus / Artifactory）场景：把上述 jar + pom 用 `mvn deploy:deploy-file` 传到私服的 hosted 仓库，团队即可正常拉取。
@@ -141,7 +141,7 @@ ls ~/.m2/repository/plus/ruoyi/officia-all/1.1.0/
 
 | 症状 | 原因 | 处置 |
 |---|---|---|
-| `Could not resolve dependencies ... plus.ruoyi:officia-all:jar:1.1.0` | 本地仓没有 | 去 `../officia` 跑 `mvn install -DskipTests` |
+| `Could not resolve dependencies ... plus.ruoyi:officia-all:jar:1.1.1` | 本地仓没有 | 去 `../officia` 跑 `mvn install -DskipTests` |
 | `class file has wrong version 61.0` | JDK < 17 | 升到 JDK 17+，或检查 `maven.compiler.target` |
 | 编译期找不到 `OfficiaWords` | 只引了 `officia-pdf` 等单模块 | 改引 `officia-all`，或补引 `officia-words` |
 | 离线 `mvn -o` 报插件缺失 | 插件未缓存 | 联网跑一次完整构建预热，或在 `pluginManagement` 固定已缓存版本（本 demo `pom.xml` 就这么做的） |
