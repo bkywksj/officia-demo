@@ -54,7 +54,7 @@ java -Xmx8g -jar target/officia-demo-1.0.0.jar          # 大文件（设计型 
 | **模板填充 · 邮件合并** | 模板 + JSON → 单条 / 合并一份 / 每条一份 / 只填 docx | `officia-template` |
 | **Cells · XLSX/CSV** | XLSX→PDF、XLSX→CSV、CSV→PDF、CSV 解析、单元格公式求值、整表重算 | `officia-cells` |
 | **Slides · PPTX** | PPTX→PDF（版式保真），看页数 / 耗时 / 体积并内嵌预览 | `officia-slides` |
-| **PDF 工具箱** | 合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图片·RC4-128·AES-256·信息·**转 Word**·**转图片**·**数字签名 / 会签 / 验签 / 篡改演示** | `officia-pdf` |
+| **PDF 工具箱** | 合并·拆分·抽页·删页·旋转·**水印（平铺/字号/透明度/角度/颜色/间距可调，支持 {datetime} 等动态变量）**·页码·抽文字·抽图片·RC4-128·AES-256·信息·**转 Word**·**转图片**·**数字签名 / 会签 / 验签 / 篡改演示** | `officia-pdf` |
 | **Imaging · 图像** | 滤镜/变换全项 + 格式转换 + 图片→PDF，**处理前后并排对比** | `officia-imaging` |
 | **BarCode · 条码** | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR（4 档纠错）+ **全码制一键预览** | `officia-barcode` |
 | **Email · EML** | EML 解析（主题/收发件/附件/正文）、邮件归档 → PDF | `officia-email` |

@@ -101,6 +101,7 @@ byte[] rot  = OfficiaPdf.rotate(pdf, 90);                          // 旋转（�
 ## 三、水印与页码
 
 ```java
+// 简版：页心 45° 半透明灰字（样式固定）
 byte[] wm = OfficiaPdf.watermark(pdf, "内部资料");
 byte[] wm = OfficiaPdf.watermark(pdf, "内部资料", fontTtfBytes);   // 中文必须传 TTF
 
@@ -110,6 +111,62 @@ byte[] pn = OfficiaPdf.addPageNumbers(pdf, "第 %d 页 / 共 %d 页", fontTtfByt
 ```
 
 > 🔴 **中文水印 / 中文页码必须传 `fontTtf`**——PDF 内置字体没有中文字形。见 `officia-chinese-font`（含 demo 里自动探测系统字体的做法）。
+
+### 参数化水印（样式可调 + 平铺 + 图片）
+
+简版把颜色、透明度、45°、页心位置全写死了。要做**防泄密溯源水印**（「姓名 + 时间戳」整页平铺、
+截图裁掉一角仍能追溯到人）得用 `WatermarkOptions`：
+
+```java
+import plus.ruoyi.officia.render.image.WatermarkOptions;
+
+byte[] out = OfficiaPdf.watermark(pdf,
+        WatermarkOptions.text("张三 {datetime}")
+                .tile(true)              // 整页平铺（PDF 平铺图案，几十个水印≈一个的体积）
+                .fontSizePt(13)
+                .opacity(0.13f)
+                .rotationDegrees(-30f)
+                .colorRgb(0x9AA0A6)
+                .tileGapRatio(1.5f),     // 间距系数，越大越稀疏（1.0~8.0）
+        simsunBytes);                    // 中文必需
+
+// 印章 / LOGO：PNG 透明通道保留，不会带白底
+byte[] stamped = OfficiaPdf.watermark(pdf,
+        WatermarkOptions.image(sealPng).imageWidthPt(120f));
+
+// 链式同样可用
+byte[] chained = OfficiaPdf.edit(pdf)
+        .watermark(WatermarkOptions.text("机密").tile(true), font)
+        .encryptAes256("u", "o")
+        .toBytes();
+```
+
+**全部选项**
+
+| 方法 | 含义 | 默认 |
+|---|---|---|
+| `text(String)` / `image(byte[])` | 文字水印 / 图片水印（二选一） | — |
+| `tile(boolean)` | 整页平铺 | false（页心单个） |
+| `tileGapRatio(float)` | 平铺间距系数，越大越稀疏，夹到 [1.0, 8.0] | 1.6 |
+| `fontSizePt(float)` | 字号 | 自动（平铺 1/40 页宽、单个 1/14） |
+| `imageWidthPt(float)` | 图片显示宽（高按原图比例） | 平铺 1/4、单个 1/3 页宽 |
+| `colorRgb(int)` | 颜色 0xRRGGBB | 0x808080 |
+| `opacity(float)` | 不透明度 | 0.15 |
+| `rotationDegrees(float)` | 旋转角 | -38 |
+| `behindText(boolean)` | 画在正文之下 | false（之上） |
+| `annotation(boolean)` | 走水印注解而非内容流 | false |
+
+**文字支持动态变量**，逐页替换：`{page}` `{pages}` `{date}` `{time}` `{datetime}`。
+
+> 🔴 **溯源水印别开 `annotation(true)`**。内容流里的水印与正文是同一层字节，去掉等同于重排页面；
+> 注解是独立对象，阅读器能隐藏、编辑器能删除。注解模式适合「草稿」「待审」这类**提示性**水印，
+> 它的好处是打印时按固定尺寸位置输出、不随纸张缩放。
+
+> ⚠️ **`behindText(true)` 要看文档**：画在正文下可读性更好，但原页面若有不透明底色
+>（整页填充的表格底纹、扫描件位图），水印会被完全盖住看不见。
+
+> ⚠️ 文字含中文却没传 `fontTtf` 时**直接报错**（不是静默变问号）——水印多是安全/合规措施，
+> 失效而不报警比报错危险得多。
 
 ## 四、加密
 
@@ -447,6 +504,7 @@ byte[] out = OfficiaPdf.edit(pdf)           // 加密文档用 edit(pdf, passwor
 
 ```java
 PdfEditor watermark(String text)                        PdfEditor watermark(String text, byte[] fontTtf)
+PdfEditor watermark(WatermarkOptions o)                 PdfEditor watermark(WatermarkOptions o, byte[] fontTtf)
 PdfEditor pageNumbers()                                 PdfEditor pageNumbers(String format)
 PdfEditor pageNumbers(String format, byte[] fontTtf)
 PdfEditor rotate(int degrees)
