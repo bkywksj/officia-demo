@@ -5,6 +5,9 @@ import plus.ruoyi.officia.barcode.OfficiaBarCode;
 import plus.ruoyi.officia.barcode.qr.QrEcc;
 import plus.ruoyi.officia.cells.OfficiaCells;
 import plus.ruoyi.officia.common.json.MiniJson;
+import plus.ruoyi.officia.editor.EditorDocument;
+import plus.ruoyi.officia.editor.EditorFormat;
+import plus.ruoyi.officia.editor.OfficiaEditor;
 import plus.ruoyi.officia.email.EmailMessage;
 import plus.ruoyi.officia.email.OfficiaEmail;
 import plus.ruoyi.officia.imaging.OfficiaImaging;
@@ -119,6 +122,7 @@ final class ApiRoutes {
         registerBarCode(r);
         registerEmail(r);
         registerOcr(r);
+        registerEditor(r);
         return r;
     }
 
@@ -274,6 +278,16 @@ final class ApiRoutes {
             }
             Http.json(ex, result(outName(q.get("id"), "pdf", "words.pdf"),
                 "application/pdf", pdf, t0).end());
+        });
+
+        // markdown → docx（语义写出：真段落真表格，可再被编辑器打开继续编辑）
+        r.add("/api/words/mdtodocx", (ex, q) -> {
+            byte[] md = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            byte[] docx = OfficiaWords.markdownToDocx(md);
+            Http.json(ex, result(outName(q.get("id"), "docx", "markdown.docx"),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                docx, t0).end());
         });
 
         // docx/doc → 一页一张图片（文档在线预览）。与 topdf 共用前段，只换输出后端
@@ -1012,6 +1026,147 @@ final class ApiRoutes {
     }
 
     // ==================== OCR ====================
+
+    /**
+     * 在线编辑（Officia.Editor）：文档 ⇄ officia-doc/1 JSON。
+     *
+     * <p>这一组端点是 P0 契约的可视化验收窗口：/open 看契约长什么样，
+     * /roundtrip 一次跑完「打开→保存→再打开」并给出保真度判定。</p>
+     */
+    private static void registerEditor(Router r) {
+        // docx/doc → officia-doc/1 JSON（交给浏览器端编辑器的那份数据）
+        r.add("/api/editor/open", (ex, q) -> {
+            byte[] src = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            EditorDocument doc = OfficiaEditor.open(src);
+            long ms = (System.nanoTime() - t0) / 1_000_000;
+            byte[] json = doc.getJson().getBytes(StandardCharsets.UTF_8);
+            // officia 侧的排版页数：把同一份 JSON 交给 officia 排一遍再数页。
+            // 编辑器面板的「检查」页拿它与前端页数比对——两端一致性是 W11 的核心承诺，
+            // 而承诺要看得见就必须有一个真数出来的数，不能只在单测里绿着。
+            int serverPages = 0;
+            try {
+                serverPages = OfficiaPdf.pageCount(OfficiaEditor.save(doc.getJson(), EditorFormat.PDF));
+            } catch (RuntimeException ignored) {
+                // 排不出来就如实报 0（前端会显示「未知」），不让一次页数统计毁掉整个打开流程
+                serverPages = 0;
+            }
+            Http.json(ex, result(outName(q.get("id"), "json", "editor.json"),
+                    "application/json", json, t0)
+                .put("sourceFormat", doc.getSourceFormat())
+                .put("blocks", doc.getBlockCount())
+                .put("jsonKb", json.length / 1024)
+                .put("pages", serverPages)
+                .put("ms", ms)
+                .put("hint", "这份 JSON 就是交给浏览器端 Canvas 编辑器的全部数据："
+                    + "内容 + 字体前进宽度。前端不需要再向服务端要任何东西即可渲染与编辑")
+                .end());
+        });
+
+        // JSON → docx / pdf（编辑器保存回来走的路径）
+        r.add("/api/editor/save", (ex, q) -> {
+            String json = new String(Http.body(ex), StandardCharsets.UTF_8);
+            String fmt = q.getOrDefault("format", "docx").toLowerCase(java.util.Locale.ROOT);
+            EditorFormat target = "pdf".equals(fmt) ? EditorFormat.PDF : EditorFormat.DOCX;
+            long t0 = System.nanoTime();
+            byte[] out = OfficiaEditor.save(json, target);
+            Http.json(ex, result("editor-saved." + fmt,
+                    target == EditorFormat.PDF ? "application/pdf"
+                        : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    out, t0).end());
+        });
+
+        // 一键保真度验收：open → save(docx) → 再 open，比两轮 JSON
+        r.add("/api/editor/roundtrip", (ex, q) -> {
+            byte[] src = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            EditorDocument first = OfficiaEditor.open(src);
+            byte[] saved = OfficiaEditor.save(first.getJson(), EditorFormat.DOCX);
+            EditorDocument second = OfficiaEditor.open(saved);
+            long ms = (System.nanoTime() - t0) / 1_000_000;
+
+            boolean same = first.getJson().equals(second.getJson());
+            Json j = Json.obj()
+                .put("lossless", same)
+                .put("verdict", same ? "无损：打开→保存→再打开，内容 JSON 逐字符一致"
+                    : "有差异：见 firstDiff，需查 DocModelJson 是否漏了字段")
+                .put("sourceFormat", first.getSourceFormat())
+                .put("blocksBefore", first.getBlockCount())
+                .put("blocksAfter", second.getBlockCount())
+                .put("jsonKb", first.getJson().length() / 1024)
+                .put("savedKb", saved.length / 1024)
+                .put("ms", ms);
+            if (!same) {
+                j.put("firstDiff", firstDiff(first.getJson(), second.getJson()));
+            }
+            // 产物一并入库，便于下载用 Word 打开人工核对
+            j.put("saved", store(outName(q.get("id"), "往返", "docx", "roundtrip.docx"),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                saved, t0).toJson());
+            Http.json(ex, j.end());
+        });
+
+        // ── 工作簿（Cells 编辑器）：xlsx ⇄ officia-workbook/1 ──
+
+        // xlsx → officia-workbook/1 JSON（交给浏览器端网格编辑器）
+        r.add("/api/editor/workbook/open", (ex, q) -> {
+            byte[] src = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            String json = OfficiaEditor.openWorkbook(src);
+            byte[] data = json.getBytes(StandardCharsets.UTF_8);
+            Http.json(ex, result(outName(q.get("id"), "json", "workbook.json"),
+                    "application/json", data, t0)
+                .put("sheets", countKey(json, "\"name\":"))
+                .put("cells", countKey(json, "\"r\":"))
+                .put("jsonKb", data.length / 1024)
+                .put("hint", "网格排版按列宽(字符数)+行高(磅)定尺寸，不做西文断行，"
+                    + "故这份契约不像 officia-doc/1 那样附带逐码位字形宽度")
+                .end());
+        });
+
+        // 公式重算：走 Officia.Cells 那 35 个函数的同一个引擎，与 xlsx→PDF 的数字必然一致
+        r.add("/api/editor/workbook/recalc", (ex, q) -> {
+            String json = new String(Http.body(ex), StandardCharsets.UTF_8);
+            long t0 = System.nanoTime();
+            String next = OfficiaEditor.recalc(json);
+            byte[] data = next.getBytes(StandardCharsets.UTF_8);
+            Http.json(ex, result("recalculated.json", "application/json", data, t0)
+                .put("hasErrors", next.contains("\"recalcErrors\""))
+                .end());
+        });
+
+        // JSON → xlsx（网格编辑器保存回来走的路径）
+        r.add("/api/editor/workbook/save", (ex, q) -> {
+            String json = new String(Http.body(ex), StandardCharsets.UTF_8);
+            long t0 = System.nanoTime();
+            byte[] xlsx = OfficiaEditor.saveWorkbook(json);
+            Http.json(ex, result("editor-saved.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                xlsx, t0).end());
+        });
+    }
+
+    /** 数一数 JSON 里某个键出现了几次——只为在界面上给个规模感，不做解析。 */
+    private static int countKey(String json, String key) {
+        int n = 0;
+        for (int i = json.indexOf(key); i >= 0; i = json.indexOf(key, i + key.length())) {
+            n++;
+        }
+        return n;
+    }
+
+    /** 定位两份 JSON 的首个差异并给出上下文，便于在网页上直接看出丢了什么。 */
+    private static String firstDiff(String a, String b) {
+        int n = Math.min(a.length(), b.length());
+        for (int i = 0; i < n; i++) {
+            if (a.charAt(i) != b.charAt(i)) {
+                int from = Math.max(0, i - 50), to = Math.min(n, i + 50);
+                return "第 " + i + " 字符起: [前] ..." + a.substring(from, to)
+                    + "... | [后] ..." + b.substring(from, to) + "...";
+            }
+        }
+        return "长度不同 " + a.length() + " vs " + b.length();
+    }
 
     private static void registerOcr(Router r) {
         // 图片 → 文字。除整段文本外一并返回逐行的框与置信度：

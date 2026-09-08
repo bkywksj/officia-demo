@@ -16,6 +16,14 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
  .dropzone{border:2px dashed #CBD5E1;transition:all .2s}.dropzone:hover{border-color:#1E40AF;background:rgb(30 64 175/.03)}
  .dropzone.over{border-color:#1E40AF;background:rgb(30 64 175/.06)}
  .spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+ /* 编辑器工具栏按钮。写成普通 class 而不是 @apply：Tailwind 的 play CDN 不处理
+    普通 <style> 里的 @apply，整条会被静默丢弃（本项目踩过，见任务文档问题 1） */
+ .edbtn{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;
+        padding:0 6px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;cursor:pointer;
+        font-size:13px;color:#334155;transition:all .15s}
+ .edbtn:hover{border-color:#1E40AF;color:#1E40AF}
+ /* 编辑器画布不要有文本选择的蓝框——选区由编辑器自己画 */
+ #edHost{user-select:none;-webkit-user-select:none}
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -39,6 +47,9 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
     <a data-p="img" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="image" class="w-4 h-4 mr-3"></i>Imaging · 图像</a>
     <a data-p="bar" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="scan-barcode" class="w-4 h-4 mr-3"></i>BarCode · 条码</a>
     <a data-p="ocr" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="scan-text" class="w-4 h-4 mr-3"></i>OCR · 图片/扫描件</a>
+    <div class="px-5 py-1.5 mt-2 text-xs font-medium text-slate-400">在线编辑</div>
+    <a data-p="editor" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="pencil-ruler" class="w-4 h-4 mr-3"></i>Editor · Words 编辑</a>
+    <a data-p="editorx" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="table-2" class="w-4 h-4 mr-3"></i>Editor · Cells 网格</a>
     <div class="px-5 py-1.5 mt-2 text-xs font-medium text-slate-400">商业授权</div>
     <a data-p="lic" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="shield-check" class="w-4 h-4 mr-3"></i>授权门控与对比</a>
     <a data-p="batch" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="list-checks" class="w-4 h-4 mr-3"></i>批量回归</a>
@@ -533,6 +544,129 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
   </section>
 
   <!-- 批量回归 -->
+  <section id="editor" class="panel">
+    <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
+      <div class="text-sm text-slate-600 mb-3">
+        上传 docx/doc → 服务端出 <code class="text-xs bg-slate-100 px-1 rounded">officia-doc/1</code> JSON
+        → <b>浏览器端 Canvas 自行排版并真编辑</b>（打字 / 撤销 / 加粗 / 插表格）→ 存回 docx / PDF。
+        整条链路不经服务端出图，编辑期一个网络请求都不发。
+      </div>
+      <div class="flex items-center gap-3 flex-wrap">
+        <input type="file" id="edFile" class="hidden" accept=".docx,.doc" onchange="edUpload(this.files[0])">
+    <!-- 「插入 → 图片」用：库不弹文件框，由宿主选完把字节交回去 -->
+    <input type="file" id="edImgFile" class="hidden" accept="image/*" onchange="edInsertImage(this.files[0])">
+        <button onclick="pick('edFile')" class="bg-primary text-white px-4 py-2 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center gap-1.5"><i data-lucide="upload" class="w-4 h-4"></i>选择文档</button>
+        <button onclick="edSample()" class="border border-slate-300 px-4 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer flex items-center gap-1.5"><i data-lucide="file-plus" class="w-4 h-4"></i>用内置样本</button>
+        <label class="flex items-center gap-1.5 text-sm text-slate-600">缩放
+          <select id="edZoom" onchange="edSetZoom(parseFloat(this.value)||1)" class="border border-slate-300 rounded px-2 py-1 text-sm cursor-pointer outline-none">
+            <option value="1">100%</option><option value="0.75">75%</option><option value="1.5">150%</option>
+          </select>
+        </label>
+        <span id="edStat" class="text-xs text-slate-400 ml-auto">尚未加载</span>
+      </div>
+    </div>
+
+    <!-- 功能区：由 OfficiaEditor.mountRibbon 按能力清单渲染（78 个控件、六个标签、三态齐全）。
+         三态、分组折叠、控件 DOM 都来自 officia 仓的设计原型，demo 只负责接命令与导出。 -->
+    <div id="edRibbon" class="mb-4" style="display:none"></div>
+    <div id="edBar" class="flex items-center gap-3 mb-4 text-xs text-slate-500" style="display:none">
+      <span class="inline-flex items-center gap-1"><i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5"></i>
+        琥珀 = 能改但存回 docx 会降级；置灰 = 模型层没有，点了只提示不动文档</span>
+      <span id="edDirty" class="text-xs text-slate-400 ml-auto"></span>
+    </div>
+
+    <div class="grid grid-cols-4 gap-4 mb-4" id="edCards" style="display:none">
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="text-xs text-slate-400 mb-1">前端排版页数</div>
+        <div class="text-2xl font-semibold" id="edPagesJs">-</div>
+        <div class="text-xs text-slate-400 mt-1" id="edPagesCmp"></div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="text-xs text-slate-400 mb-1">字体度量命中</div>
+        <div class="text-2xl font-semibold" id="edMiss">-</div>
+        <div class="text-xs text-slate-400 mt-1">misses &gt; 0 说明有码点没度量，会退到兜底宽度</div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="text-xs text-slate-400 mb-1">实际渲染 / 总页</div>
+        <div class="text-2xl font-semibold" id="edRendered">-</div>
+        <div class="text-xs text-slate-400 mt-1">虚拟滚动：只画可视范围</div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="text-xs text-slate-400 mb-1">编辑器版本</div>
+        <div class="text-2xl font-semibold" id="edVer">-</div>
+        <div class="text-xs text-slate-400 mt-1" id="edVerCmp">与服务端 jar 版本比对</div>
+      </div>
+    </div>
+
+    <!-- 工作区：画布 + 右侧属性面板。外壳渲染在这块面板之内，不做全屏独占 -->
+    <div class="flex gap-4 items-start">
+      <div id="edHost" class="bg-slate-100 rounded-lg border border-slate-200 p-6 overflow-auto flex-1 min-w-0"
+           style="max-height:70vh">
+        <div class="text-center text-slate-400 text-sm py-12">选择一份 docx 开始</div>
+      </div>
+      <!-- 右侧属性面板：段落 / 表格 / 页面 / 检查（DESIGN.md §6.4） -->
+      <div id="edPanel" class="w-72 shrink-0" style="display:none;height:70vh"></div>
+    </div>
+    <!-- 底部状态栏：页码 / 字数 / 段落·行·列 / 语言 / 缩放滑杆 -->
+    <div id="edStatus" class="mt-3" style="display:none"></div>
+    <div id="edOut" class="mt-4"></div>
+  </section>
+
+  <section id="editorx" class="panel">
+    <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4">
+      <div class="text-sm text-slate-600 mb-3">
+        上传 xlsx → 服务端出 <code class="text-xs bg-slate-100 px-1 rounded">officia-workbook/1</code> JSON
+        → <b>浏览器端 Canvas 网格</b>（公式栏 / 多 Sheet / 拖列宽）。改完公式点「重算」，
+        走的是 <b>Officia.Cells 那 35 个函数的同一个引擎</b>——编辑器里的数字与 xlsx→PDF 算出的必然一致。
+      </div>
+      <div class="flex items-center gap-3 flex-wrap">
+        <input type="file" id="exFile" class="hidden" accept=".xlsx" onchange="exUpload(this.files[0])">
+    <!-- 「数据 → 导入 CSV」用 -->
+    <input type="file" id="exCsvFile" class="hidden" accept=".csv" onchange="exImportCsv(this.files[0])">
+        <button onclick="pick('exFile')" class="bg-primary text-white px-4 py-2 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center gap-1.5"><i data-lucide="upload" class="w-4 h-4"></i>选择 xlsx</button>
+        <button onclick="exSample()" class="border border-slate-300 px-4 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer flex items-center gap-1.5"><i data-lucide="file-plus" class="w-4 h-4"></i>用内置样本</button>
+        <span id="exStat" class="text-xs text-slate-400 ml-auto">尚未加载</span>
+      </div>
+    </div>
+
+    <!-- 功能区：67 个控件，与 Words 侧同一套渲染与三态，只是标签集不同（公式 / 数据） -->
+    <div id="exRibbon" class="mb-4" style="display:none"></div>
+    <div id="exBar" class="flex items-center gap-3 mb-4 text-xs text-slate-500" style="display:none">
+      <span class="inline-flex items-center gap-1"><i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5"></i>
+        置灰 = 工作簿模型或写侧没有这个东西；先在网格里选中区域，命令都作用于选区</span>
+      <span id="exInfo" class="text-xs text-slate-400 ml-auto"></span>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4 mb-4" id="exCards" style="display:none">
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="text-xs text-slate-400 mb-1">工作表 / 单元格</div>
+        <div class="text-2xl font-semibold" id="exScale">-</div>
+        <div class="text-xs text-slate-400 mt-1">JSON 规模</div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="text-xs text-slate-400 mb-1">本屏绘制格数</div>
+        <div class="text-2xl font-semibold" id="exPainted">-</div>
+        <div class="text-xs text-slate-400 mt-1">虚拟滚动：只与视口相关，与表大小无关</div>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 p-4">
+        <div class="text-xs text-slate-400 mb-1">最近一次重算</div>
+        <div class="text-2xl font-semibold" id="exRecalcMs">-</div>
+        <div class="text-xs text-slate-400 mt-1" id="exRecalcNote">走服务端 35 函数引擎</div>
+      </div>
+    </div>
+
+    <div class="flex gap-4 items-start">
+      <div id="exHost" class="bg-white rounded-lg border border-slate-200 flex-1 min-w-0" style="height:60vh">
+        <div class="text-center text-slate-400 text-sm py-12">选择一份 xlsx 开始</div>
+      </div>
+      <!-- 右侧属性面板：单元格 / 工作表 / 页面 / 检查 -->
+      <div id="exPanel" class="w-72 shrink-0" style="display:none;height:60vh"></div>
+    </div>
+    <!-- 底部状态栏：选区引用 / 求和 / 平均 / 计数 / 工作表 -->
+    <div id="exStatus" class="mt-3" style="display:none"></div>
+    <div id="exOut" class="mt-4"></div>
+  </section>
+
   <section id="batch" class="panel">
     <div class="bg-white rounded-lg border border-slate-200 p-4 mb-4 flex items-center gap-4">
       <div class="text-sm text-slate-600">用 officia 自造输入跑一遍全能力，并对结构性事实断言（%PDF- 头 / 页数 / PNG 魔数 / 往返一致）</div>
@@ -549,7 +683,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
 
 <script>
 const T={dash:'能力总览',words:'Words · DOC/DOCX',tpl:'模板填充 · 邮件合并',cells:'Cells · XLSX/CSV',slides:'Slides · PPTX',
- email:'Email · EML',pdf:'PDF 工具箱',img:'Imaging · 图像',bar:'BarCode · 条码',ocr:'OCR · 图片/扫描件',lic:'授权门控与对比',batch:'批量回归'};
+ email:'Email · EML',pdf:'PDF 工具箱',img:'Imaging · 图像',bar:'BarCode · 条码',ocr:'OCR · 图片/扫描件',lic:'授权门控与对比',batch:'批量回归',editor:'Editor · Words 编辑',editorx:'Editor · Cells 网格'};
 const S={};              // 各面板选中的文件 id
 let tasks=[];            // 最近任务
 let ecc='M';
@@ -570,6 +704,543 @@ function toast(msg,ok=true){
   setTimeout(()=>d.remove(),3200);
 }
 function pick(id){document.getElementById(id).click()}
+
+// ── 在线编辑（Officia.Editor）：服务端出 JSON → 浏览器端 Canvas 排版 + 真编辑 ──
+let edView=null, edJson=null, edSrvPages=0, edDirty=false, edRibbon=null, edName='', edShell=null;
+// 🔴 缩放只有这一个真相源。此前它存在 <select> 的 value 里，而状态栏滑杆是连续的
+// （50%~200%）——滑到 140% 时下拉框没有这一档，value 变成空串，parseFloat 出 NaN，
+// 于是回落到 1，画面弹回 100%。两处状态各存一份，必然在某个取值上分家。
+let edZoomLevel=1;
+let exEditor=null, exJson=null, exRibbon=null, exName='', exShell=null;
+// Cells 的重算读数：服务端算出来的，不在工作簿里，交给「检查」页当 probe
+let exProbe={};
+// Cells 侧的纯视图开关：只影响渲染参数，不写工作簿（与功能区「视图」页的徽标口径一致）
+const exView={gridLine:true,header:true,formulaBar:true};
+
+async function edEnsureLib(){
+  if(window.OfficiaEditor)return true;
+  // 前端产物随 officia-editor.jar 分发在 META-INF/resources/ 下，
+  // DemoServer 显式映射了 /officia-editor/* → 这一路径（Servlet 容器会自动做这件事）
+  await new Promise((res,rej)=>{
+    const t=document.createElement('script');
+    t.src='/officia-editor/officia-editor.js';
+    t.onload=res; t.onerror=()=>rej(new Error('取不到 /officia-editor/officia-editor.js'));
+    document.head.appendChild(t);
+  });
+  return !!window.OfficiaEditor;
+}
+
+// ════════════════════════ Words 编辑器 ════════════════════════
+
+async function edUpload(f){
+  if(!f)return;
+  try{
+    const up=await api('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:f});
+    edName=f.name;
+    await edLoad(up.id);
+  }catch(e){toast(e.message,false)}
+}
+
+async function edSample(){
+  try{
+    // 用 officia 自己的 markdownToDocx 造一份有结构的样本（标题/表格/列表/加粗）
+    const md=['# 2026 年度设备采购合同','',
+      '**甲方（采购方）**：华信科技股份有限公司','',
+      '根据《中华人民共和国民法典》及相关法律法规，甲乙双方在平等、自愿、公平、诚实信用的基础上，就甲方向乙方采购工业检测设备事宜，经友好协商达成如下协议。','',
+      '## 第一条 标的与数量','',
+      '| 序号 | 设备名称 | 型号 | 数量 |','|---|---|---|---|',
+      '| 1 | 三坐标测量机 | ZEISS CONTURA 9/12/8 | 2 |',
+      '| 2 | 工业 CT 扫描仪 | GE phoenix v tome x m | 1 |','',
+      '## 第二条 交付与验收','',
+      '乙方应于合同生效后 **45 个工作日**内将全部设备运抵甲方指定地点。设备到达后，甲方应在 7 个工作日内组织验收。'
+    ].join('\n');
+    const up=await api('/api/upload?name=sample.md',{method:'POST',body:new Blob([md])});
+    const docx=await api('/api/words/mdtodocx?id='+up.id,{method:'POST'}).catch(()=>null);
+    if(!docx){toast('demo 未暴露 markdown→docx，请手动选择一份 docx',false);return}
+    edName='内置样本.docx';
+    await edLoad(docx.id);
+  }catch(e){toast(e.message,false)}
+}
+
+async function edLoad(id){
+  document.getElementById('edStat').textContent='加载中…';
+  try{
+    if(!await edEnsureLib())throw new Error('前端库加载失败');
+    const j=await api('/api/editor/open?id='+id,{method:'POST'});
+    edSrvPages=j.pages||0;
+    const r=await fetch('/api/result/'+j.id+'?download=1');
+    edJson=await r.json();
+    edDirty=false;
+    document.getElementById('edCards').style.display='';
+    document.getElementById('edBar').style.display='';
+    document.getElementById('edOut').innerHTML='';
+    edRender();          // edRender 内部已挂外壳
+    edMountRibbon();
+    lucide.createIcons();
+    toast('已加载：'+j.blocks+' 个块 · JSON '+j.jsonKb+' KB');
+  }catch(e){
+    document.getElementById('edStat').textContent='加载失败';
+    toast(e.message,false);
+  }
+}
+
+function edRender(){
+  if(!edJson||!window.OfficiaEditor)return;
+  const host=document.getElementById('edHost');
+  const zoom=edZoomLevel;
+  // 先撤外壳再换视图：mountEditable 在构造期就会播报一次初始状态，
+  // 那一刻旧外壳还指着已销毁的旧视图，让它去回读等于读一份陈的
+  if(edShell){edShell.destroy();edShell=null}
+  if(edView&&edView.destroy)edView.destroy();
+  host.textContent='';
+  const t0=performance.now();
+  // mountEditable = 可编辑视图；mount 是只读的那个
+  edView=OfficiaEditor.mountEditable(host,edJson,{zoom,onChange:edOnChange});
+  const ms=(performance.now()-t0).toFixed(0);
+  edView.focus();
+
+  document.getElementById('edPagesJs').textContent=edView.pageCount;
+  document.getElementById('edMiss').textContent=edView.fontMisses===0?'全部命中':edView.fontMisses+' 处缺失';
+  document.getElementById('edRendered').textContent=edView.renderedCount+' / '+edView.pageCount;
+  document.getElementById('edStat').textContent='前端排版 '+ms+' ms · 缩放 '+(zoom*100).toFixed(0)+'%'
+    +' · 点一下页面即可打字';
+  document.getElementById('edVer').textContent=OfficiaEditor.version;
+  // 视图换了，外壳跟着重挂（上面已把旧的撤掉）
+  edMountShell();
+  const cmp=document.getElementById('edPagesCmp');
+  cmp.textContent=edSrvPages?('服务端排版 '+edSrvPages+' 页 · '+(edSrvPages===edView.pageCount?'两端一致':'两端不一致')):'';
+  cmp.className='text-xs mt-1 '+(edSrvPages===edView.pageCount?'text-emerald-600':'text-amber-600');
+}
+
+/** 编辑器每次内容/选区变化都回调这里，据此点亮工具栏。 */
+function edOnChange(st){
+  if(edRibbon){
+    // 选区样式回灌到功能区：'on' 全选中才点亮，'mixed' 不点亮（选区里两种都有）
+    const map={加粗:st.style&&st.style.bold,斜体:st.style&&st.style.italic,
+               下划线:st.style&&st.style.underline,删除线:st.style&&st.style.strike};
+    for(const cap in map)edRibbon.setActive(cap,map[cap]==='on');
+    // 对齐是单选组，判定必须与右侧属性面板**同一套**：精确匹配 st.paragraph.align，
+    // 未显式设置时四个都不亮（见 shell/mount.ts 的 paint：data-value === value）。
+    // 不回灌的后果不是「少个高亮」而是「原型静态高亮的两端对齐永远清不掉」——
+    // 面板显示居中、工具栏显示两端，两处读数当场打架。
+    const al=st.paragraph&&st.paragraph.align;
+    for(const [cap,v] of [['左对齐','LEFT'],['居中','CENTER'],['右对齐','RIGHT'],['两端对齐','JUSTIFY']]){
+      edRibbon.setActive(cap,al===v);
+    }
+    for(const [cap,can] of [['撤销',st.canUndo],['重做',st.canRedo]]){
+      const b=edRibbon.control(cap);
+      if(b)b.style.opacity=can?'1':'.35';
+    }
+    // 多分节文档改不了块序列，插入类命令一律置灰（库侧报 canEditStructure=false）
+    for(const cap of ['表格','分页符','分栏符','分节符']){
+      const b=edRibbon.control(cap);
+      if(b){b.style.opacity=st.canEditStructure?'1':'.35';
+        b.title=st.canEditStructure?b.title:'多分节文档暂不支持插入块（改动传导不回各节）';}
+    }
+  }
+  document.getElementById('edPagesJs').textContent=st.pageCount;
+  // 用 st.renderedCount 而不是 edView.renderedCount：构造期就会播报一次初始状态，
+  // 那时 edView 的赋值还没完成（还是 null），摸视图对象必空指针
+  document.getElementById('edRendered').textContent=st.renderedCount+' / '+st.pageCount;
+  // 外壳按最新状态整体回读一遍：属性面板逐字段、状态栏逐格
+  if(edShell)edShell.refresh(edProbe());
+  const d=document.getElementById('edDirty');
+  if(st.canUndo)edDirty=true;
+  d.textContent=(edDirty?'已修改（未保存）':'')+(st.editable?'':' · 光标处不可编辑（表格内 / 正文之外）');
+  d.className='text-xs ml-auto '+(st.editable?'text-amber-600':'text-slate-400');
+}
+
+// ── 功能区：78 个控件按能力清单渲染，命令派发交给库里的 runWordsCommand ──
+// 三态在库里就硬化成了行为：置灰点不动、琥珀只提示，两者都不会走到这里。
+function edMountRibbon(){
+  const host=document.getElementById('edRibbon');
+  if(edRibbon){edRibbon.destroy();host.textContent=''}
+  edRibbon=OfficiaEditor.mountRibbon(host,{
+    surface:'words',
+    onCommand:e=>edRibbonCommand(e),
+    backstage:edBackstage(),
+  });
+  // 标签行右侧塞两个快捷导出：后台视图里也有，但存盘是高频动作，值得放在手边
+  const extra=host.querySelector('[data-ofr-extra]');
+  if(extra){
+    extra.innerHTML=
+      '<button onclick="edSave(\'docx\')" class="bg-primary text-white px-3 py-1.5 rounded text-xs hover:opacity-90 cursor-pointer">存为 docx</button>'+
+      '<button onclick="edSave(\'pdf\')" class="border border-slate-300 px-3 py-1.5 rounded text-xs hover:border-primary hover:text-primary cursor-pointer">存为 PDF</button>';
+  }
+  host.style.display='';
+  // 🔴 刚挂出来的功能区带着原型 HTML 里写死的高亮（加粗、两端对齐各一个），
+  // 而 edOnChange 只在**之后**的变化里才回灌 —— 不在这儿主动推一次当前状态，
+  // 首屏就会出现「工具栏亮两端对齐、右侧面板写左对齐」的自相矛盾。
+  // 每重挂一次就要回灌一次，所以放函数尾部而不是放初始化里。
+  if(edView)edOnChange(edView.state());
+}
+
+// ── 外壳：右侧属性面板 + 底部状态栏（DESIGN.md §6.1 的 UI 壳里工具栏之外的两件）──
+// 值全部从 IR 现算：面板自己不存任何一份，所以「光标移到别的段落还留着上一段的值」
+// 这种失真在结构上就不可能发生。
+function edMountShell(){
+  const panelHost=document.getElementById('edPanel');
+  const statusHost=document.getElementById('edStatus');
+  if(edShell){edShell.destroy();}
+  panelHost.textContent='';statusHost.textContent='';
+  edShell=OfficiaEditor.mountWordsShell(panelHost,statusHost,{
+    view:edView,
+    probe:edProbe(),
+    // 缩放会重挂视图与外壳；把当前倍率交回去，滑杆才不会每次弹回 100%
+    zoom:edZoomLevel,
+    onZoom:edSetZoom,
+    onChange:()=>{edDirty=true;},
+  });
+  panelHost.style.display='';statusHost.style.display='';
+}
+
+/** 改缩放：写进唯一的真相源再重排。下拉框没有对应档位时留空，不去伪造一个。 */
+function edSetZoom(z){
+  edZoomLevel=Math.max(0.25,Math.min(4,z))||1;
+  const sel=document.getElementById('edZoom');
+  sel.value=[...sel.options].some(o=>parseFloat(o.value)===edZoomLevel)?String(edZoomLevel):'';
+  edRender();
+}
+
+/** 「另一端」才知道的读数：服务端排版页数、前端字体度量缺口。 */
+function edProbe(){
+  return {serverPages:edSrvPages||0, fontMisses:edView?edView.fontMisses:0};
+}
+
+/** 「文件」后台视图的内容，每次挂载时按当前文档算一遍。 */
+function edBackstage(){
+  const kb=edJson?(JSON.stringify(edJson).length/1024).toFixed(1):'0';
+  return {
+    title:edName||'未命名文档.docx',
+    subtitle:'由 OfficiaEditor.save(json, DOCX) 写回；页数与 toPdf 同一套排版',
+    sections:['信息','导出'],
+    info:[
+      ['前端排版页数',String(edView?edView.pageCount:0)],
+      // 服务端没回页数时显示破折号：摆一个 0 会让人以为服务端排出了零页
+      ['服务端页数',edSrvPages?String(edSrvPages):'—'],
+      ['块数',String((edJson&&edJson.blocks&&edJson.blocks.length)||0)],
+      ['JSON 大小',kb+' KB'],
+      ['schema','officia-doc/1'],
+    ],
+    exports:[
+      {label:'DOCX',note:'DocxWriter 语义写出',onPick:()=>edSave('docx')},
+      {label:'PDF',note:'LayoutEngine → PdfRenderer',onPick:()=>edSave('pdf')},
+      {label:'JSON',note:'officia-doc/1 契约',onPick:()=>edDownloadJson()},
+    ],
+  };
+}
+
+function edDownloadJson(){
+  const blob=new Blob([edView?edView.json():'{}'],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=(edName||'document')+'.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast('已下载 officia-doc/1 JSON');
+}
+
+/** 一个正常态控件被点了：先交给库里的命令表，库不接的（视图类 / 要选文件）由这里兜。 */
+function edRibbonCommand(e){
+  if(!edView){toast('还没加载文档',false);return}
+  // 一条命令抛了不该把整页带崩：库里抛出来的都是"这一步做不了"的说明，
+  // 原样念给用户听，比让页面变成一个不响应的死壳有用
+  let done=false;
+  try{done=OfficiaEditor.runWordsCommand(edView,e)}
+  catch(err){toast(e.cap+'：'+(err&&err.message||err),false);return}
+  if(done){
+    edView.focus();
+    return;
+  }
+  // 库明说不归它管的那几个（HOST_CAPS）：视图开关与要弹文件框的
+  if(e.cap==='缩放'){
+    edSetZoom({'100%':1,'75%':0.75,'150%':1.5,'页宽':1}[e.value]||1);
+    return;
+  }
+  if(e.cap==='页面视图'){toast('已是页面视图（CanvasRenderer）');return}
+  if(e.cap==='图片'){document.getElementById('edImgFile').click();return}
+  const why=OfficiaEditor.WORDS_UNWIRED.get(e.cap);
+  toast(why?(e.cap+'：'+why):(e.cap+'：这一步没有改动文档（可能光标不在可编辑处，或选项无需变更）'),false);
+}
+
+/** 「插入 → 图片」：库不弹文件框，宿主选完把字节交回去。 */
+async function edInsertImage(f){
+  if(!f||!edView)return;
+  try{
+    const buf=new Uint8Array(await f.arrayBuffer());
+    let bin='';for(const b of buf)bin+=String.fromCharCode(b);
+    const fmt=(f.type||'image/png').replace('image/','');
+    edView.apply(r=>new OfficiaEditor.InsertImage(r.to,{format:fmt,data:btoa(bin)},{w:200}));
+    edView.focus();
+    toast('已插入图片 '+f.name);
+  }catch(err){toast('插入图片失败：'+err.message,false)}
+}
+
+async function edSave(fmt){
+  if(!edView){toast('还没加载文档',false);return}
+  try{
+    const t0=performance.now();
+    const j=await api('/api/editor/save?format='+fmt,{method:'POST',body:edView.json()});
+    const ms=(performance.now()-t0).toFixed(0);
+    document.getElementById('edOut').innerHTML=
+      '<div class="bg-white rounded-lg border border-slate-200 p-4 flex items-center gap-4">'+
+      '<i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>'+
+      '<div class="text-sm"><b>'+j.name+'</b> · '+(j.size/1024).toFixed(1)+' KB'+
+      (j.pages?(' · '+j.pages+' 页'):'')+' · 服务端 '+(j.ms||0)+' ms / 往返 '+ms+' ms</div>'+
+      '<a href="/api/result/'+j.id+'?download=1" class="ml-auto border border-slate-300 px-3 py-1.5 rounded text-xs hover:border-primary hover:text-primary cursor-pointer">下载</a></div>';
+    lucide.createIcons();
+    edDirty=false;
+    document.getElementById('edDirty').textContent='已保存';
+    toast('已导出 '+fmt+'：'+(j.size/1024).toFixed(1)+' KB');
+  }catch(e){toast(e.message,false)}
+}
+
+// ════════════════════════ Cells 网格编辑器 ════════════════════════
+
+async function exUpload(f){
+  if(!f)return;
+  try{
+    const up=await api('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:f});
+    exName=f.name;
+    await exLoad(up.id);
+  }catch(e){toast(e.message,false)}
+}
+
+async function exSample(){
+  try{
+    // officia 没有 csv→xlsx 的公开门面，所以样本这样造：前端拼一份 officia-workbook/1 JSON
+    // → saveWorkbook 出 xlsx → 再 openWorkbook 读回来。顺带把这两个门面的往返走通一遍，
+    // 也证明网格拿到的确实是"从真 xlsx 解出来的"，不是前端自己捏的那份
+    const cells=[];
+    const head=['季度','营收','成本','毛利','毛利率'];
+    head.forEach((v,c)=>cells.push({r:0,c,t:'STRING',s:v}));
+    const data=[['Q1',1250.5,820],['Q2',2400,1510],['Q3',1890.25,1120],['Q4',3100,1980]];
+    data.forEach((row,i)=>{
+      const r=i+1;
+      cells.push({r,c:0,t:'STRING',s:row[0]});
+      cells.push({r,c:1,t:'NUMBER',n:row[1]});
+      cells.push({r,c:2,t:'NUMBER',n:row[2]});
+      cells.push({r,c:3,f:'B'+(r+1)+'-C'+(r+1)});
+      cells.push({r,c:4,f:'D'+(r+1)+'/B'+(r+1)});
+    });
+    cells.push({r:5,c:0,t:'STRING',s:'合计'});
+    cells.push({r:5,c:1,f:'SUM(B2:B5)'});
+    cells.push({r:5,c:2,f:'SUM(C2:C5)'});
+    cells.push({r:5,c:3,f:'SUM(D2:D5)'});
+    cells.push({r:5,c:4,f:'D6/B6'});
+    const wb={schema:'officia-workbook/1',styles:[{}],sheets:[{name:'季度汇总',cells}]};
+    const saved=await api('/api/editor/workbook/save',{method:'POST',body:JSON.stringify(wb)});
+    exName='内置样本.xlsx';
+    await exLoad(saved.id);
+  }catch(e){toast(e.message,false)}
+}
+
+async function exLoad(id){
+  document.getElementById('exStat').textContent='加载中…';
+  try{
+    if(!await edEnsureLib())throw new Error('前端库加载失败');
+    const j=await api('/api/editor/workbook/open?id='+id,{method:'POST'});
+    const r=await fetch('/api/result/'+j.id+'?download=1');
+    exJson=await r.json();
+    const host=document.getElementById('exHost');
+    if(exEditor&&exEditor.destroy)exEditor.destroy();
+    host.textContent='';
+    const t0=performance.now();
+    exEditor=OfficiaEditor.Cells.mountWorkbook(host,exJson);
+    const ms=(performance.now()-t0).toFixed(0);
+
+    document.getElementById('exCards').style.display='';
+    document.getElementById('exBar').style.display='';
+    document.getElementById('exOut').innerHTML='';
+    exMountRibbon();
+    exMountShell();
+    document.getElementById('exScale').textContent=j.sheets+' / '+j.cells;
+    document.getElementById('exPainted').textContent=exEditor.paintedCellCount;
+    document.getElementById('exStat').textContent='网格装载 '+ms+' ms · 点格子选中，在公式栏输入后回车提交';
+    lucide.createIcons();
+    toast('已加载工作簿：'+j.sheets+' 张表 · JSON '+j.jsonKb+' KB');
+  }catch(e){
+    document.getElementById('exStat').textContent='加载失败';
+    toast(e.message,false);
+  }
+}
+
+// ── Cells 功能区：67 个控件，命令交给 runCellsCommand，视图开关留给这里 ──
+function exMountRibbon(){
+  const host=document.getElementById('exRibbon');
+  if(exRibbon){exRibbon.destroy();host.textContent=''}
+  exRibbon=OfficiaEditor.mountRibbon(host,{
+    surface:'cells',
+    onCommand:e=>exRibbonCommand(e),
+    backstage:exBackstage(),
+  });
+  const extra=host.querySelector('[data-ofr-extra]');
+  if(extra){
+    extra.innerHTML=
+      '<button onclick="exSave()" class="bg-primary text-white px-3 py-1.5 rounded text-xs hover:opacity-90 cursor-pointer">存为 xlsx</button>';
+  }
+  host.style.display='';
+}
+
+function exMountShell(){
+  const panelHost=document.getElementById('exPanel');
+  const statusHost=document.getElementById('exStatus');
+  if(exShell){exShell.destroy();}
+  panelHost.textContent='';statusHost.textContent='';
+  exShell=OfficiaEditor.mountCellsShell(panelHost,statusHost,{
+    editor:exEditor, probe:exProbe,
+    onChange:()=>{document.getElementById('exPainted').textContent=exEditor.paintedCellCount;},
+  });
+  panelHost.style.display='';statusHost.style.display='';
+  // 网格的选区变化没有回调，靠点击后补一次刷新——状态栏的求和/计数才跟得上选区
+  document.getElementById('exHost').addEventListener('mouseup',()=>exShell&&exShell.refresh(exProbe));
+  document.getElementById('exHost').addEventListener('keyup',()=>exShell&&exShell.refresh(exProbe));
+}
+
+function exBackstage(){
+  const wb=exEditor?exEditor.view.wb:null;
+  const cells=wb?wb.sheets.reduce((n,s)=>n+((s.cells&&s.cells.length)||0),0):0;
+  return {
+    title:exName||'未命名工作簿.xlsx',
+    subtitle:'由 OfficiaEditor.saveWorkbook 写回；公式走服务端那 35 个函数的同一个引擎',
+    sections:['信息','导出'],
+    info:[
+      ['工作表',String(wb?wb.sheets.length:0)],
+      ['单元格',String(cells)],
+      ['本屏绘制',String(exEditor?exEditor.paintedCellCount:0)],
+      ['schema','officia-workbook/1'],
+    ],
+    exports:[
+      {label:'XLSX',note:'XlsxWriter 写出',onPick:()=>exSave()},
+      {label:'重算后 XLSX',note:'先跑一遍 35 函数引擎',onPick:()=>exRecalc().then(()=>exSave())},
+    ],
+  };
+}
+
+function exRibbonCommand(e){
+  if(!exEditor){toast('还没加载工作簿',false);return}
+  const info=document.getElementById('exInfo');
+  let done=false;
+  try{done=OfficiaEditor.runCellsCommand(exEditor,e)}
+  catch(err){toast(e.cap+'：'+(err&&err.message||err),false);return}
+  if(done){
+    info.textContent=e.cap+'：已应用到选区 '+exRefText();
+    if(exShell)exShell.refresh(exProbe);
+    return;
+  }
+  // 视图开关与要服务端往返的那几个（CELLS_HOST_CAPS）
+  if(e.cap==='立即重算'){exRecalc();return}
+  if(e.cap==='错误检查'){exCheckErrors();return}
+  if(e.cap==='网格线'){exView.gridLine=(e.value!=='false');exRepaint();return}
+  if(e.cap==='行列标题'){exView.header=(e.value!=='false');exRepaint();return}
+  if(e.cap==='编辑栏'){exView.formulaBar=(e.value!=='false');exToggleFormulaBar();return}
+  if(e.cap==='普通'){toast('已是普通视图（paintGrid）');return}
+  if(e.cap==='导入 CSV'){document.getElementById('exCsvFile').click();return}
+  const why=OfficiaEditor.CELLS_UNWIRED.get(e.cap);
+  info.textContent=why?(e.cap+'：'+why):(e.cap+'：这一步没有改动工作簿（选区不满足前提，或值无需变更）');
+}
+
+/** 当前选区的 A1 引用，供状态条回显。 */
+function exRefText(){
+  const s=exEditor.view.selection;
+  const col=n=>{let x='',i=n;do{x=String.fromCharCode(65+i%26)+x;i=Math.floor(i/26)-1}while(i>=0);return x};
+  const a=col(Math.min(s.anchorCol,s.focusCol))+(Math.min(s.anchorRow,s.focusRow)+1);
+  const b=col(Math.max(s.anchorCol,s.focusCol))+(Math.max(s.anchorRow,s.focusRow)+1);
+  return a===b?a:(a+':'+b);
+}
+
+/** 视图开关只改渲染参数，不写工作簿——重挂一次网格即可。 */
+function exRepaint(){
+  if(!exEditor)return;
+  const wb=exEditor.view.wb, host=document.getElementById('exHost');
+  exEditor.destroy();host.textContent='';
+  const theme=Object.assign({},OfficiaEditor.Cells.DEFAULT_THEME);
+  if(!exView.gridLine)theme.gridLine='transparent';
+  exEditor=OfficiaEditor.Cells.mountWorkbook(host,wb,{theme,
+    headerWidth:exView.header?undefined:0,headerHeight:exView.header?undefined:0});
+  exToggleFormulaBar();
+  if(exShell)exMountShell();
+  document.getElementById('exPainted').textContent=exEditor.paintedCellCount;
+}
+
+function exToggleFormulaBar(){
+  const bar=document.getElementById('exHost').firstElementChild;
+  if(bar)bar.style.display=exView.formulaBar?'':'none';
+}
+
+/** 「公式 → 错误检查」：重算一次，把算不出来的格列出来（只呈现，不写回）。 */
+async function exCheckErrors(){
+  try{
+    const j=await api('/api/editor/workbook/recalc',{method:'POST',
+      body:JSON.stringify(exEditor.view.wb)});
+    const r=await fetch('/api/result/'+j.id+'?download=1');
+    const next=await r.json();
+    const errs=next.recalcErrors||[];
+    const note=document.getElementById('exRecalcNote');
+    note.textContent=errs.length?(errs.length+' 个格算不出来：'+errs.map(x=>x.ref).join(' ')):'全部算得出，没有错误格';
+    note.className='text-xs mt-1 '+(errs.length?'text-amber-600':'text-emerald-600');
+    toast(errs.length?('发现 '+errs.length+' 个错误格'):'没有错误格');
+  }catch(e){toast(e.message,false)}
+}
+
+/** 「数据 → 导入 CSV」：宿主选文件，服务端用 CsvImporter 转成工作簿再装回网格。 */
+async function exImportCsv(f){
+  if(!f)return;
+  try{
+    const up=await api('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:f});
+    const j=await api('/api/editor/workbook/fromcsv?id='+up.id,{method:'POST'}).catch(()=>null);
+    if(!j){toast('demo 未暴露 csv→工作簿端点，请直接选 xlsx',false);return}
+    await exLoad(j.id);
+  }catch(e){toast(e.message,false)}
+}
+
+async function exRecalc(){
+  if(!exEditor){toast('还没加载工作簿',false);return}
+  try{
+    const t0=performance.now();
+    // 把网格里当前这份 JSON 交回服务端，用 35 函数引擎算——不在浏览器里另写一套求值器
+    const j=await api('/api/editor/workbook/recalc',{method:'POST',
+      body:JSON.stringify(exEditor.view.wb)});
+    const r=await fetch('/api/result/'+j.id+'?download=1');
+    const next=await r.json();
+    const ms=(performance.now()-t0).toFixed(0);
+    const host=document.getElementById('exHost');
+    if(exEditor.destroy)exEditor.destroy();
+    host.textContent='';
+    exJson=next;
+    exEditor=OfficiaEditor.Cells.mountWorkbook(host,next);
+    // 重算读数是服务端算出来的，不在工作簿里——交给「检查」页当 probe
+    exProbe={recalcMs:j.ms||0, recalcErrors:(next.recalcErrors||[]).length};
+    exMountShell();
+    document.getElementById('exPainted').textContent=exEditor.paintedCellCount;
+    document.getElementById('exRecalcMs').textContent=(j.ms||0)+' ms';
+    const note=document.getElementById('exRecalcNote');
+    if(next.recalcErrors&&next.recalcErrors.length){
+      note.textContent=next.recalcErrors.length+' 个格算不出来：'+next.recalcErrors[0].ref+' '+next.recalcErrors[0].message;
+      note.className='text-xs text-amber-600 mt-1';
+    }else{
+      note.textContent='全部算出，服务端 '+(j.ms||0)+' ms / 往返 '+ms+' ms';
+      note.className='text-xs text-emerald-600 mt-1';
+    }
+    toast('已重算');
+  }catch(e){toast(e.message,false)}
+}
+
+async function exSave(){
+  if(!exEditor){toast('还没加载工作簿',false);return}
+  try{
+    const t0=performance.now();
+    const j=await api('/api/editor/workbook/save',{method:'POST',
+      body:JSON.stringify(exEditor.view.wb)});
+    const ms=(performance.now()-t0).toFixed(0);
+    document.getElementById('exOut').innerHTML=
+      '<div class="bg-white rounded-lg border border-slate-200 p-4 flex items-center gap-4">'+
+      '<i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>'+
+      '<div class="text-sm"><b>'+j.name+'</b> · '+(j.size/1024).toFixed(1)+' KB · 服务端 '+(j.ms||0)+' ms / 往返 '+ms+' ms</div>'+
+      '<a href="/api/result/'+j.id+'?download=1" class="ml-auto border border-slate-300 px-3 py-1.5 rounded text-xs hover:border-primary hover:text-primary cursor-pointer">下载</a></div>';
+    lucide.createIcons();
+    toast('已导出 xlsx：'+(j.size/1024).toFixed(1)+' KB');
+  }catch(e){toast(e.message,false)}
+}
+
 function dz(e,on){e.preventDefault();e.currentTarget.classList.toggle('over',!!on)}
 function drop(e,key){e.preventDefault();e.currentTarget.classList.remove('over');
   const f=e.dataTransfer.files;if(!f.length)return;

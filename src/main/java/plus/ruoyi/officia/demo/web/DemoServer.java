@@ -170,7 +170,13 @@ public final class DemoServer {
 
     /** classpath 静态资源（打进 jar，随 jar 分发）。 */
     private static void serveStatic(HttpExchange ex, String path) throws IOException {
-        String res = "/".equals(path) || path.isEmpty() ? "/web/index.html" : "/web" + path;
+        // officia-editor 的前端产物打在 officia-editor.jar 的 META-INF/resources/ 下
+        // （Servlet 3.0 规范约定的静态资源目录）。本 demo 用的是 JDK 内置 HttpServer，
+        // 没有容器帮忙自动暴露，故在此显式映射一条——顺带验证「产物随 jar 分发」
+        // 这个设计在真实消费方里确实跑得通，客户不必额外拷任何文件。
+        String res = path.startsWith("/officia-editor/")
+            ? "/META-INF/resources" + path
+            : ("/".equals(path) || path.isEmpty() ? "/web/index.html" : "/web" + path);
         try (InputStream in = DemoServer.class.getResourceAsStream(res)) {
             if (in == null) {
                 Http.error(ex, 404, "资源不存在: " + path);
