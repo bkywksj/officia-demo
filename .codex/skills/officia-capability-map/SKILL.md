@@ -19,7 +19,11 @@ allowed-tools: ["Read", "Grep", "Glob", "Bash"]
 
 ## 概述
 
-Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `OfficiaSlides` / `OfficiaPdf` / `OfficiaBarCode` / `OfficiaImaging` / `OfficiaEmail` / `OfficiaLicense`），全部是 `public final class` + **全静态方法** + **`byte[]` 进 `byte[]` 出**。底层 13 个模块（ooxml/cfb/engine/render-pdf 等）不需要你直接碰。
+Officia 对外只暴露 **10 个门面类**（`OfficiaWords` / `OfficiaCells` / `OfficiaSlides` / `OfficiaPdf` / `OfficiaBarCode` / `OfficiaImaging` / `OfficiaEmail` / `OfficiaOcr` / `OfficiaEditor` / `OfficiaLicense`），全部是 `public final class` + **全静态方法**，绝大多数 **`byte[]` 进 `byte[]` 出**。底层 17 个模块（ooxml/cfb/engine/render-pdf/render-image 等）不需要你直接碰。
+
+> `OfficiaEditor` 是唯一一个**公开面不止 Java** 的门面：在线编辑还有一份前端产物
+> `officia-editor.js`（随 jar 分发，按 `/officia-editor/officia-editor.js` 引用），
+> 详见 `officia-editor`。
 
 本技能是**入口**：先在这里定位到"该调哪个方法"，再去对应的专项技能拿完整用法。
 
@@ -46,7 +50,8 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 | 一个 PDF | 多个单页 PDF | `OfficiaPdf.split(byte[])` | `officia-pdf` |
 | PDF | 纯文本 | `OfficiaPdf.extractText(byte[])` | `officia-pdf` |
 | PDF | 内嵌图片 | `OfficiaPdf.extractImages(byte[])` | `officia-pdf` |
-| PDF（电子版，有文字层） | **可编辑 Word** | `OfficiaPdf.toWord(byte[])` | `officia-pdf` |
+| PDF（电子版，有文字层） | **可编辑 Word**（真表格 + 标题大纲，版式按原文还原） | `OfficiaPdf.toWord(byte[])` | `officia-pdf` |
+| PDF（电子版，有文字层） | Word（绝对定位文本框，不可编辑） | `OfficiaPdf.toWordPreserveLayout(byte[])` | `officia-pdf` |
 | PDF | **带防篡改数字签名的 PDF**（支持多人依次签字、RFC 3161 时间戳） | `OfficiaPdf.sign(byte[], KeyMaterial)` | `officia-pdf` |
 | — | **验证签名**（内容是否被改、谁签的、身份可信否），返回结构化结论供程序判定 | `OfficiaPdf.verify(byte[][, List<X509Certificate>])` | `officia-pdf` |
 | 内网签发需求 | 私有 CA 根证书与下级签名证书 | `CertAuthority.createRoot(..)` / `.issue(..)` | `officia-pdf` |
@@ -55,6 +60,8 @@ Officia 对外只暴露 **8 个门面类**（`OfficiaWords` / `OfficiaCells` / `
 | 一段文本/网址 | 条码/二维码 PNG | `OfficiaBarCode.qrPng(String)` 等 | `officia-barcode` |
 | 图片字节 | 处理后图片 / PDF | `OfficiaImaging.*` | `officia-imaging` |
 | `.eml` | 结构化对象 / PDF | `OfficiaEmail.parseEml(...)` / `toPdf(...)` | `officia-email` |
+| `.docx` / `.doc` | **在网页里编辑**（打字、改格式、存回 docx/PDF） | `OfficiaEditor.open(byte[])` → JSON，前端 `mountEditable`，存回 `OfficiaEditor.save(json, EditorFormat.DOCX)` | `officia-editor` |
+| `.xlsx` | **在网页里编辑**（改格、算公式、存回 xlsx） | `OfficiaEditor.openWorkbook(byte[])` → JSON，前端 `Cells.mountWorkbook`，重算 `recalc`，存回 `saveWorkbook` | `officia-editor` |
 
 ## 按目标反查（"我要出 PDF"）
 
@@ -96,6 +103,8 @@ OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选�
 | Cells 公式求值 | `evaluateFormula(Map, ref)` | `evaluateXlsxCell(xlsx, ref)` | 没有 xlsx、只想算一张散列表用 A；对真实 xlsx 实算用 B |
 | 模板批量 | `fillTemplateEach` → N 份 | `fillTemplateMerged` → 1 份长文档 | 每人一份文件用 A；打印/归档成一份用 B |
 | 引依赖粒度 | `officia-all` | 单模块（`officia-pdf` 等） | 多数场景用 `officia-all` 最省心；只用一个能力可单引 |
+| 网页里给人**看**文档 vs 给人**改**文档 | `toPdf` / `toImages` | `OfficiaEditor.open` + 前端 `mountEditable` | 只读展示用 A（省事、无前端集成）；要用户改内容再存回 docx/xlsx 才用 B |
+| 在线编辑要不要另起服务 | — | — | **不需要**。没有 Document Server、没有新进程新端口，open/save 就是两次普通方法调用 |
 
 ## 🔴 明确**不支持** / 有边界的场景
 
@@ -122,6 +131,11 @@ OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选�
 | **OCR 评估版限制** | ⚠️ 限 1000 行 | 未授权时识别结果最多 1000 行（约 40 页），超出截断并追加显式提示。**不是限页也不是水印**——OCR 产出文本/docx，插水印就是污染数据、无从评估 |
 | 图像格式 | PNG / JPEG / BMP / GIF | 基于 `javax.imageio`；WebP / AVIF 等不在其中 |
 | PDF 加密强度 | RC4-40/128、AES-256 | 见 `officia-pdf` |
+| **在线编辑的实时协同**（多人同改一份） | ❌ 明确不做 | 必然要服务与长连接。命令层已设计成可序列化操作日志，为将来留门。见 `officia-editor` |
+| **在线编辑修订 / 批注 / 脚注** | ⚠️ 只读透传 | 打开保留、存回不丢，但改不了 |
+| **在线编辑浮动对象拖拽 / 图文环绕** | ⚠️ 只读 | 同上 |
+| **pptx 在线编辑** | ❌ 不做 | 编辑器只覆盖 Words 与 Cells 两条线；pptx 仍可 `OfficiaSlides.toPdf` |
+| 在线编辑的**逐控件**能力边界 | ✅ 有机检清单 | 功能区 145 个控件（Words 78 / Cells 67）各带三态，真相源是 `../officia/docs/design/online-editor/toolbar-capability.tsv`，由 `ToolbarCapabilityTest` 逐行机检 |
 
 > 核实这些状态的命令：
 > ```bash
@@ -135,7 +149,9 @@ OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选�
 要处理文档
 ├─ 输入是 Office 文件（docx/doc/xlsx/pptx）
 │   ├─ 只是要转成 PDF        → OfficiaWords/Cells/Slides.toPdf     → officia-words / cells / slides
-│   └─ 要按数据生成文档       → OfficiaWords.fillTemplate*          → officia-template
+│   ├─ 要按数据生成文档       → OfficiaWords.fillTemplate*          → officia-template
+│   └─ 要让用户在网页里改      → OfficiaEditor.open/save（docx）
+│                              OfficiaEditor.openWorkbook/saveWorkbook（xlsx） → officia-editor
 ├─ 输入/输出是 PDF
 │   ├─ 有文字层              → OfficiaPdf.*（多步用 edit() 链式）    → officia-pdf
 │   └─ 是扫描件（整页是图）   → new ScannedPdfConverter().language(..).toWord(..) → officia-pdf
@@ -163,6 +179,7 @@ java -jar target/officia-demo-1.0.0.jar
 | 我接下来要 | 用 |
 |---|---|
 | 把依赖引进我的项目 | `officia-setup` |
+| 在网页里编辑 Word / Excel | `officia-editor` |
 | 去掉输出上的水印 | `officia-license` |
 | 中文显示成方块 | `officia-chinese-font` |
 | 报错了 | `officia-troubleshooting` |

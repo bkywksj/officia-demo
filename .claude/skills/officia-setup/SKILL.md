@@ -46,10 +46,15 @@ Officia 以标准 Maven 产物发布，坐标前缀 `plus.ruoyi`。**运行时�
 implementation 'plus.ruoyi:officia-all:1.1.3'
 ```
 
-**`officia-all` 已聚合以下模块**（核实自 `../officia/officia-all/pom.xml`）：
-`officia-words`、`officia-cells`、`officia-slides`、`officia-pdf`、`officia-barcode`、`officia-imaging`、`officia-email`、**`officia-license`**。
+**`officia-all` 已聚合以下模块**（核实自 `../officia/officia-all/pom.xml`，2026-09-08 复核）：
+`officia-words`、`officia-cells`、`officia-slides`、`officia-pdf`、`officia-email`、`officia-imaging`、`officia-barcode`、`officia-ocr`、**`officia-editor`**、**`officia-license`**。
 
 > 💡 所以引了 `officia-all` **就已经有授权客户端了**，不必再单独引 `officia-license`。
+
+> 🔴 **`officia-editor` 是 1.1.3 之后才进聚合的**（`officia-editor` 模块在 1.1.3 发版之后才建）。
+> 客户用 `officia-all:1.1.3` **引不到** `plus.ruoyi.officia.editor.OfficiaEditor`，也取不到
+> `/officia-editor/officia-editor.js`。回答「在线编辑怎么引」时先确认对方用的版本，
+> 别照着源码里的聚合清单直接答。核实：`unzip -l ~/.m2/.../officia-all-<版本>.jar | grep officia-editor`。
 
 ### 🔴 Maven Central 上只有 `officia-all` 这一个构件
 
@@ -98,9 +103,15 @@ Maven 会自动带上该模块依赖的底座（如 `officia-pdf` → `officia-r
 | `officia-barcode` | `OfficiaBarCode` | 条码 / 二维码 |
 | `officia-imaging` | `OfficiaImaging` | 图像处理 |
 | `officia-email` | `OfficiaEmail` | 邮件 EML |
+| `officia-ocr` | `OfficiaOcr` | 图片/扫描件识别成文字 |
+| `officia-editor` | `OfficiaEditor` | 在线编辑（Java 门面 + 随 jar 分发的 `officia-editor.js`） |
 | `officia-license` | `OfficiaLicense` | 授权加载与门控 |
 
-底座模块（`officia-common` / `officia-ooxml` / `officia-cfb` / `officia-engine` / `officia-render-pdf`）**不用手动引**，由能力模块传递带入。
+底座模块（`officia-common` / `officia-ooxml` / `officia-cfb` / `officia-engine` / `officia-render-pdf` / `officia-render-image`）**不用手动引**，由能力模块传递带入。
+
+> ⚠️ **`officia-editor` 单引时注意**：前端产物 `officia-editor.js` 打在这个 jar 的
+> `META-INF/resources/officia-editor/` 里。Servlet 3.0+ 容器（Spring Boot 等）会自动把它暴露为
+> `/officia-editor/officia-editor.js`；非 Servlet 容器要自己映射一条。用法见 `officia-editor`。
 
 > **选型建议**：直接用 `officia-all`——从 Central 拿包时它本来也是唯一选择，且 officia 零第三方依赖，
 > 全引不会污染依赖树。只有"自行源码构建 + 对产物体积极度敏感"这一种情况才谈得上单引。
@@ -245,5 +256,6 @@ public class OfficiaSmokeTest {
 |---|---|
 | 输出有水印要去掉 | `officia-license` |
 | 不知道调哪个方法 | `officia-capability-map` |
+| 在网页里编辑 Word / Excel | `officia-editor` |
 | 集成进 Spring Boot | `officia-spring-integration` |
 | 升级版本 | `officia-upgrade` |

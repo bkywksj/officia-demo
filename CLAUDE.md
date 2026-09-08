@@ -10,19 +10,19 @@
 
 本目录是 **Officia 的消费方示例项目**，同时也是使用者的**学习台 + 验证台**。
 
-- **Officia** = 纯自研、**运行时零第三方依赖**的 Java 办公文档套件（对标 Aspose），13 个模块 / 7 条产品线。
+- **Officia** = 纯自研、**运行时零第三方依赖**的 Java 办公文档套件（对标 Aspose），17 个模块 / 10 条产品线。
 - **officia-demo** = 模拟真实客户，通过 Maven 坐标引入**已发布的** officia 产物（`plus.ruoyi:officia-all` + `officia-license`），演示各能力用法、授权门控效果，并作升级回归护栏。
 - 独立 groupId `plus.ruoyi.demo`，**不属于** officia reactor（同级独立目录）。
 
 > 🎯 **本技能体系面向"使用 officia 的开发者"**——你要解决的是「怎么接入、怎么调 API、输出不对怎么排查、怎么集成进我自己的系统」。
 >
-> ⚠️ 它**不是**开发 officia 库本身的技能体系。改库本身（新增格式解析器、改排版引擎、改 IR 模型…）请去同级 `../officia/`，那里有面向库开发者的 26 个技能（洁净室、零依赖、字体子集、排版引擎…）。
+> ⚠️ 它**不是**开发 officia 库本身的技能体系。改库本身（新增格式解析器、改排版引擎、改 IR 模型…）请去同级 `../officia/`，那里有面向库开发者的 30 个技能（洁净室、零依赖、字体子集、排版引擎…）。
 
 ### 同级目录分工
 
 | 目录 | 是什么 | 你什么时候进去 |
 |---|---|---|
-| `../officia/` | Officia 库**源码**（13 模块 reactor） | 查 API 真实签名/行为；改库本身 |
+| `../officia/` | Officia 库**源码**（17 模块 reactor） | 查 API 真实签名/行为；改库本身 |
 | `../officia-docs/` | 文档站（VitePress） | 查面向用户的说明文档 |
 | `officia-demo/`（本目录） | 消费方示例 + 可视化测试台 | 学用法、实测能力、写验证、回归 |
 
@@ -55,7 +55,7 @@
 
 ---
 
-## Officia 能力速览（13 模块 / 7 门面）
+## Officia 能力速览（17 模块 / 10 门面）
 
 引 `officia-all` 一次得全部能力，**运行时零第三方依赖**（只依赖 JDK 17+）。
 
@@ -68,9 +68,11 @@
 | `OfficiaBarCode` | officia-barcode | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR | `officia-barcode` |
 | `OfficiaImaging` | officia-imaging | 15 种滤镜/变换、格式互转、图片 → PDF | `officia-imaging` |
 | `OfficiaEmail` | officia-email | EML 解析、邮件归档 → PDF、写出 EML | `officia-email` |
+| `OfficiaOcr` | officia-ocr | 图片/扫描件识别成文字（中英两档权重内置） | 见 `officia-capability-map` |
+| `OfficiaEditor` | officia-editor | **在线编辑**：docx/xlsx ⇄ JSON 契约，前端 `officia-editor.js` 随 jar 分发 | `officia-editor` |
 | `OfficiaLicense` | officia-license | 授权加载、门控查询、评估态判定 | `officia-license` |
 
-底层模块（`officia-common` / `officia-ooxml` / `officia-cfb` / `officia-engine` / `officia-render-pdf` / `officia-all`）**不需要直接调用**——门面已屏蔽。
+底层模块（`officia-common` / `officia-ooxml` / `officia-cfb` / `officia-engine` / `officia-render-pdf` / `officia-render-image` / `officia-all`）**不需要直接调用**——门面已屏蔽。
 
 ---
 
@@ -103,7 +105,7 @@ mvn -o test
 | `officia-setup` | 引依赖、Maven/Gradle 坐标、JDK 版本、本地仓安装、离线部署、打包 |
 | `officia-license` | 加载 `.lic`、去水印、评估态判定、模块门控、`enableEnforcement` |
 
-### 能力使用（8）
+### 能力使用（9）
 
 | 技能 | 什么时候用 |
 |---|---|
@@ -115,6 +117,7 @@ mvn -o test
 | `officia-barcode` | 条码/二维码生成、码制选型、纠错级别、尺寸参数 |
 | `officia-imaging` | 图片滤镜变换、格式互转、图片 → PDF、水印 |
 | `officia-email` | EML 解析、邮件归档 PDF、构造 EML |
+| `officia-editor` | 在线编辑：`OfficiaEditor` 六组门面 + 前端 `officia-editor.js`（功能区/属性面板/网格）、工作簿重算、能力边界 |
 
 ### 排坑与工程化（6）
 

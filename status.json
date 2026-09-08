@@ -34,8 +34,8 @@
     "phase6_5_usage_guide": "docs/usage-guide.md 已生成"
   },
   "skills": {
-    "total": 20,
-    "completed": 20,
+    "total": 21,
+    "completed": 21,
     "categories": {
       "entry_and_setup": {
         "count": 3,
@@ -46,7 +46,7 @@
         ]
       },
       "capability_usage": {
-        "count": 8,
+        "count": 9,
         "list": [
           "officia-words",
           "officia-template",
@@ -55,7 +55,8 @@
           "officia-pdf",
           "officia-barcode",
           "officia-imaging",
-          "officia-email"
+          "officia-email",
+          "officia-editor"
         ]
       },
       "troubleshooting_and_engineering": {
@@ -117,8 +118,8 @@
   "codex_mirror": {
     "enabled": true,
     "built_at": "2026-07-30",
-    "skills": 27,
-    "mirrored_skills": 20,
+    "skills": 28,
+    "mirrored_skills": 21,
     "command_skills": 7,
     "hooks_generated": 4,
     "config_files_generated": true,
@@ -134,12 +135,14 @@
       "officia-barcode/.../OfficiaBarCode.java",
       "officia-imaging/.../OfficiaImaging.java",
       "officia-email/.../OfficiaEmail.java",
+      "officia-editor/.../OfficiaEditor.java",
+      "officia-editor/web/src/index.ts（前端产物的导出清单，与 Java 门面同为对外契约）",
       "officia-license/.../OfficiaLicense.java"
     ],
     "key_facts_extracted": [
       "ConvertOptions 四项配置与默认值；PageSize 五个枚举值及尺寸",
       "OfficiaWords 16 个 fillTemplate* 重载；模板九类占位符语法（取自 Wml*/Template* 实现类注释）",
-      "FormulaEngine 支持的 34 个 Excel 函数（grep case \"XXX\" 实得）",
+      "FormulaEngine 支持的 35 个 Excel 函数（grep case \"XXX\" 去重实得，2026-09-08 复核；此前记 34 为旧数）",
       "PDF 加密 bits 取值 40/128/256 与各自 /V /R 规格；PdfEditor 全部链式方法",
       "PDF 数字签名（PDF32000 §12.8 adbe.pkcs7.detached）：OfficiaPdf.sign 两个重载、KeyMaterial 的 .p12/自签名/私有CA签发三条身份来源、SignOptions 六项（含 timestampProvider）；签名是终结操作故刻意不进 PdfEditor 链式",
       "PDF 验签：OfficiaPdf.verify 两个重载（可选传 List<X509Certificate> 信任锚做 PKIX 路径验证）；结果类型 SignatureVerification + SignatureInfo，均为只读 DTO（Date 与 int[] 出参做防御性拷贝）",
@@ -151,7 +154,12 @@
       "License 自动加载顺序：-Dofficia.license → OFFICIA_LICENSE → classpath /officia.lic → ./officia.lic",
       "officia-all 已聚合 officia-license（demo pom 单独再引属显式冗余）",
       "异常消息前缀分布可作故障域路标（MS-DOC 719 / CFB 105 / MS-ODRAW 85 / MS-OLEPS 53 …）",
-      "demo 测试台 39 个 /api 端点与 Batch.run() 的 10 个回归用例（端点数以 /api/health 的 endpoints 字段为准，勿抄本行）"
+      "demo 测试台 39 个 /api 端点与 Batch.run() 的 10 个回归用例（端点数以 /api/health 的 endpoints 字段为准，勿抄本行）",
+      "在线编辑（officia-editor，2026-09-08 新增技能）：Java 六组门面 open / save / toImages / openWorkbook / recalc / saveWorkbook；EditorFormat 只有 DOCX 与 PDF（工作簿走 saveWorkbook 那条闭环）；前端产物 officia-editor.js 打在 META-INF/resources/officia-editor/ 随 jar 分发，Servlet 3.0+ 容器自动暴露为 /officia-editor/officia-editor.js（demo 用 JDK HttpServer，故在 DemoServer.serveStatic 显式映射一条）",
+      "前端公开导出取自 officia-editor/web/src/index.ts：mountEditable / mount（只读）/ mountRibbon / mountWordsShell / mountCellsShell / Cells.mountWorkbook / runWordsCommand / runCellsCommand / RIBBONS / RIBBON_CSS / SHELL_CSS / WORDS_UNWIRED / WORDS_HOST_CAPS / CELLS_UNWIRED / CELLS_HOST_CAPS；示例用法取自 demo 自己的 src/main/resources/web/index.html（edEnsureLib / edRender / edMountRibbon / edMountShell）",
+      "功能区 145 个控件（Words 78 / Cells 67）与三态分布（words 53 normal·14 readonly·11 disabled；cells 47 normal·0 readonly·20 disabled）取自 ../officia/docs/design/online-editor/toolbar-capability.tsv，由 ToolbarCapabilityTest 逐行机检",
+      "属性面板标签：Words 段落/表格/页面/检查，Cells 单元格/工作表/页面/检查（shell/words-fields.ts、cells-fields.ts 的 PANES 定义）",
+      "编辑器的 6 个 demo 端点：/api/editor/open、/save、/roundtrip、/workbook/open、/workbook/recalc、/workbook/save（ApiRoutes.registerEditor）"
     ],
     "honest_disclaimers_carried": [
       "doc 二进制输入：主链路可用且绿测覆盖，但未宣布生产就绪",
@@ -192,7 +200,11 @@
       "数字签名已接入 demo 测试台面板（PDF 工具箱 → 数字签名 / 三人会签 / 验证签名 / 篡改演示）。「验证签名」走 OfficiaPdf.verify 不依赖阅读器；「篡改演示」改 1 个字节再验一次，并排显示改动前后结论。要看阅读器内的效果仍需 Adobe Acrobat，浏览器内置阅读器多数不验签名",
       "私有 CA（CertAuthority）：只做建根证书与签发终端实体证书两件事；不含证书吊销（CRL/OCSP）、密钥托管、自动续期、多级中间 CA。根证书 pathLen=0，结构上锁死为两层",
       "🔴 .p12 口令必须是 ASCII —— JDK 的 PKCS#12 实现不接受非 ASCII 口令，用中文口令抛 UnrecoverableKeyException: Password is not ASCII。是 JDK 限制非 officia 的，但国内用户习惯中文密码，实测撞到过",
-      "统一社会信用代码写入证书主体的 serialNumber 字段（OID 2.5.4.5，国内 CA 惯例；欧盟 eIDAS 用 organizationIdentifier 2.5.4.97）；createRoot 与 issue 各有带该参数的重载"
+      "统一社会信用代码写入证书主体的 serialNumber 字段（OID 2.5.4.5，国内 CA 惯例；欧盟 eIDAS 用 organizationIdentifier 2.5.4.97）；createRoot 与 issue 各有带该参数的重载",
+      "在线编辑明确不做（DESIGN.md §9）：实时协同（OT/CRDT）、修订/批注/脚注的编辑（只读透传）、浮动对象拖拽与图文环绕的编辑（只读）、pptx 在线编辑、前端引入 UI 框架",
+      "在线编辑已知缺口（代码里的 UNWIRED，可被前端读出原因）：下标（前端 VerticalAlign 只有 NONE/SUPERSCRIPT）、单元格边距（CellPropsPatch 无 marT/marL/marB/marR）、标题行跨页重复（TableRow.header 无对应命令）、Cells 的格式刷（两步交互，工具栏不持有该状态）",
+      "在线编辑：OfficiaEditor.save(json, PDF) 与 OfficiaWords.toPdf(docx) 走同一条排版渲染链，同一份 IR 必然同字节；但 toPdf(docx) 会额外叠加 docx 内嵌字体，save 只拿得到 JSON、用基础字体表，故内嵌字体的文档两者字节可以不同——是信息量差异不是缺陷",
+      "在线编辑：saveWorkbook 刻意不自动重算（要兜底就串 saveWorkbook(recalc(json))）；recalc 用的是 Officia.Cells 那 35 个函数的同一个引擎，浏览器端没有第二套求值器；算不出来的格写 #VALUE! 并把原因附在根级 recalcErrors，不让整表失败"
     ]
   },
   "not_included": {

@@ -67,6 +67,7 @@ const instructions = `## 强制技能激活流程（必须执行）
 - officia-barcode: 条码、条形码、二维码、QR、Code128、EAN、UPC、ITF、纠错
 - officia-imaging: 图片、图像、缩放、裁剪、滤镜、灰度、模糊、锐化、水印、格式转换、图片转PDF
 - officia-email: 邮件、EML、邮件解析、邮件归档、附件、收发件人
+- officia-editor: 在线编辑、网页编辑、编辑器、OfficiaEditor、可编辑、officia-editor.js、mountEditable、mountRibbon、mountWorkbook、功能区、属性面板、往返、重算、recalc、ONLYOFFICE
 
 【排坑与工程化】
 - officia-chinese-font: 中文、字体、方块、乱码、豆腐块、TTF、字体目录、CID、嵌入字体

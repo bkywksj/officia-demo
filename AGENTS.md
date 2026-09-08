@@ -12,18 +12,18 @@
 
 本目录是 **Officia 的消费方示例项目**，同时也是使用者的**学习台 + 验证台**。
 
-- **Officia** = 纯自研、**运行时零第三方依赖**的 Java 办公文档套件（对标 Aspose），13 个能力模块 / 8 个门面类。
+- **Officia** = 纯自研、**运行时零第三方依赖**的 Java 办公文档套件（对标 Aspose），17 个模块 / 10 个门面类。
 - **officia-demo** = 模拟真实客户，通过 Maven 坐标引入**已发布的** officia 产物（`plus.ruoyi:officia-all` + `officia-license`），演示各能力用法、授权门控效果，并作升级回归护栏。
 - 独立 groupId `plus.ruoyi.demo`，**不属于** officia reactor。
 
 > 🎯 本技能体系面向**使用 officia 的开发者**（接入 / 调 API / 排错 / 集成）。
-> ⚠️ 它**不是**开发 officia 库本身的技能体系——改库请去同级 `../officia/`（那里有面向库开发者的 26 个技能）。
+> ⚠️ 它**不是**开发 officia 库本身的技能体系——改库请去同级 `../officia/`（那里有面向库开发者的 30 个技能）。
 
 ### 同级目录分工
 
 | 目录 | 是什么 | 何时进去 |
 |---|---|---|
-| `../officia/` | Officia 库**源码**（13 模块 reactor） | 查 API 真实签名/行为；改库本身 |
+| `../officia/` | Officia 库**源码**（17 模块 reactor） | 查 API 真实签名/行为；改库本身 |
 | `../officia-docs/` | 文档站（VitePress） | 查面向用户的说明文档 |
 | `officia-demo/`（本目录） | 消费方示例 + 可视化测试台 | 学用法、实测能力、写验证、回归 |
 
@@ -56,7 +56,7 @@
 
 ---
 
-## Officia 能力速览（8 个门面）
+## Officia 能力速览（10 个门面）
 
 引 `officia-all` 一次得全部能力，**运行时零第三方依赖**（只依赖 JDK 17+）。
 
@@ -69,13 +69,15 @@
 | `OfficiaBarCode` | officia-barcode | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR |
 | `OfficiaImaging` | officia-imaging | 滤镜变换、格式互转、图片 → PDF |
 | `OfficiaEmail` | officia-email | EML 解析、邮件归档 → PDF、写出 EML |
+| `OfficiaOcr` | officia-ocr | 图片/扫描件识别成文字（中英两档权重内置） |
+| `OfficiaEditor` | officia-editor | 在线编辑：docx/xlsx ⇄ JSON 契约，前端 `officia-editor.js` 随 jar 分发 |
 | `OfficiaLicense` | officia-license | 授权加载、门控查询、评估态判定 |
 
 门面统一形态：`public final class` + 全静态方法 + `byte[]` 进 `byte[]` 出 + 异常统一 `OfficiaException`。
 
 ---
 
-## 技能清单（26 个 = 19 能力技能 + 7 命令技能）
+## 技能清单（28 个 = 21 能力技能 + 7 命令技能）
 
 Codex 启动时已自动加载全部 SKILL.md 的 frontmatter。按 description 的触发场景匹配后，读取完整正文再动手。
 
@@ -87,18 +89,19 @@ Codex 启动时已自动加载全部 SKILL.md 的 frontmatter。按 description 
 | `officia-setup` | Maven/Gradle 坐标、JDK 基线、本地仓安装、离线部署、打包 |
 | `officia-license` | `.lic` 加载、去水印、门控排查、构建期开关差异 |
 
-### 能力使用（8）
+### 能力使用（9）
 
 | 技能 | 用途 |
 |---|---|
 | `officia-words` | Word → PDF；四种入参、流式、页数耗时、ConvertOptions |
 | `officia-template` | 模板填充 / 邮件合并；完整占位符语法；批量与 JSON 数据源 |
-| `officia-cells` | Excel/CSV 转换、CSV 解析、公式求值与重算（34 个函数） |
+| `officia-cells` | Excel/CSV 转换、CSV 解析、公式求值与重算（35 个函数） |
 | `officia-slides` | PPTX → PDF；内容提取式 vs 版式保真式 |
 | `officia-pdf` | PDF 工具箱 + `PdfEditor` 链式编辑 |
 | `officia-barcode` | 8 种码制、输入约束与校验位、QR 四档纠错 |
 | `officia-imaging` | 滤镜变换、格式互转、水印、图片 → PDF |
 | `officia-email` | EML 解析、归档 PDF、构造写出 |
+| `officia-editor` | 在线编辑：`OfficiaEditor` 六组门面 + `officia-editor.js` 前端（功能区/属性面板/网格）、工作簿重算、能力边界 |
 
 ### 排坑与工程化（6）
 
