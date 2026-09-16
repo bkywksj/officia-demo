@@ -1116,7 +1116,7 @@ final class ApiRoutes {
             byte[] data = json.getBytes(StandardCharsets.UTF_8);
             Http.json(ex, result(outName(q.get("id"), "json", "workbook.json"),
                     "application/json", data, t0)
-                .put("sheets", countKey(json, "\"name\":"))
+                .put("sheets", countSheets(json))
                 .put("cells", countKey(json, "\"r\":"))
                 .put("jsonKb", data.length / 1024)
                 .put("hint", "网格排版按列宽(字符数)+行高(磅)定尺寸，不做西文断行，"
@@ -1147,6 +1147,18 @@ final class ApiRoutes {
     }
 
     /** 数一数 JSON 里某个键出现了几次——只为在界面上给个规模感，不做解析。 */
+    /**
+     * 数工作表个数。
+     *
+     * <p>🔴 <b>不能全文数 {@code "name":}</b>——样式表里的字体名用的也是这个键。
+     * 2026-09-16 实测一份单表的 xlsx：全文出现 10 次，界面于是显示「共 10 表」，
+     * 而它只有 1 个表。从 {@code "sheets":} 之后开始数才对得上。</p>
+     */
+    private static int countSheets(String json) {
+        int at = json.indexOf("\"sheets\":");
+        return at < 0 ? 0 : countKey(json.substring(at), "\"name\":");
+    }
+
     private static int countKey(String json, String key) {
         int n = 0;
         for (int i = json.indexOf(key); i >= 0; i = json.indexOf(key, i + key.length())) {
