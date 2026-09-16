@@ -2,7 +2,7 @@
 name: officia-editor
 description: |
   用 OfficiaEditor 在自己的网页里做在线编辑：Java 侧 open(docx/doc) → officia-doc/1 JSON、
-  save(JSON) → docx/pdf，工作簿侧 openWorkbook / recalc / saveWorkbook；
+  save(JSON) → docx/pdf，工作簿侧 openWorkbook（xlsx/xls）/ recalc / saveWorkbook；
   前端产物 officia-editor.js 随 jar 分发，挂到页面上就是一个能打字的 Word / Excel。
   **不需要 Document Server、不需要新进程新端口**——只多引一个 jar。
 
@@ -87,7 +87,7 @@ List<byte[]> p2   = OfficiaEditor.toImages(json, options);
 ### 4–6. 工作簿：`openWorkbook` / `recalc` / `saveWorkbook`
 
 ```java
-String wbJson = OfficiaEditor.openWorkbook(xlsxBytes);   // officia-workbook/1 契约的 JSON 文本
+String wbJson = OfficiaEditor.openWorkbook(excelBytes);  // xlsx 或 xls；officia-workbook/1 契约的 JSON 文本
 String next   = OfficiaEditor.recalc(wbJson);            // 重算全部公式格，返回同契约 JSON
 byte[] xlsx   = OfficiaEditor.saveWorkbook(next);        // 写回 xlsx
 ```
@@ -197,10 +197,24 @@ Cells 侧对应 `OfficiaEditor.mountCellsShell(panelHost, statusHost, { editor, 
 ### 5. 挂工作簿（Cells 网格）
 
 ```js
-const editor = OfficiaEditor.Cells.mountWorkbook(host, workbookJson);
-editor.view;   // WorkbookView：选区、活动格、公式栏文本
+const editor = OfficiaEditor.Cells.mountWorkbook(host, workbookJson, {
+  onCellCommitted: (e) => { if (editor.hasFormula) scheduleRecalc(); },
+});
+editor.view;                 // WorkbookView：选区、活动格、公式栏文本
 editor.paint();
+editor.hasFormula;           // 有没有公式格——没有就不必为重算跑一趟往返
+editor.staleFormulaCount;    // 有公式但还没算出结果的格数；打开时 > 0 就先算一次
+editor.applyRecalc(next);    // 只并回计算结果，选区/滚动/正在编辑的那一格都保留
 ```
+
+🔴 **公式结果不在浏览器里算**：同一个 35 函数引擎只有一份（在服务端），
+前端另写一套，「编辑器里的数字与 xlsx→PDF 算出的必然一致」这句承诺就作废了。
+所以打开时若 `staleFormulaCount > 0` 要先 `recalc` 一次，之后每次 `onCellCommitted`
+再按需重算——**不是「提交的是公式才算」**，改一个常量同样会牵动引用它的公式。
+
+⚠️ **xls 进、xlsx 出**：`openWorkbook` 也收 .xls（未加密），JSON 顶层会多一个
+`"src": "xls"`；而写侧只有 xlsx，`saveWorkbook` 存回来的一定是 xlsx。
+拿这个字段告诉用户一声，别默默替人改了文件格式。
 
 Cells 的全部对外面都在 `OfficiaEditor.Cells.*` 命名空间下（`mountWorkbook`、`WorkbookView`、
 `PutCell` / `MergeCells` / `SetFreeze` 等命令、`formatNumber` 等数字格式函数），
