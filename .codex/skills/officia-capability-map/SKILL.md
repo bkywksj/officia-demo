@@ -42,7 +42,9 @@ Officia 对外只暴露 **10 个门面类**（`OfficiaWords` / `OfficiaCells` / 
 | Markdown 文本 / `.md` | PDF | `OfficiaWords.markdownToPdf(String)` | `officia-words` |
 | Markdown 文本 / `.md` | 可编辑 docx | `OfficiaWords.markdownToDocx(String)`（版式暂较素，见技能） | `officia-words` |
 | `.xlsx` | PDF | `OfficiaCells.toPdf(byte[])` | `officia-cells` |
-| `.xlsx` | CSV 文本 | `OfficiaCells.toCsv(byte[])` | `officia-cells` |
+| `.xls`（CFB 二进制） | PDF | `OfficiaCells.toPdf(byte[])`（同一入口，**自动识别**格式） | `officia-cells` |
+| `.xlsx` / `.xls` | CSV 文本 | `OfficiaCells.toCsv(byte[])` | `officia-cells` |
+| `.xlsx` / `.xls` | 工作簿模型（公式原文 + 样式都在） | `OfficiaCells.readWorkbook(byte[])` | `officia-cells` |
 | CSV 文本 | PDF | `OfficiaCells.csvToPdf(String)` | `officia-cells` |
 | CSV 文本 | 行列网格 | `OfficiaCells.parseCsv(String)` | `officia-cells` |
 | `.pptx` | PDF | `OfficiaSlides.toPdf(byte[])` | `officia-slides` |
@@ -100,7 +102,7 @@ OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选�
 | 要在浏览器里给人看文档 | `toPdf` 出 PDF | `toImages` 出图片 | **移动端 webview / 微信内置浏览器对 PDF 支持差** → 用 B；桌面浏览器都内置 PDF 阅读器（**不需要插件**）→ A 更省体积、文字可选中可搜索 |
 | Words 要不要页数耗时 | `toPdf(...)` | `convert(...)` → `ConvertResult` | 需要 `getPageCount()` / `getCostMillis()` 用 B |
 | PDF 多步操作 | 逐个静态方法 | `OfficiaPdf.edit(pdf).xxx().yyy().toBytes()` | 两步以上用链式 `PdfEditor`，少一轮解析/序列化 |
-| Cells 公式求值 | `evaluateFormula(Map, ref)` | `evaluateXlsxCell(xlsx, ref)` | 没有 xlsx、只想算一张散列表用 A；对真实 xlsx 实算用 B |
+| Cells 公式求值 | `evaluateFormula(Map, ref)` | `evaluateCell(excel, ref)` | 没有文件、只想算一张散列表用 A；对真实 xlsx/xls 实算用 B（旧名 `evaluateXlsxCell` 已 `@Deprecated`，行为不变） |
 | 模板批量 | `fillTemplateEach` → N 份 | `fillTemplateMerged` → 1 份长文档 | 每人一份文件用 A；打印/归档成一份用 B |
 | 引依赖粒度 | `officia-all` | 单模块（`officia-pdf` 等） | 多数场景用 `officia-all` 最省心；只用一个能力可单引 |
 | 网页里给人**看**文档 vs 给人**改**文档 | `toPdf` / `toImages` | `OfficiaEditor.open` + 前端 `mountEditable` | 只读展示用 A（省事、无前端集成）；要用户改内容再存回 docx/xlsx 才用 B |
@@ -129,6 +131,9 @@ OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选�
 | **扫描件转录质量按印刷年代分层** | ⚠️ 现代书可用，老铅印只能读懂大意 | 2004 年胶印书实测正文页平均置信度 **0.961**、基本逐字准确，错误集中在生僻字与封面美术字；1990 年代铅印书召回 **69.6%**。差距来自字形域差（老铅字的墨色扩散、纸张透印在训练分布外），不是 bug。**交付前按你自己的样本实测**，别按单一数字预期 |
 | **OCR 语种自动判别** | ❌ 明确不做 | 必须显式指定（`OcrOptions.setLanguage` / `ScannedPdfConverter.language`）；中英两档模型分别内置。**不指定就用 `ScannedPdfConverter` 会直接抛异常**——选错语种不报错、只产出满篇噪声，所以宁可响亮失败 |
 | **OCR 评估版限制** | ⚠️ 限 1000 行 | 未授权时识别结果最多 1000 行（约 40 页），超出截断并追加显式提示。**不是限页也不是水印**——OCR 产出文本/docx，插水印就是污染数据、无从评估 |
+| **加密的 `.xls`** | ❌ 明确拒绝 | 解密需 MS-OFFCRYPTO 规范（上游尚未归档）。检出时**点名加密方式**（XOR 混淆 / RC4），不静默失败。注意：工作表「保护」不是加密，照常可读 |
+| **BIFF5 / BIFF7**（Excel 5.0/95 的更老 `.xls`） | ❌ 明确拒绝 | 其记录布局不在 MS-XLS 规范内，上游不依据非官方资料猜测。提示另存为 97-2003 或 xlsx |
+| **`.xls` 里的图片 / 图表 / 条件格式** | ❌ 不解析 | 转 PDF 时不出现。xlsx 侧同样未实现 |
 | 图像格式 | PNG / JPEG / BMP / GIF | 基于 `javax.imageio`；WebP / AVIF 等不在其中 |
 | PDF 加密强度 | RC4-40/128、AES-256 | 见 `officia-pdf` |
 | **在线编辑的实时协同**（多人同改一份） | ❌ 明确不做 | 必然要服务与长连接。命令层已设计成可序列化操作日志，为将来留门。见 `officia-editor` |
@@ -147,7 +152,7 @@ OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选�
 
 ```
 要处理文档
-├─ 输入是 Office 文件（docx/doc/xlsx/pptx）
+├─ 输入是 Office 文件（docx/doc/xlsx/xls/pptx）
 │   ├─ 只是要转成 PDF        → OfficiaWords/Cells/Slides.toPdf     → officia-words / cells / slides
 │   ├─ 要按数据生成文档       → OfficiaWords.fillTemplate*          → officia-template
 │   └─ 要让用户在网页里改      → OfficiaEditor.open/save（docx）
