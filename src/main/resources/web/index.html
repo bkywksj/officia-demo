@@ -1155,6 +1155,10 @@ function exRibbonCommand(e){
   if(done){
     info.textContent=e.cap+'：已应用到选区 '+exRefText();
     if(exShell)exShell.refresh(exProbe);
+    // 🔴 工具栏插公式也要重算。onCellCommitted 只在【就地编辑提交】时回调，
+    // 走工具栏（SUM / AVERAGE / 自动求和…）的这条路不经过它——不补这一句，
+    // 点完 SUM 格子是空白的，用户得自己去点「重算」才看得到数
+    if(exEditor.hasFormula)exScheduleRecalc();
     return;
   }
   // 视图开关与要服务端往返的那几个（CELLS_HOST_CAPS）
