@@ -174,7 +174,7 @@ const why = OfficiaEditor.WORDS_UNWIRED.get(e.cap);   // Map<控件名, 为什�
 ```
 
 `*_HOST_CAPS` 是**按设计交给宿主**的那几个（缩放、页面视图、插图要弹文件框、
-超链接要弹框问 URL、书签要弹框问名字、Cells 的立即重算要走服务端），不是失败。
+超链接要弹框问 URL、书签要弹框问名字、脚注要弹框问注释内容、Cells 的立即重算要走服务端），不是失败。
 
 宿主接管的两个要点：
 
@@ -194,10 +194,19 @@ if (e.cap === '超链接') { askUrl().then(url =>
 // 书签：与超链接是一对——内链指向的正是这里建的名字。空名返回 undefined
 if (e.cap === '书签') { askName().then(name =>
   view.apply(r => OfficiaEditor.insertBookmark(r, name))); }
+
+// 脚注：正文一个上标引用 + 注释正文排在本页页底。insertFootnote 一条命令同时改两处
+// （引用 + doc.notes），所以 Ctrl+Z 一次整条撤掉，不会停在「引用没了、注释还在」的中间态
+if (e.cap === '脚注') { askText().then(text =>
+  view.apply(r => OfficiaEditor.insertFootnote(r.to, text))); }
 ```
 
 ⚠️ 书签在画布上**按设计不可见**（Word 默认也不显示）。别拿「画面变没变」当它做没做成的判据——
 判据是 IR 里多了 anchor 节点、存回 docx 是 `w:bookmarkStart/End`、内链能指到它。
+
+⚠️ 🔴 **颜色必须写成 `#rrggbb`**。契约就是这个形态，而画布是 `ctx.fillStyle = st.color`——
+给 Canvas 一个无 `#` 的值它会**静默忽略**这次赋值、沿用上一个颜色，不报错也不抛异常。
+自己构造 TextStyle / Fill 时尤其要注意。
 
 ⚠️ 弹框别用 `window.prompt`：它是模态，会阻塞事件循环，样式也不可控。
 

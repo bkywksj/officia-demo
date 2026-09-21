@@ -989,6 +989,7 @@ function edRibbonCommand(e){
   if(e.cap==='图片'){document.getElementById('edImgFile').click();return}
   if(e.cap==='超链接'){edAskUrl(e.el);return}
   if(e.cap==='书签'){edAskBookmark(e.el);return}
+  if(e.cap==='脚注'){edAskFootnote(e.el);return}
   const why=OfficiaEditor.WORDS_UNWIRED.get(e.cap);
   toast(why?(e.cap+'：'+why):(e.cap+'：这一步没有改动文档（可能光标不在可编辑处，或选项无需变更）'),false);
 }
@@ -1068,6 +1069,22 @@ function edAskBookmark(anchorEl){
       const ok=edView.apply(rg=>OfficiaEditor.insertBookmark(rg, v));
       toast(ok?('已插入书签：'+v+'（画布上不可见，内链写 #'+v+' 即可跳转）')
               :'插入书签失败：光标不在可编辑处', ok);
+    },
+  });
+}
+
+/**
+ * 「插入 → 脚注」：正文插一个上标引用，注释正文排在本页页底。
+ *
+ * 库不弹框问注释内容。insertFootnote 一条命令同时改两处（引用 + doc.notes），
+ * 所以 Ctrl+Z 一次就整条撤掉，不会停在「引用没了、注释还在」的中间态。
+ */
+function edAskFootnote(anchorEl){
+  edAskLine(anchorEl,{
+    placeholder:'注释内容',
+    onOk:v=>{
+      const ok=edView.apply(rg=>OfficiaEditor.insertFootnote(rg.to, v));
+      toast(ok?('已插入脚注：'+v):'插入脚注失败：光标不在可编辑处', ok);
     },
   });
 }
