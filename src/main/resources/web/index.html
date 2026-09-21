@@ -609,7 +609,6 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
     </div>
     <!-- 底部状态栏：页码 / 字数 / 段落·行·列 / 语言 / 缩放滑杆 -->
     <div id="edStatus" class="mt-3" style="display:none"></div>
-    <div id="edOut" class="mt-4"></div>
   </section>
 
   <section id="editorx" class="panel">
@@ -664,7 +663,6 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
     </div>
     <!-- 底部状态栏：选区引用 / 求和 / 平均 / 计数 / 工作表 -->
     <div id="exStatus" class="mt-3" style="display:none"></div>
-    <div id="exOut" class="mt-4"></div>
   </section>
 
   <section id="batch" class="panel">
@@ -710,8 +708,10 @@ function pick(id){document.getElementById(id).click()}
  *
  * 用 `<a download>` 而不是 `location.href`：后者在同源下会被当成导航，
  * 浏览器按 Content-Disposition 决定是下载还是内联打开，pdf 就会直接在标签页里预览。
- * 临时 a 元素不插进 DOM —— 只要设了 href 与 download，click() 就生效，
- * 插进去反而要记得清理。
+ *
+ * 🔴 临时 a 元素**必须插进 DOM** 再 click()。这里原来写的是「不插进去也生效」——
+ * 那句话是错的：游离 anchor 的 click() 在 Firefox 等浏览器上**不触发下载**，
+ * 只有 Chrome 容忍，于是「存为 docx」时灵时不灵且不报任何错。
  */
 /**
  * 导出用的文件名：源基名 + `_导出` + 目标扩展名。
@@ -742,14 +742,15 @@ function fire(id, name){
 }
 
 /**
- * 把结果面板滚进视野。
+ * 导出成功的一句话回执。
  *
- * 导出结果排在左侧面板下方，首屏往往看不到——用户点完「存为 docx」
- * 得自己滚到底才看得见回执与「重新下载」。滚一下省掉这一步。
+ * 页数与耗时是**测试台**该给的读数（这正是它与普通编辑器的区别），
+ * 原来铺在页面下方一整块卡片里，删卡片时折进 toast——零新增 UI，信息一条不少。
  */
-function reveal(id){
-  const el=document.getElementById(id);
-  if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+function exportToast(j, roundTripMs){
+  return '已导出 '+j.name+' · '+(j.size/1024).toFixed(1)+' KB'
+    +(j.pages?(' · '+j.pages+' 页'):'')
+    +' · 服务端 '+(j.ms||0)+' / 往返 '+roundTripMs+' ms';
 }
 
 // ── 在线编辑（Officia.Editor）：服务端出 JSON → 浏览器端 Canvas 排版 + 真编辑 ──
@@ -820,7 +821,6 @@ async function edLoad(id){
     edDirty=false;
     document.getElementById('edCards').style.display='';
     document.getElementById('edBar').style.display='';
-    document.getElementById('edOut').innerHTML='';
     edRender();          // edRender 内部已挂外壳
     edMountRibbon();
     lucide.createIcons();
@@ -1127,19 +1127,13 @@ async function edSave(fmt){
     const j=await api('/api/editor/save?format='+fmt+'&name='+encodeURIComponent(name),
       {method:'POST',body:edView.json()});
     const ms=(performance.now()-t0).toFixed(0);
-    document.getElementById('edOut').innerHTML=
-      '<div class="bg-white rounded-lg border border-slate-200 p-4 flex items-center gap-4">'+
-      '<i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>'+
-      '<div class="text-sm"><b>'+j.name+'</b> · '+(j.size/1024).toFixed(1)+' KB'+
-      (j.pages?(' · '+j.pages+' 页'):'')+' · 服务端 '+(j.ms||0)+' ms / 往返 '+ms+' ms</div>'+
-      '<a href="/api/result/'+j.id+'?download=1" download="'+(j.name||'')+'" class="ml-auto border border-slate-300 px-3 py-1.5 rounded text-xs hover:border-primary hover:text-primary cursor-pointer">重新下载</a></div>';
-    lucide.createIcons();
-    // 导出即下载：用户点「存为 docx」要的就是这个文件，不该再点一次
+    // 导出即下载：用户点「存为 docx」要的就是这个文件，没有第二步。
+    // 这里原来还在下方铺一块「✓ 文件名 · 体积 · [重新下载]」的回执——
+    // 它唯一的用处是让人再点一次下载，而那件事按钮本身已经做了
     fire(j.id, j.name);
-    reveal('edOut');
     edDirty=false;
     document.getElementById('edDirty').textContent='已保存';
-    toast('已导出 '+fmt+'：'+(j.size/1024).toFixed(1)+' KB');
+    toast(exportToast(j, ms));
   }catch(e){toast(e.message,false)}
 }
 
@@ -1203,7 +1197,6 @@ async function exLoad(id){
 
     document.getElementById('exCards').style.display='';
     document.getElementById('exBar').style.display='';
-    document.getElementById('exOut').innerHTML='';
     exMountRibbon();
     exMountShell();
     document.getElementById('exScale').textContent=j.sheets+' / '+j.cells;
@@ -1454,15 +1447,8 @@ async function exSave(){
       +encodeURIComponent(exportName(exName,'xlsx')),
       {method:'POST',body:JSON.stringify(exEditor.view.wb)});
     const ms=(performance.now()-t0).toFixed(0);
-    document.getElementById('exOut').innerHTML=
-      '<div class="bg-white rounded-lg border border-slate-200 p-4 flex items-center gap-4">'+
-      '<i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>'+
-      '<div class="text-sm"><b>'+j.name+'</b> · '+(j.size/1024).toFixed(1)+' KB · 服务端 '+(j.ms||0)+' ms / 往返 '+ms+' ms</div>'+
-      '<a href="/api/result/'+j.id+'?download=1" download="'+(j.name||'')+'" class="ml-auto border border-slate-300 px-3 py-1.5 rounded text-xs hover:border-primary hover:text-primary cursor-pointer">重新下载</a></div>';
-    lucide.createIcons();
     fire(j.id, j.name);
-    reveal('exOut');
-    toast('已导出 xlsx：'+(j.size/1024).toFixed(1)+' KB');
+    toast(exportToast(j, ms));
   }catch(e){toast(e.message,false)}
 }
 

@@ -82,13 +82,32 @@ class DownloadWiringTest {
     }
 
     @Test
-    @DisplayName("导出后把结果面板滚进视野——它在首屏外，否则用户得自己滚到底")
-    void export_reveals_the_result_panel() throws IOException {
+    @DisplayName("🔴 导出不留回执面板——点「另存为」就是下载，没有第二步")
+    void export_leaves_no_receipt_panel() throws IOException {
+        // 那块「✓ 文件名 · 体积 · [重新下载]」唯一的用处是让人再点一次下载，
+        // 而那件事按钮本身已经做了。删掉它，页数与耗时折进 toast
         String html = page();
 
-        assertThat(html).as("没有 reveal 辅助").contains("function reveal(");
-        assertThat(html).as("Words 导出后没滚动结果面板").contains("reveal('edOut')");
-        assertThat(html).as("Cells 导出后没滚动结果面板").contains("reveal('exOut')");
+        assertThat(html).as("edOut 回执面板该删掉了").doesNotContain("edOut");
+        assertThat(html).as("exOut 回执面板该删掉了").doesNotContain("exOut");
+        // ⚠️ 判据扫【标签】不扫文字：注释里正在解释「为什么删掉重新下载」，
+        // 扫全文会被那句注释误伤。本仓为同一类原因红过三次
+        assertThat(html).as("「重新下载」按钮该没了").doesNotContain(">重新下载</a>");
+    }
+
+    @Test
+    @DisplayName("页数与耗时折进 toast——测试台的读数不能跟着面板一起删掉")
+    void export_toast_carries_the_readings() throws IOException {
+        String html = page();
+        int at = html.indexOf("function exportToast(");
+        assertThat(at).as("找不到 exportToast()").isGreaterThan(0);
+        String body = html.substring(at, html.indexOf("\n}", at));
+
+        assertThat(body).as("没带文件名").contains("j.name");
+        assertThat(body).as("没带体积").contains("j.size");
+        assertThat(body).as("没带页数").contains("j.pages");
+        assertThat(body).as("没带服务端耗时").contains("j.ms");
+        assertThat(body).as("没带往返耗时").contains("roundTripMs");
     }
 
     @Test
