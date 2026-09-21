@@ -988,51 +988,88 @@ function edRibbonCommand(e){
   if(e.cap==='页面视图'){toast('已是页面视图（CanvasRenderer）');return}
   if(e.cap==='图片'){document.getElementById('edImgFile').click();return}
   if(e.cap==='超链接'){edAskUrl(e.el);return}
+  if(e.cap==='书签'){edAskBookmark(e.el);return}
   const why=OfficiaEditor.WORDS_UNWIRED.get(e.cap);
   toast(why?(e.cap+'：'+why):(e.cap+'：这一步没有改动文档（可能光标不在可编辑处，或选项无需变更）'),false);
 }
 
 /**
- * 「插入 → 超链接」：库不弹框问 URL（window.prompt 是模态、会阻塞事件循环，
- * 样式也不可控），宿主收完再调库的 setHyperlink —— 它连 Word 观感
- * （蓝 0563C1 + 下划线）一起套，与读 docx 时那套一致。
+ * 宿主侧的「收一行文字」小面板：超链接问 URL、书签问名字，都用它。
+ *
+ * 🔴 不用 window.prompt：它是模态，会阻塞事件循环（浏览器自动化一撞上就整个卡死），
+ * 样式也不可控。面板挂在触发按钮下方，Enter 提交 / Esc 取消。
+ *
+ * @param opts.placeholder 输入框提示
+ * @param opts.onOk        拿到非空文字后做什么
+ * @param opts.extra       可选的第二个按钮 {label, onClick}（超链接的「取消链接」）
  */
-function edAskUrl(anchorEl){
+function edAskLine(anchorEl, opts){
   if(!edView){toast('还没加载文档',false);return}
-  document.getElementById('edUrlBox')?.remove();
+  document.getElementById('edAskBox')?.remove();
   const box=document.createElement('div');
-  box.id='edUrlBox';
+  box.id='edAskBox';
   box.className='absolute z-50 bg-white border border-slate-300 rounded shadow-lg p-2 flex gap-2 items-center';
   box.innerHTML=
-    '<input id="edUrlInput" placeholder="https://… 或 #书签名" '+
+    '<input id="edAskInput" placeholder="'+opts.placeholder+'" '+
     'class="border border-slate-300 rounded px-2 py-1 text-xs w-64 outline-none focus:border-primary">'+
-    '<button id="edUrlOk" class="bg-primary text-white px-2.5 py-1 rounded text-xs cursor-pointer">确定</button>'+
-    '<button id="edUrlOff" class="border border-slate-300 px-2.5 py-1 rounded text-xs cursor-pointer">取消链接</button>';
+    '<button id="edAskOk" class="bg-primary text-white px-2.5 py-1 rounded text-xs cursor-pointer">确定</button>'+
+    (opts.extra?('<button id="edAskExtra" class="border border-slate-300 px-2.5 py-1 rounded text-xs cursor-pointer">'+opts.extra.label+'</button>'):'');
   const r=(anchorEl||document.body).getBoundingClientRect();
   box.style.left=(r.left+window.scrollX)+'px';
   box.style.top=(r.bottom+window.scrollY+4)+'px';
   document.body.appendChild(box);
-  const input=box.querySelector('#edUrlInput');
+  const input=box.querySelector('#edAskInput');
   input.focus();
   const close=()=>box.remove();
-  const commit=v=>{
+  box.querySelector('#edAskOk').onclick=()=>{
+    const v=input.value.trim();
+    if(!v){toast('请输入内容',false);return}
+    opts.onOk(v);
+    edView.focus();
+    close();
+  };
+  if(opts.extra){
+    box.querySelector('#edAskExtra').onclick=()=>{opts.extra.onClick();edView.focus();close()};
+  }
+  input.onkeydown=ev=>{
+    if(ev.key==='Enter'){ev.preventDefault();box.querySelector('#edAskOk').click()}
+    if(ev.key==='Escape'){ev.preventDefault();close()}
+  };
+}
+
+/**
+ * 「插入 → 超链接」：库不弹框问 URL，宿主收完再调库的 setHyperlink ——
+ * 它连 Word 观感（蓝 0563C1 + 下划线）一起套，与读 docx 时那套一致。
+ */
+function edAskUrl(anchorEl){
+  const put=v=>{
     // # 开头当文档内书签（内链），其余当外链 URL
     const anchor=v.startsWith('#')?v.slice(1):'';
     edView.apply(rg=>OfficiaEditor.setHyperlink(rg, anchor?undefined:v, anchor||undefined));
-    edView.focus();
     toast(v?('已加链接：'+v):'已取消链接');
-    close();
   };
-  box.querySelector('#edUrlOk').onclick=()=>{
-    const v=input.value.trim();
-    if(!v){toast('请输入 URL',false);return}
-    commit(v);
-  };
-  box.querySelector('#edUrlOff').onclick=()=>commit('');
-  input.onkeydown=ev=>{
-    if(ev.key==='Enter'){ev.preventDefault();box.querySelector('#edUrlOk').click()}
-    if(ev.key==='Escape'){ev.preventDefault();close()}
-  };
+  edAskLine(anchorEl,{
+    placeholder:'https://… 或 #书签名',
+    onOk:put,
+    extra:{label:'取消链接',onClick:()=>put('')},
+  });
+}
+
+/**
+ * 「插入 → 书签」：与超链接是一对——内链指向的正是这里建的名字。
+ *
+ * 🔴 书签在画布上【按设计不可见】（Word 默认也不显示），所以别指望点完看到什么变化；
+ * 它存回 docx 是 w:bookmarkStart/End，内链 `#名字` 就能跳到这儿。
+ */
+function edAskBookmark(anchorEl){
+  edAskLine(anchorEl,{
+    placeholder:'书签名（如 第一章）',
+    onOk:v=>{
+      const ok=edView.apply(rg=>OfficiaEditor.insertBookmark(rg, v));
+      toast(ok?('已插入书签：'+v+'（画布上不可见，内链写 #'+v+' 即可跳转）')
+              :'插入书签失败：光标不在可编辑处', ok);
+    },
+  });
 }
 
 /** 「插入 → 图片」：库不弹文件框，宿主选完把字节交回去。 */
