@@ -713,6 +713,21 @@ function pick(id){document.getElementById(id).click()}
  * 临时 a 元素不插进 DOM —— 只要设了 href 与 download，click() 就生效，
  * 插进去反而要记得清理。
  */
+/**
+ * 导出用的文件名：源基名 + `_导出` + 目标扩展名。
+ *
+ * 🔴 源扩展名必须先剥掉：源是 docx 而导出 PDF 时，留着会得到
+ * 「合同.docx_导出.pdf」。剥的是<b>最后一段</b>扩展名，
+ * 「2026.年报.docx」这类带点的名字只丢 `.docx`。
+ *
+ * @param src 用户上传的文件名；空则用「未命名」
+ * @param ext 目标扩展名（不带点）
+ */
+function exportName(src, ext){
+  const base=(src||'').replace(/\.[^.\\/]*$/, '').trim() || '未命名';
+  return base+'_导出.'+ext;
+}
+
 function fire(id, name){
   const a=document.createElement('a');
   a.href='/api/result/'+id+'?download=1';
@@ -1037,7 +1052,9 @@ async function edSave(fmt){
   if(!edView){toast('还没加载文档',false);return}
   try{
     const t0=performance.now();
-    const j=await api('/api/editor/save?format='+fmt,{method:'POST',body:edView.json()});
+    const name=exportName(edName, fmt);
+    const j=await api('/api/editor/save?format='+fmt+'&name='+encodeURIComponent(name),
+      {method:'POST',body:edView.json()});
     const ms=(performance.now()-t0).toFixed(0);
     document.getElementById('edOut').innerHTML=
       '<div class="bg-white rounded-lg border border-slate-200 p-4 flex items-center gap-4">'+
@@ -1361,8 +1378,9 @@ async function exSave(){
   if(!exEditor){toast('还没加载工作簿',false);return}
   try{
     const t0=performance.now();
-    const j=await api('/api/editor/workbook/save',{method:'POST',
-      body:JSON.stringify(exEditor.view.wb)});
+    const j=await api('/api/editor/workbook/save?name='
+      +encodeURIComponent(exportName(exName,'xlsx')),
+      {method:'POST',body:JSON.stringify(exEditor.view.wb)});
     const ms=(performance.now()-t0).toFixed(0);
     document.getElementById('exOut').innerHTML=
       '<div class="bg-white rounded-lg border border-slate-200 p-4 flex items-center gap-4">'+

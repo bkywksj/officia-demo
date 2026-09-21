@@ -1070,7 +1070,7 @@ final class ApiRoutes {
             EditorFormat target = "pdf".equals(fmt) ? EditorFormat.PDF : EditorFormat.DOCX;
             long t0 = System.nanoTime();
             byte[] out = OfficiaEditor.save(json, target);
-            Http.json(ex, result("editor-saved." + fmt,
+            Http.json(ex, result(downloadName(q.get("name"), "editor-saved." + fmt),
                     target == EditorFormat.PDF ? "application/pdf"
                         : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     out, t0).end());
@@ -1140,7 +1140,7 @@ final class ApiRoutes {
             String json = new String(Http.body(ex), StandardCharsets.UTF_8);
             long t0 = System.nanoTime();
             byte[] xlsx = OfficiaEditor.saveWorkbook(json);
-            Http.json(ex, result("editor-saved.xlsx",
+            Http.json(ex, result(downloadName(q.get("name"), "editor-saved.xlsx"),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 xlsx, t0).end());
         });
@@ -1297,6 +1297,36 @@ final class ApiRoutes {
     }
 
     /** 产物元信息 JSON（附当前授权态，前端据此提示"评估降级"）。 */
+    /**
+     * 导出用的下载名：调用方给什么用什么，给不出就回退到固定名。
+     *
+     * <p>名字由前端算（只有它知道用户上传的是哪个文件），但这是个<b>对外端点</b>，
+     * 入参一律当不可信处理：剔掉路径分隔符与控制字符（{@code ../} 这类穿越、
+     * 换行注入 Content-Disposition），并限长。中文不动——下载头走 RFC 5987 编码。</p>
+     *
+     * @param requested 前端请求的文件名；null / 空 / 清洗后为空都走回退
+     * @param fallback  回退名
+     */
+    // 包级可见（不是 private）：同包的 ExportNameTest 直接钉它的清洗规则。
+    // 这条规则是对外端点的入参防线，值得单测，而不是只靠上层路由间接覆盖
+    static String downloadName(String requested, String fallback) {
+        if (requested == null || requested.isBlank()) {
+            return fallback;
+        }
+        StringBuilder sb = new StringBuilder(requested.length());
+        for (char c : requested.toCharArray()) {
+            if (c == '/' || c == '\\' || c < 0x20 || c == 0x7f || c == '"') {
+                continue;
+            }
+            sb.append(c);
+        }
+        String clean = sb.toString().trim();
+        if (clean.isEmpty() || ".".equals(clean) || "..".equals(clean)) {
+            return fallback;
+        }
+        return clean.length() > 120 ? clean.substring(0, 120) : clean;
+    }
+
     private static Json result(String name, String mime, byte[] data, long t0) {
         return store(name, mime, data, t0).toJson()
             .put("evaluation", OfficiaLicense.isEvaluation())
