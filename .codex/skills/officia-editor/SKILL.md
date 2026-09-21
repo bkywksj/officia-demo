@@ -201,6 +201,15 @@ if (e.cap === '脚注') { askText().then(text =>
   view.apply(r => OfficiaEditor.insertFootnote(r.to, text))); }
 ```
 
+**目录不走宿主**——大纲现成就在 `doc.outlines` 里（读 docx 时 `registerOutline` 已登记，
+并在标题段首自动挂 `__officia_outline_N` 书签），`runWordsCommand` 直接处理：
+
+```js
+// 页码是 PAGEREF 域，由排版层按分页结果算，加页会自动更新。
+// 文档没有标题（outlines 为空）时返回 false——插一个空目录毫无意义
+OfficiaEditor.insertToc(doc, atBlockIndex, contentWidthPt);
+```
+
 ⚠️ 书签在画布上**按设计不可见**（Word 默认也不显示）。别拿「画面变没变」当它做没做成的判据——
 判据是 IR 里多了 anchor 节点、存回 docx 是 `w:bookmarkStart/End`、内链能指到它。
 
