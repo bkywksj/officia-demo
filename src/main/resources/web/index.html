@@ -972,8 +972,52 @@ function edRibbonCommand(e){
   }
   if(e.cap==='页面视图'){toast('已是页面视图（CanvasRenderer）');return}
   if(e.cap==='图片'){document.getElementById('edImgFile').click();return}
+  if(e.cap==='超链接'){edAskUrl(e.el);return}
   const why=OfficiaEditor.WORDS_UNWIRED.get(e.cap);
   toast(why?(e.cap+'：'+why):(e.cap+'：这一步没有改动文档（可能光标不在可编辑处，或选项无需变更）'),false);
+}
+
+/**
+ * 「插入 → 超链接」：库不弹框问 URL（window.prompt 是模态、会阻塞事件循环，
+ * 样式也不可控），宿主收完再调库的 setHyperlink —— 它连 Word 观感
+ * （蓝 0563C1 + 下划线）一起套，与读 docx 时那套一致。
+ */
+function edAskUrl(anchorEl){
+  if(!edView){toast('还没加载文档',false);return}
+  document.getElementById('edUrlBox')?.remove();
+  const box=document.createElement('div');
+  box.id='edUrlBox';
+  box.className='absolute z-50 bg-white border border-slate-300 rounded shadow-lg p-2 flex gap-2 items-center';
+  box.innerHTML=
+    '<input id="edUrlInput" placeholder="https://… 或 #书签名" '+
+    'class="border border-slate-300 rounded px-2 py-1 text-xs w-64 outline-none focus:border-primary">'+
+    '<button id="edUrlOk" class="bg-primary text-white px-2.5 py-1 rounded text-xs cursor-pointer">确定</button>'+
+    '<button id="edUrlOff" class="border border-slate-300 px-2.5 py-1 rounded text-xs cursor-pointer">取消链接</button>';
+  const r=(anchorEl||document.body).getBoundingClientRect();
+  box.style.left=(r.left+window.scrollX)+'px';
+  box.style.top=(r.bottom+window.scrollY+4)+'px';
+  document.body.appendChild(box);
+  const input=box.querySelector('#edUrlInput');
+  input.focus();
+  const close=()=>box.remove();
+  const commit=v=>{
+    // # 开头当文档内书签（内链），其余当外链 URL
+    const anchor=v.startsWith('#')?v.slice(1):'';
+    edView.apply(rg=>OfficiaEditor.setHyperlink(rg, anchor?undefined:v, anchor||undefined));
+    edView.focus();
+    toast(v?('已加链接：'+v):'已取消链接');
+    close();
+  };
+  box.querySelector('#edUrlOk').onclick=()=>{
+    const v=input.value.trim();
+    if(!v){toast('请输入 URL',false);return}
+    commit(v);
+  };
+  box.querySelector('#edUrlOff').onclick=()=>commit('');
+  input.onkeydown=ev=>{
+    if(ev.key==='Enter'){ev.preventDefault();box.querySelector('#edUrlOk').click()}
+    if(ev.key==='Escape'){ev.preventDefault();close()}
+  };
 }
 
 /** 「插入 → 图片」：库不弹文件框，宿主选完把字节交回去。 */

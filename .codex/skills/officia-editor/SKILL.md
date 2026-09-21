@@ -174,7 +174,28 @@ const why = OfficiaEditor.WORDS_UNWIRED.get(e.cap);   // Map<控件名, 为什�
 ```
 
 `*_HOST_CAPS` 是**按设计交给宿主**的那几个（缩放、页面视图、插图要弹文件框、
-Cells 的立即重算要走服务端），不是失败。
+超链接要弹框问 URL、Cells 的立即重算要走服务端），不是失败。
+
+宿主接管的两个要点：
+
+```js
+// 插图：库不弹文件框，宿主选完把字节交回去
+if (e.cap === '图片') { filePicker().then(bytes =>
+  view.apply(r => new OfficiaEditor.InsertImage(r.to, bytes, { w: 200 }))); }
+
+// 超链接：库不弹框问 URL。🔴 收到后调 setHyperlink，**不要**自己写
+// SetTextStyle({ link })——画布对 st.link 零个引用，只设 link 用户点完画面纹丝不动；
+// setHyperlink 连 Word 观感（蓝 HYPERLINK_COLOR 0563C1 + 下划线）一起套，
+// 与读 docx 时解析器给的那套一致。不传 uri 也不传 anchor 即取消链接（观感一并撤掉）
+if (e.cap === '超链接') { askUrl().then(url =>
+  view.apply(r => OfficiaEditor.setHyperlink(r, url))); }
+// 内链（文档内书签）：OfficiaEditor.setHyperlink(r, undefined, '第一章')
+```
+
+⚠️ 弹框别用 `window.prompt`：它是模态，会阻塞事件循环，样式也不可控。
+
+⚠️ 超链接要求选区**落在同一段正文内**：`view.apply` 拿不到 IR 区间时返回 false。
+全选一份带表格的文档会判成"不可编辑"（跨表格/分页符这类非段落块），这是能力边界。
 
 ### 4. 挂外壳（右侧属性面板 + 底部状态栏）
 
