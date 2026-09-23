@@ -103,6 +103,7 @@ byte[] xlsx   = OfficiaEditor.saveWorkbook(next);        // 写回 xlsx
 
 算不出来的格写成 `#VALUE!`，**不让整张表失败**；失败原因附在返回 JSON 的根级可选字段
 `recalcErrors`（`[{sheet, ref, message}]`，无失败时不出现），界面据此提示「哪张表哪个格为什么算不出来」。
+引擎**解析不了**的写法（如跨表引用 `Sheet1!A1`）例外：带缓存值的保留 Excel 存下的结果、不重算，引用它的公式照常用这个值算，消息以「引擎不支持此公式写法，保留原缓存值」开头；没缓存值的才写 `#VALUE!`。
 循环引用（`A1=B1, B1=A1`）由求值栈检出并落成错误格，**不会栈溢出**。
 
 ---
@@ -245,6 +246,8 @@ Cells 侧对应 `OfficiaEditor.mountCellsShell(panelHost, statusHost, { editor, 
 ```js
 const editor = OfficiaEditor.Cells.mountWorkbook(host, workbookJson, {
   onCellCommitted: (e) => { if (editor.hasFormula) scheduleRecalc(); },
+  // 提交、Delete 清空、Ctrl+Z / Ctrl+Y、拖列宽行高之后都会调——撤销也会改动公式依赖的格
+  onChange: () => { if (editor.hasFormula) scheduleRecalc(); },
 });
 editor.view;                 // WorkbookView：选区、活动格、公式栏文本
 editor.paint();
@@ -256,7 +259,14 @@ editor.applyRecalc(next);    // 只并回计算结果，选区/滚动/正在编�
 🔴 **公式结果不在浏览器里算**：同一个 35 函数引擎只有一份（在服务端），
 前端另写一套，「编辑器里的数字与 xlsx→PDF 算出的必然一致」这句承诺就作废了。
 所以打开时若 `staleFormulaCount > 0` 要先 `recalc` 一次，之后每次 `onCellCommitted`
+（及 `onChange`：撤销 / 重做 / Delete 清空也会牵动公式，只挂 `onCellCommitted` 的话按 Ctrl+Z 后公式停在旧值）
 再按需重算——**不是「提交的是公式才算」**，改一个常量同样会牵动引用它的公式。
+
+格内输入按 Excel 的规矩识别：在「常规」格里敲 `1,000`、`50%`、`2023-03-15`、`12:30`，
+存的是**数值**（1000、0.5、日期序列值、一天的小数），并顺手配上 `#,##0` / `0%` / `yyyy-mm-dd` / `h:mm`
+格式——所以 `SUM` 算得到它们、排序按数值排。已设过数字格式的格只存值、不改格式。
+开头敲一个英文单引号强制存文本（`'00123` 存 `00123`，引号本身不存），
+这类格在公式栏里也带着引号显示，原样回车不会被改成数字。
 
 ⚠️ **xls 进、xlsx 出**：`openWorkbook` 也收 .xls（未加密），JSON 顶层会多一个
 `"src": "xls"`；而写侧只有 xlsx，`saveWorkbook` 存回来的一定是 xlsx。
