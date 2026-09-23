@@ -884,6 +884,18 @@ function edOnChange(st){
       if(b){b.style.opacity=st.canEditStructure?'1':'.35';
         b.title=st.canEditStructure?b.title:'多分节文档暂不支持插入块（改动传导不回各节）';}
     }
+    // 复选框按【文档】回读，不信原型里的静态勾选：「首页不同页眉」原型写死了 checked，
+    // 文档里其实没有 titlePg，于是用户第一次点它执行的是「关闭」——什么都没变
+    // （全面实测时抓到）。构造期 edView 还是 null，跳过即可，下一次变更会再播报
+    const doc=edView&&edView.doc;
+    if(doc){
+      const sec0=(doc.sections&&doc.sections[0])||{};
+      const ps=doc.pageSetup||{};
+      for(const [cap,on] of [['首页不同页眉',!!(sec0.titlePg||doc.titlePg)],['行号',!!ps.lineNumBy]]){
+        const box=edRibbon.control(cap)?.querySelector('input[type=checkbox]');
+        if(box)box.checked=on;
+      }
+    }
   }
   document.getElementById('edPagesJs').textContent=st.pageCount;
   // 用 st.renderedCount 而不是 edView.renderedCount：构造期就会播报一次初始状态，
