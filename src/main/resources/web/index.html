@@ -878,11 +878,11 @@ function edOnChange(st){
       const b=edRibbon.control(cap);
       if(b)b.style.opacity=can?'1':'.35';
     }
-    // 多分节文档改不了块序列，插入类命令一律置灰（库侧报 canEditStructure=false）
+    // 库侧报 canEditStructure=false 时插入类命令置灰。自 1.1.5 起多分节文档也可增删块（恒为 true），留着兜底
     for(const cap of ['表格','分页符','分栏符','分节符']){
       const b=edRibbon.control(cap);
       if(b){b.style.opacity=st.canEditStructure?'1':'.35';
-        b.title=st.canEditStructure?b.title:'多分节文档暂不支持插入块（改动传导不回各节）';}
+        b.title=st.canEditStructure?b.title:'当前文档不支持插入块';}
     }
     // 复选框按【文档】回读，不信原型里的静态勾选：「首页不同页眉」原型写死了 checked，
     // 文档里其实没有 titlePg，于是用户第一次点它执行的是「关闭」——什么都没变
@@ -1204,7 +1204,7 @@ async function exLoad(id){
     if(exEditor&&exEditor.destroy)exEditor.destroy();
     host.textContent='';
     const t0=performance.now();
-    exEditor=OfficiaEditor.Cells.mountWorkbook(host,exJson,{onCellCommitted:exOnCommit});
+    exEditor=OfficiaEditor.Cells.mountWorkbook(host,exJson,{onCellCommitted:exOnCommit,onChange:exOnCommit});
     const ms=(performance.now()-t0).toFixed(0);
 
     document.getElementById('exCards').style.display='';
@@ -1307,6 +1307,7 @@ function exRibbonCommand(e){
   if(e.cap==='编辑栏'){exView.formulaBar=(e.value!=='false');exToggleFormulaBar();return}
   if(e.cap==='普通'){toast('已是普通视图（paintGrid）');return}
   if(e.cap==='导入 CSV'){document.getElementById('exCsvFile').click();return}
+  if(e.cap==='符号'){exSymbolPalette(e.el);return}
   const why=OfficiaEditor.CELLS_UNWIRED.get(e.cap);
   info.textContent=why?(e.cap+'：'+why):(e.cap+'：这一步没有改动工作簿（选区不满足前提，或值无需变更）');
 }
@@ -1327,7 +1328,7 @@ function exRepaint(){
   exEditor.destroy();host.textContent='';
   const theme=Object.assign({},OfficiaEditor.Cells.DEFAULT_THEME);
   if(!exView.gridLine)theme.gridLine='transparent';
-  exEditor=OfficiaEditor.Cells.mountWorkbook(host,wb,{theme,onCellCommitted:exOnCommit,
+  exEditor=OfficiaEditor.Cells.mountWorkbook(host,wb,{theme,onCellCommitted:exOnCommit,onChange:exOnCommit,
     headerWidth:exView.header?undefined:0,headerHeight:exView.header?undefined:0});
   exToggleFormulaBar();
   if(exShell)exMountShell();
@@ -1340,15 +1341,33 @@ function exToggleFormulaBar(){
 }
 
 /** 「公式 → 错误检查」：重算一次，把算不出来的格列出来（只呈现，不写回）。 */
+/**
+ * 重算结果里的两类记录要分开说：
+ *   · 沿用原结果——引擎不认识的写法（跨表引用等），保留了原文件里 Excel 算好的值，数据是对的；
+ *   · 算不出来——公式自身的问题，格子里是 #VALUE!。
+ * 混在一起报「2400 个格算不出来」，用户会以为表坏了，而那些格其实都显示着正确的数。
+ */
+function exRecalcSummary(next){
+  const all=next.recalcErrors||[];
+  const kept=all.filter(e=>(e.message||'').startsWith('引擎不支持此公式写法'));
+  const bad=all.filter(e=>!(e.message||'').startsWith('引擎不支持此公式写法'));
+  const parts=[];
+  if(bad.length)parts.push(bad.length+' 个格算不出来：'+bad[0].ref+' '+bad[0].message);
+  if(kept.length)parts.push(kept.length+' 个格沿用原文件的结果（跨表引用等写法暂不参与重算）');
+  return {text:parts.join('；'), bad, kept};
+}
+
 async function exCheckErrors(){
   try{
     const j=await api('/api/editor/workbook/recalc',{method:'POST',
       body:JSON.stringify(exEditor.view.wb)});
     const r=await fetch('/api/result/'+j.id+'?download=1');
     const next=await r.json();
-    const errs=next.recalcErrors||[];
+    const sum=exRecalcSummary(next), errs=sum.bad;
     const note=document.getElementById('exRecalcNote');
-    note.textContent=errs.length?(errs.length+' 个格算不出来：'+errs.map(x=>x.ref).join(' ')):'全部算得出，没有错误格';
+    note.textContent=errs.length?(errs.length+' 个格算不出来：'+errs.map(x=>x.ref).join(' ')
+      +(sum.kept.length?'；另 '+sum.kept.length+' 个格沿用原文件的结果':''))
+      :('没有错误格'+(sum.kept.length?'（'+sum.kept.length+' 个格沿用原文件的结果，跨表引用等写法暂不参与重算）':''));
     note.className='text-xs mt-1 '+(errs.length?'text-amber-600':'text-emerald-600');
     toast(errs.length?('发现 '+errs.length+' 个错误格'):'没有错误格');
   }catch(e){toast(e.message,false)}
@@ -1372,6 +1391,39 @@ async function exImportCsv(f){
  * 改一个常量会牵动引用它的公式（把 C2 从 820 改成 82022，D2=B2-C2 就该跟着变）。
  * 判 isFormula 只用来决定要不要立刻算，节流窗口都一样。
  */
+/**
+ * 「插入 → 符号」：库把它列为宿主控件（要一个选择面板，选完才知道插什么），
+ * 此前 demo 没接，点了只提示「没有改动工作簿」。点一个符号追加到当前格末尾，
+ * 走 EditCell 命令，Ctrl+Z 撤得掉。
+ */
+function exSymbolPalette(anchorEl){
+  document.getElementById('exSymBox')?.remove();
+  const box=document.createElement('div');
+  box.id='exSymBox';
+  box.className='absolute z-50 bg-white border border-slate-300 rounded shadow-lg p-2 grid grid-cols-8 gap-1';
+  for(const ch of ['✓','✗','○','●','□','■','★','※','℃','￥','±','×','÷','≤','≥','→','←','↑','↓','①','②','③','Ⅰ','Ⅱ']){
+    const b=document.createElement('button');
+    b.textContent=ch;
+    b.className='w-7 h-7 border border-slate-200 rounded hover:border-primary cursor-pointer';
+    b.onclick=()=>{
+      const v=exEditor.view, s=v.selection, r=s.focusRow, c=s.focusCol;
+      const cur=v.formulaBarText||'';
+      v.execute(new OfficiaEditor.Cells.EditCell(v.activeSheetIndex,r,c,cur.startsWith('=')?ch:cur+ch));
+      exEditor.paint();
+      box.remove();
+      exOnCommit();
+    };
+    box.appendChild(b);
+  }
+  const r=(anchorEl||document.body).getBoundingClientRect();
+  box.style.left=(r.left+window.scrollX)+'px';
+  box.style.top=(r.bottom+window.scrollY+4)+'px';
+  document.body.appendChild(box);
+  setTimeout(()=>document.addEventListener('mousedown',function off(ev){
+    if(!box.contains(ev.target)){box.remove();document.removeEventListener('mousedown',off)}
+  }),0);
+}
+
 function exOnCommit(info){
   if(!exEditor||!exEditor.hasFormula)return;
   exScheduleRecalc();
@@ -1398,12 +1450,12 @@ async function exAutoRecalc(){
     const changed=exEditor.applyRecalc(next);
     document.getElementById('exRecalcMs').textContent=(j.ms||0)+' ms';
     const note=document.getElementById('exRecalcNote');
-    const bad=(next.recalcErrors||[]).length;
+    const sum=exRecalcSummary(next), bad=sum.bad.length;
     if(bad){
-      note.textContent=bad+' 个格算不出来：'+next.recalcErrors[0].ref+' '+next.recalcErrors[0].message;
+      note.textContent=sum.text;
       note.className='text-xs text-amber-600 mt-1';
     }else{
-      note.textContent='自动重算 · '+changed+' 格更新 · 服务端 '+(j.ms||0)+' ms';
+      note.textContent='自动重算 · '+changed+' 格更新 · 服务端 '+(j.ms||0)+' ms'+(sum.kept.length?' · '+sum.text:'');
       note.className='text-xs text-emerald-600 mt-1';
     }
     exProbe={recalcMs:j.ms||0, recalcErrors:bad};
@@ -1433,18 +1485,19 @@ async function exRecalc(){
     if(exEditor.destroy)exEditor.destroy();
     host.textContent='';
     exJson=next;
-    exEditor=OfficiaEditor.Cells.mountWorkbook(host,next,{onCellCommitted:exOnCommit});
+    exEditor=OfficiaEditor.Cells.mountWorkbook(host,next,{onCellCommitted:exOnCommit,onChange:exOnCommit});
     // 重算读数是服务端算出来的，不在工作簿里——交给「检查」页当 probe
-    exProbe={recalcMs:j.ms||0, recalcErrors:(next.recalcErrors||[]).length};
+    exProbe={recalcMs:j.ms||0, recalcErrors:exRecalcSummary(next).bad.length};
     exMountShell();
     document.getElementById('exPainted').textContent=exEditor.paintedCellCount;
     document.getElementById('exRecalcMs').textContent=(j.ms||0)+' ms';
     const note=document.getElementById('exRecalcNote');
-    if(next.recalcErrors&&next.recalcErrors.length){
-      note.textContent=next.recalcErrors.length+' 个格算不出来：'+next.recalcErrors[0].ref+' '+next.recalcErrors[0].message;
+    const sum=exRecalcSummary(next);
+    if(sum.bad.length){
+      note.textContent=sum.text;
       note.className='text-xs text-amber-600 mt-1';
     }else{
-      note.textContent='全部算出，服务端 '+(j.ms||0)+' ms / 往返 '+ms+' ms';
+      note.textContent='全部算出，服务端 '+(j.ms||0)+' ms / 往返 '+ms+' ms'+(sum.kept.length?' · '+sum.text:'');
       note.className='text-xs text-emerald-600 mt-1';
     }
     toast('已重算');

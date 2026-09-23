@@ -30,6 +30,9 @@ import plus.ruoyi.officia.slides.OfficiaSlides;
 import plus.ruoyi.officia.words.OfficiaWords;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1135,6 +1138,22 @@ final class ApiRoutes {
                 .end());
         });
 
+        // CSV → xlsx：Cells 编辑器「导入 CSV」用。
+        // 🔴 前端早就在调这个端点，demo 却一直没有它——点「导入 CSV」只弹「demo 未暴露 csv→工作簿端点」
+        //（工具栏逐个实测时抓到）。库没有 CSV→工作簿的门面，这里只用公开接口拼：
+        // OfficiaCells.parseCsv 解析成二维表 → 拼 officia-workbook/1 → OfficiaEditor.saveWorkbook 存成 xlsx，
+        // 前端再按普通 xlsx 走 /workbook/open，与打开文件是同一条路
+        r.add("/api/editor/workbook/fromcsv", (ex, q) -> {
+            byte[] src = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            List<List<String>> rows = OfficiaCells.parseCsv(decodeCsv(src));
+            byte[] xlsx = OfficiaEditor.saveWorkbook(csvWorkbookJson(rows));
+            Http.json(ex, result(outName(q.get("id"), "xlsx", "imported.xlsx"),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx, t0)
+                .put("rows", rows.size())
+                .end());
+        });
+
         // JSON → xlsx（网格编辑器保存回来走的路径）
         r.add("/api/editor/workbook/save", (ex, q) -> {
             String json = new String(Http.body(ex), StandardCharsets.UTF_8);
@@ -1144,6 +1163,46 @@ final class ApiRoutes {
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 xlsx, t0).end());
         });
+    }
+
+    /**
+     * CSV 字节 → 文本：先按严格 UTF-8 试（去掉 BOM），不合法再按 GBK——
+     * 国内 Excel「另存为 CSV」默认就是 GBK，一律按 UTF-8 读会满屏乱码。
+     */
+    private static String decodeCsv(byte[] src) {
+        int from = src.length >= 3 && (src[0] & 0xFF) == 0xEF && (src[1] & 0xFF) == 0xBB && (src[2] & 0xFF) == 0xBF ? 3 : 0;
+        try {
+            return StandardCharsets.UTF_8.newDecoder()
+                .decode(ByteBuffer.wrap(src, from, src.length - from)).toString();
+        } catch (CharacterCodingException e) {
+            return new String(src, Charset.forName("GBK"));
+        }
+    }
+
+    /** 二维表 → officia-workbook/1 JSON（一张表；像数字的格存成数值，其余存文本）。 */
+    private static String csvWorkbookJson(List<List<String>> rows) {
+        StringBuilder sb = new StringBuilder("{\"schema\":\"officia-workbook/1\",\"styles\":[{}],"
+            + "\"sheets\":[{\"name\":\"导入\",\"cells\":[");
+        boolean first = true;
+        for (int r = 0; r < rows.size(); r++) {
+            List<String> row = rows.get(r);
+            for (int c = 0; c < row.size(); c++) {
+                String v = row.get(c);
+                if (v == null || v.isEmpty()) {
+                    continue;
+                }
+                sb.append(first ? "" : ",").append("{\"r\":").append(r).append(",\"c\":").append(c);
+                first = false;
+                if (v.matches("-?\\d+(\\.\\d+)?")) {
+                    sb.append(",\"t\":\"NUMBER\",\"n\":").append(v);
+                } else {
+                    sb.append(",\"t\":\"STRING\",\"s\":");
+                    Json.writeString(sb, v);
+                }
+                sb.append('}');
+            }
+        }
+        return sb.append("]}]}").toString();
     }
 
     /** 数一数 JSON 里某个键出现了几次——只为在界面上给个规模感，不做解析。 */
