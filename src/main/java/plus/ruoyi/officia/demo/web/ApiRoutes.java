@@ -1127,7 +1127,7 @@ final class ApiRoutes {
                 .end());
         });
 
-        // 公式重算：走 Officia.Cells 那 50 个函数的同一个引擎，与 xlsx→PDF 的数字必然一致
+        // 公式重算：走 Officia.Cells 那 80 个函数的同一个引擎，与 xlsx→PDF 的数字必然一致
         r.add("/api/editor/workbook/recalc", (ex, q) -> {
             String json = new String(Http.body(ex), StandardCharsets.UTF_8);
             long t0 = System.nanoTime();

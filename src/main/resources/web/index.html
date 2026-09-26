@@ -616,7 +616,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
       <div class="text-sm text-slate-600 mb-3">
         上传 xlsx → 服务端出 <code class="text-xs bg-slate-100 px-1 rounded">officia-workbook/1</code> JSON
         → <b>浏览器端 Canvas 网格</b>（公式栏 / 多 Sheet / 拖列宽）。改完公式点「重算」，
-        走的是 <b>Officia.Cells 那 50 个函数的同一个引擎</b>——编辑器里的数字与 xlsx→PDF 算出的必然一致。
+        走的是 <b>Officia.Cells 那 80 个函数的同一个引擎</b>——编辑器里的数字与 xlsx→PDF 算出的必然一致。
       </div>
       <div class="flex items-center gap-3 flex-wrap">
         <input type="file" id="exFile" class="hidden" accept=".xlsx,.xls" onchange="exUpload(this.files[0])">
@@ -650,7 +650,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
       <div class="bg-white rounded-lg border border-slate-200 p-4">
         <div class="text-xs text-slate-400 mb-1">最近一次重算</div>
         <div class="text-2xl font-semibold" id="exRecalcMs">-</div>
-        <div class="text-xs text-slate-400 mt-1" id="exRecalcNote">走服务端 50 函数引擎</div>
+        <div class="text-xs text-slate-400 mt-1" id="exRecalcNote">走服务端 80 函数引擎</div>
       </div>
     </div>
 
@@ -1269,7 +1269,7 @@ function exBackstage(){
   const cells=wb?wb.sheets.reduce((n,s)=>n+((s.cells&&s.cells.length)||0),0):0;
   return {
     title:exName||'未命名工作簿.xlsx',
-    subtitle:'由 OfficiaEditor.saveWorkbook 写回；公式走服务端那 50 个函数的同一个引擎',
+    subtitle:'由 OfficiaEditor.saveWorkbook 写回；公式走服务端那 80 个函数的同一个引擎',
     sections:['信息','导出'],
     info:[
       ['工作表',String(wb?wb.sheets.length:0)],
@@ -1279,7 +1279,7 @@ function exBackstage(){
     ],
     exports:[
       {label:'XLSX',note:'XlsxWriter 写出',onPick:()=>exSave()},
-      {label:'重算后 XLSX',note:'先跑一遍 50 函数引擎',onPick:()=>exRecalc().then(()=>exSave())},
+      {label:'重算后 XLSX',note:'先跑一遍 80 函数引擎',onPick:()=>exRecalc().then(()=>exSave())},
     ],
   };
 }
@@ -1343,7 +1343,7 @@ function exToggleFormulaBar(){
 /** 「公式 → 错误检查」：重算一次，把算不出来的格列出来（只呈现，不写回）。 */
 /**
  * 重算结果里的两类记录要分开说：
- *   · 沿用原结果——引擎算不了的公式（数组公式、SUMPRODUCT 等未支持的函数、外部工作簿引用），保留了原文件里 Excel 算好的值，数据是对的；
+ *   · 沿用原结果——引擎算不了的公式（OFFSET、INDIRECT 等未支持的函数、外部工作簿引用），保留了原文件里 Excel 算好的值，数据是对的；
  *   · 算不出来——公式自身的问题，格子里是 #VALUE!。
  * 混在一起报「2400 个格算不出来」，用户会以为表坏了，而那些格其实都显示着正确的数。
  */
@@ -1353,7 +1353,7 @@ function exRecalcSummary(next){
   const bad=all.filter(e=>!(e.message||'').startsWith('引擎不支持此公式写法'));
   const parts=[];
   if(bad.length)parts.push(bad.length+' 个格算不出来：'+bad[0].ref+' '+bad[0].message);
-  if(kept.length)parts.push(kept.length+' 个格沿用原文件的结果（数组公式、未支持的函数等暂不参与重算）');
+  if(kept.length)parts.push(kept.length+' 个格沿用原文件的结果（未支持的函数等暂不参与重算）');
   return {text:parts.join('；'), bad, kept};
 }
 
@@ -1367,7 +1367,7 @@ async function exCheckErrors(){
     const note=document.getElementById('exRecalcNote');
     note.textContent=errs.length?(errs.length+' 个格算不出来：'+errs.map(x=>x.ref).join(' ')
       +(sum.kept.length?'；另 '+sum.kept.length+' 个格沿用原文件的结果':''))
-      :('没有错误格'+(sum.kept.length?'（'+sum.kept.length+' 个格沿用原文件的结果，数组公式、未支持的函数等暂不参与重算）':''));
+      :('没有错误格'+(sum.kept.length?'（'+sum.kept.length+' 个格沿用原文件的结果，未支持的函数等暂不参与重算）':''));
     note.className='text-xs mt-1 '+(errs.length?'text-amber-600':'text-emerald-600');
     toast(errs.length?('发现 '+errs.length+' 个错误格'):'没有错误格');
   }catch(e){toast(e.message,false)}
@@ -1436,7 +1436,7 @@ let exAutoTimer=null;
  * 静默重算：把当前 JSON 交服务端算，只把结果并回网格。
  *
  * 与「重算」按钮的区别是**不重建视图**——选区、滚动位置、正在编辑的那一格都保留。
- * 公式结果不在浏览器里算：同一个 50 函数引擎只有一份（在服务端），
+ * 公式结果不在浏览器里算：同一个 80 函数引擎只有一份（在服务端），
  * 前端另写一套，「编辑器里的数字与 xlsx→PDF 算出的必然一致」这句承诺就作废了。
  */
 async function exAutoRecalc(){
@@ -1475,7 +1475,7 @@ async function exRecalc(){
   if(!exEditor){toast('还没加载工作簿',false);return}
   try{
     const t0=performance.now();
-    // 把网格里当前这份 JSON 交回服务端，用 50 函数引擎算——不在浏览器里另写一套求值器
+    // 把网格里当前这份 JSON 交回服务端，用 80 函数引擎算——不在浏览器里另写一套求值器
     const j=await api('/api/editor/workbook/recalc',{method:'POST',
       body:JSON.stringify(exEditor.view.wb)});
     const r=await fetch('/api/result/'+j.id+'?download=1');
