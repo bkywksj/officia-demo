@@ -142,7 +142,7 @@
     "key_facts_extracted": [
       "ConvertOptions 四项配置与默认值；PageSize 五个枚举值及尺寸",
       "OfficiaWords 16 个 fillTemplate* 重载；模板九类占位符语法（取自 Wml*/Template* 实现类注释）",
-      "FormulaEngine 支持的 35 个 Excel 函数（grep case \"XXX\" 去重实得，2026-09-08 复核；此前记 34 为旧数）",
+      "FormulaEngine 支持的 50 个 Excel 函数（grep case \"XXX\" 去重实得，2026-09-25 复核；此前记 35、34 为旧数）",
       "PDF 加密 bits 取值 40/128/256 与各自 /V /R 规格；PdfEditor 全部链式方法",
       "PDF 数字签名（PDF32000 §12.8 adbe.pkcs7.detached）：OfficiaPdf.sign 两个重载、KeyMaterial 的 .p12/自签名/私有CA签发三条身份来源、SignOptions 六项（含 timestampProvider）；签名是终结操作故刻意不进 PdfEditor 链式",
       "PDF 验签：OfficiaPdf.verify 两个重载（可选传 List<X509Certificate> 信任锚做 PKIX 路径验证）；结果类型 SignatureVerification + SignatureInfo，均为只读 DTO（Date 与 int[] 出参做防御性拷贝）",
@@ -204,7 +204,7 @@
       "在线编辑明确不做（DESIGN.md §9）：实时协同（OT/CRDT）、修订/批注/脚注的编辑（只读透传）、浮动对象拖拽与图文环绕的编辑（只读）、pptx 在线编辑、前端引入 UI 框架",
       "在线编辑已知缺口（代码里的 UNWIRED，可被前端读出原因）：下标（前端 VerticalAlign 只有 NONE/SUPERSCRIPT）、单元格边距（CellPropsPatch 无 marT/marL/marB/marR）、标题行跨页重复（TableRow.header 无对应命令）、Cells 的格式刷（两步交互，工具栏不持有该状态）",
       "在线编辑：OfficiaEditor.save(json, PDF) 与 OfficiaWords.toPdf(docx) 走同一条排版渲染链，同一份 IR 必然同字节；但 toPdf(docx) 会额外叠加 docx 内嵌字体，save 只拿得到 JSON、用基础字体表，故内嵌字体的文档两者字节可以不同——是信息量差异不是缺陷",
-      "在线编辑：saveWorkbook 刻意不自动重算（要兜底就串 saveWorkbook(recalc(json))）；recalc 用的是 Officia.Cells 那 35 个函数的同一个引擎，浏览器端没有第二套求值器；算不出来的格写 #VALUE! 并把原因附在根级 recalcErrors，不让整表失败"
+      "在线编辑：saveWorkbook 刻意不自动重算（要兜底就串 saveWorkbook(recalc(json))）；recalc 用的是 Officia.Cells 那 50 个函数的同一个引擎，浏览器端没有第二套求值器；算不出来的格写 #VALUE! 并把原因附在根级 recalcErrors，不让整表失败"
     ]
   },
   "not_included": {

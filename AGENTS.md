@@ -95,7 +95,7 @@ Codex 启动时已自动加载全部 SKILL.md 的 frontmatter。按 description 
 |---|---|
 | `officia-words` | Word → PDF；四种入参、流式、页数耗时、ConvertOptions |
 | `officia-template` | 模板填充 / 邮件合并；完整占位符语法；批量与 JSON 数据源 |
-| `officia-cells` | Excel/CSV 转换、CSV 解析、公式求值与重算（35 个函数） |
+| `officia-cells` | Excel/CSV 转换、CSV 解析、公式求值与重算（50 个函数） |
 | `officia-slides` | PPTX → PDF；内容提取式 vs 版式保真式 |
 | `officia-pdf` | PDF 工具箱 + `PdfEditor` 链式编辑 |
 | `officia-barcode` | 8 种码制、输入约束与校验位、QR 四档纠错 |
