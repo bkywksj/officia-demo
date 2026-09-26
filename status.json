@@ -204,7 +204,7 @@
       "在线编辑明确不做（DESIGN.md §9）：实时协同（OT/CRDT）、修订/批注/脚注的编辑（只读透传）、浮动对象拖拽与图文环绕的编辑（只读）、pptx 在线编辑、前端引入 UI 框架",
       "在线编辑已知缺口（代码里的 UNWIRED，可被前端读出原因）：下标（前端 VerticalAlign 只有 NONE/SUPERSCRIPT）、单元格边距（CellPropsPatch 无 marT/marL/marB/marR）、标题行跨页重复（TableRow.header 无对应命令）、Cells 的格式刷（两步交互，工具栏不持有该状态）",
       "在线编辑：OfficiaEditor.save(json, PDF) 与 OfficiaWords.toPdf(docx) 走同一条排版渲染链，同一份 IR 必然同字节；但 toPdf(docx) 会额外叠加 docx 内嵌字体，save 只拿得到 JSON、用基础字体表，故内嵌字体的文档两者字节可以不同——是信息量差异不是缺陷",
-      "在线编辑：saveWorkbook 刻意不自动重算（要兜底就串 saveWorkbook(recalc(json))）；recalc 用的是 Officia.Cells 那 50 个函数的同一个引擎，浏览器端没有第二套求值器；算不出来的格写 #VALUE! 并把原因附在根级 recalcErrors，不让整表失败"
+      "在线编辑：saveWorkbook 刻意不自动重算（要兜底就串 saveWorkbook(recalc(json))）；recalc 用的是 Officia.Cells 那 80 个函数的同一个引擎，浏览器端没有第二套求值器；算不出来的格写 #VALUE! 并把原因附在根级 recalcErrors，不让整表失败"
     ]
   },
   "not_included": {
