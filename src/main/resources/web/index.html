@@ -763,7 +763,7 @@ let exEditor=null, exJson=null, exRibbon=null, exName='', exShell=null;
 // Cells 的重算读数：服务端算出来的，不在工作簿里，交给「检查」页当 probe
 let exProbe={};
 // Cells 侧的纯视图开关：只影响渲染参数，不写工作簿（与功能区「视图」页的徽标口径一致）
-const exView={gridLine:true,header:true,formulaBar:true};
+const exView={header:true,formulaBar:true};
 
 async function edEnsureLib(){
   if(window.OfficiaEditor)return true;
@@ -1204,12 +1204,14 @@ async function exLoad(id){
     if(exEditor&&exEditor.destroy)exEditor.destroy();
     host.textContent='';
     const t0=performance.now();
-    exEditor=OfficiaEditor.Cells.mountWorkbook(host,exJson,{onCellCommitted:exOnCommit,onChange:exOnCommit});
+    exEditor=OfficiaEditor.Cells.mountWorkbook(host,exJson,{onCellCommitted:exOnCommit,onChange:exOnCommit,
+      onActiveSheetChange:exSyncRibbon});
     const ms=(performance.now()-t0).toFixed(0);
 
     document.getElementById('exCards').style.display='';
     document.getElementById('exBar').style.display='';
     exMountRibbon();
+    exSyncRibbon();
     exMountShell();
     document.getElementById('exScale').textContent=j.sheets+' / '+j.cells;
     document.getElementById('exPainted').textContent=exEditor.paintedCellCount;
@@ -1292,6 +1294,7 @@ function exRibbonCommand(e){
   catch(err){toast(e.cap+'：'+(err&&err.message||err),false);return}
   if(done){
     info.textContent=e.cap+'：已应用到选区 '+exRefText();
+    exSyncRibbon();
     if(exShell)exShell.refresh(exProbe);
     // 🔴 工具栏插公式也要重算。onCellCommitted 只在【就地编辑提交】时回调，
     // 走工具栏（SUM / AVERAGE / 自动求和…）的这条路不经过它——不补这一句，
@@ -1302,7 +1305,6 @@ function exRibbonCommand(e){
   // 视图开关与要服务端往返的那几个（CELLS_HOST_CAPS）
   if(e.cap==='立即重算'){exRecalc();return}
   if(e.cap==='错误检查'){exCheckErrors();return}
-  if(e.cap==='网格线'){exView.gridLine=(e.value!=='false');exRepaint();return}
   if(e.cap==='行列标题'){exView.header=(e.value!=='false');exRepaint();return}
   if(e.cap==='编辑栏'){exView.formulaBar=(e.value!=='false');exToggleFormulaBar();return}
   if(e.cap==='普通'){toast('已是普通视图（paintGrid）');return}
@@ -1321,14 +1323,21 @@ function exRefText(){
   return a===b?a:(a+':'+b);
 }
 
+/**
+ * 工具栏上跟着工作表走的开关（「网格线」写的是工作表的 showGrid）同步成当前表的状态：
+ * 装载后、切表后、每次改动（含撤销 / 重做）后各调一次。
+ */
+function exSyncRibbon(){
+  if(exRibbon&&exEditor)OfficiaEditor.syncCellsRibbon(exRibbon,exEditor);
+}
+
 /** 视图开关只改渲染参数，不写工作簿——重挂一次网格即可。 */
 function exRepaint(){
   if(!exEditor)return;
   const wb=exEditor.view.wb, host=document.getElementById('exHost');
   exEditor.destroy();host.textContent='';
-  const theme=Object.assign({},OfficiaEditor.Cells.DEFAULT_THEME);
-  if(!exView.gridLine)theme.gridLine='transparent';
-  exEditor=OfficiaEditor.Cells.mountWorkbook(host,wb,{theme,onCellCommitted:exOnCommit,onChange:exOnCommit,
+  exEditor=OfficiaEditor.Cells.mountWorkbook(host,wb,{onCellCommitted:exOnCommit,onChange:exOnCommit,
+    onActiveSheetChange:exSyncRibbon,
     headerWidth:exView.header?undefined:0,headerHeight:exView.header?undefined:0});
   exToggleFormulaBar();
   if(exShell)exMountShell();
@@ -1341,6 +1350,14 @@ function exToggleFormulaBar(){
 }
 
 /** 「公式 → 错误检查」：重算一次，把算不出来的格列出来（只呈现，不写回）。 */
+/**
+ * 重算请求体：去掉 parts（图片、形状、图表的原样字节，带图形的表常有几百 KB 到几 MB）。
+ * recalc 不读它们，每改一格就来回传一遍纯属浪费；applyRecalc 只并回结果，parts 一直留在编辑器手里，保存时照样带上。
+ */
+function exRecalcBody(wb){
+  return JSON.stringify({...wb, parts: undefined});
+}
+
 /**
  * 重算结果里的两类记录要分开说：
  *   · 沿用原结果——引擎算不了的公式（OFFSET、INDIRECT 等未支持的函数、外部工作簿引用），保留了原文件里 Excel 算好的值，数据是对的；
@@ -1360,7 +1377,7 @@ function exRecalcSummary(next){
 async function exCheckErrors(){
   try{
     const j=await api('/api/editor/workbook/recalc',{method:'POST',
-      body:JSON.stringify(exEditor.view.wb)});
+      body:exRecalcBody(exEditor.view.wb)});
     const r=await fetch('/api/result/'+j.id+'?download=1');
     const next=await r.json();
     const sum=exRecalcSummary(next), errs=sum.bad;
@@ -1425,6 +1442,7 @@ function exSymbolPalette(anchorEl){
 }
 
 function exOnCommit(info){
+  exSyncRibbon();   // 撤销 / 重做可能改了网格线这类跟着表走的开关
   if(!exEditor||!exEditor.hasFormula)return;
   exScheduleRecalc();
 }
@@ -1443,7 +1461,7 @@ async function exAutoRecalc(){
   if(!exEditor||!exEditor.hasFormula)return;
   try{
     const j=await api('/api/editor/workbook/recalc',{method:'POST',
-      body:JSON.stringify(exEditor.view.wb)});
+      body:exRecalcBody(exEditor.view.wb)});
     const r=await fetch('/api/result/'+j.id+'?download=1');
     const next=await r.json();
     if(!exEditor)return;
@@ -1477,7 +1495,7 @@ async function exRecalc(){
     const t0=performance.now();
     // 把网格里当前这份 JSON 交回服务端，用 85 函数引擎算——不在浏览器里另写一套求值器
     const j=await api('/api/editor/workbook/recalc',{method:'POST',
-      body:JSON.stringify(exEditor.view.wb)});
+      body:exRecalcBody(exEditor.view.wb)});
     const r=await fetch('/api/result/'+j.id+'?download=1');
     const next=await r.json();
     const ms=(performance.now()-t0).toFixed(0);
@@ -1485,7 +1503,8 @@ async function exRecalc(){
     if(exEditor.destroy)exEditor.destroy();
     host.textContent='';
     exJson=next;
-    exEditor=OfficiaEditor.Cells.mountWorkbook(host,next,{onCellCommitted:exOnCommit,onChange:exOnCommit});
+    exEditor=OfficiaEditor.Cells.mountWorkbook(host,next,{onCellCommitted:exOnCommit,onChange:exOnCommit,
+      onActiveSheetChange:exSyncRibbon});
     // 重算读数是服务端算出来的，不在工作簿里——交给「检查」页当 probe
     exProbe={recalcMs:j.ms||0, recalcErrors:exRecalcSummary(next).bad.length};
     exMountShell();
