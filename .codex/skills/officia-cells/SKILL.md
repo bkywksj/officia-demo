@@ -53,6 +53,14 @@ ConvertResult r = OfficiaCells.convert(excelBytes, options);   // 富结果：�
 
 `ConvertOptions` 用法与 Words 一致（纸张 / 字体目录 / 嵌入字体 / 超时），见 `officia-words`。
 
+**单元格字体照原样用**（xlsx 与 xls 都是）：宋体、微软雅黑的格连数字英文也用自己的字形；Arial、Calibri 这类西文字体里的汉字自动换成中文字体；
+富文本各段按自己的字体名。服务器上没装的字体会换成相近字体——版式和本机不同时开字体替换诊断，查哪款被换掉了：
+
+```java
+ConvertResult r = OfficiaCells.convert(excelBytes, new ConvertOptions().setReportFontSubstitutions(true));
+r.getFontSubstitutions().forEach(s -> System.out.println(s.describe()));   // 不开时是空列表
+```
+
 ## 二、CSV
 
 ```java
@@ -203,6 +211,7 @@ public class ReportPipeline {
 | 文字比 Excel / WPS 里换行早 | 该格设了「不自动换行」，且**右边那格有内容**——Excel 这时是裁切，officia 退回折行（右边空着的话已经会铺过去） | 已知缺口。把列拉宽，或清空右边那格 |
 | xls 里的图片/图表没出现在 PDF 里 | 尚未支持（见下方能力边界） | 需要的话先在 Excel 里另存为 xlsx 也仍不支持——该能力两种格式都未实现 |
 | 转出的 PDF 中文方块 | 字体 | `officia-chinese-font` |
+| 服务器上转出的 PDF 字形 / 行高 / 页数和本机不同 | 表格用的字体服务器上没装，换成了相近字体 | 开 `setReportFontSubstitutions(true)` 看 `getFontSubstitutions()`，把缺的字体装上或用 `fontDirectory` 指过去 |
 | 转出的 PDF 有水印 | 未授权 + 门控开 | `officia-license` |
 
 ## xls 的能力边界（如实说明）

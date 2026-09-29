@@ -260,6 +260,9 @@ for (FontSubstitution s : r.getFontSubstitutions()) {
 }
 ```
 
+`OfficiaCells.convert(excelBytes, options)` 同样可用：表格转 PDF 也按单元格的字体名取字体，
+上面「中易系按常数度量补偿」对表格里的宋体、仿宋、楷体、黑体一样生效。
+
 `FontSubstitution` 的字段：`requestedFamily`（文档要什么）、`bold` / `italic`（哪个字面）、
 `resolvedFamily`（实际用了什么）、`reason`。
 
