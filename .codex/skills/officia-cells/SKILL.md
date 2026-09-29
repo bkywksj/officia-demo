@@ -123,7 +123,7 @@ Map<String, Object> all = OfficiaCells.recalculate(excelBytes);
 Workbook wb = OfficiaCells.readWorkbook(excelBytes);   // xlsx 或 xls
 ```
 
-公式原文、样式表、合并区、行列尺寸都在，适合要自己处理数据而不只是转格式的场景。
+公式原文、样式表、合并区、行列尺寸、定义名称、表格都在，适合要自己处理数据而不只是转格式的场景。
 
 ### ⚠️ 已废弃的旧名字
 
@@ -135,25 +135,30 @@ Workbook wb = OfficiaCells.readWorkbook(excelBytes);   // xlsx 或 xls
 旧方法标了 `@Deprecated(since = "1.1.4")` 但**行为完全一致**（内部只是委托），
 既有代码不会被打断，不急着改。
 
-## 支持的 Excel 函数（80 个，核实自 `FormulaEngine`）
+## 支持的 Excel 函数（85 个，核实自 `FormulaEngine`）
 
 | 分类 | 函数 |
 |---|---|
-| 数学（15） | `SUM` `SUMIF` `SUMIFS` `SUMPRODUCT` `PRODUCT` `ABS` `ROUND` `ROUNDUP` `ROUNDDOWN` `CEILING` `FLOOR` `INT` `MOD` `POWER` `SQRT` |
+| 数学（16） | `SUM` `SUMIF` `SUMIFS` `SUMPRODUCT` `SUBTOTAL` `PRODUCT` `ABS` `ROUND` `ROUNDUP` `ROUNDDOWN` `CEILING` `FLOOR` `INT` `MOD` `POWER` `SQRT` |
 | 统计（13） | `AVERAGE` `AVERAGEIF` `AVERAGEIFS` `MAX` `MIN` `MEDIAN` `COUNT` `COUNTA` `COUNTIF` `COUNTIFS` `SMALL` `LARGE` `RANK` |
 | 逻辑（7） | `IF` `IFERROR` `AND` `OR` `NOT` `TRUE` `FALSE` |
 | 信息（9） | `ISERROR` `ISERR` `ISNA` `ISNUMBER` `ISTEXT` `ISLOGICAL` `ISBLANK` `N` `NA` |
 | 文本（13） | `CONCATENATE` `LEFT` `RIGHT` `MID` `LEN` `TRIM` `UPPER` `LOWER` `TEXT` `FIND` `SEARCH` `SUBSTITUTE` `VALUE` |
-| 查找与引用（10） | `VLOOKUP` `HLOOKUP` `LOOKUP` `INDEX` `MATCH` `CHOOSE` `ROW` `COLUMN` `ROWS` `COLUMNS` |
+| 查找与引用（14） | `VLOOKUP` `HLOOKUP` `LOOKUP` `INDEX` `MATCH` `CHOOSE` `OFFSET` `INDIRECT` `TRANSPOSE` `HYPERLINK` `ROW` `COLUMN` `ROWS` `COLUMNS` |
 | 日期时间（13） | `DATE` `YEAR` `MONTH` `DAY` `TODAY` `NOW` `HOUR` `MINUTE` `SECOND` `WEEKDAY` `WEEKNUM` `EOMONTH` `DATEDIF` |
 
-> 清单外的函数（如 `OFFSET`、`INDIRECT`、`SUBTOTAL`）会求值失败——重算工作簿时这类格保留文件里 Excel 算好的结果。另有几处如实的边界：
+> 清单外的函数（如 `RANDBETWEEN`、`GETPIVOTDATA`）会求值失败——重算工作簿时这类格保留文件里 Excel 算好的结果。另有几处如实的边界：
 > - 跨表引用（`Sheet2!A1`、`'表 名'!A1:B2`，表名不分大小写）与整列 / 整行引用（`客户信息!A:B`、`$1:$1`）支持；
-> - **数组公式**（Excel 里按 Ctrl+Shift+Enter 输入的 `{=MAX(IF(C:C=A2,B:B))}`，xlsx 里带 `t="array"`）按数组逐元素计算；`SUMPRODUCT`、`LOOKUP` 的参数本身就按数组算，不必按数组公式输入。同样的写法作为**普通公式**时 Excel 走隐式交集，引擎不算、保留缓存值；
-> - 不支持结构化引用（`表1[列]`）、定义名称、三维引用（`Sheet1:Sheet3!A1`）、外部工作簿引用（`[1]Sheet1!A1`）与数组常量（`{1,2,3}`）；`INDEX` 取整行 / 整列（行号或列号为 0）只在数组公式里可用；
+> - **数组公式**（Excel 里按 Ctrl+Shift+Enter 输入的 `{=MAX(IF(C:C=A2,B:B))}`，xlsx 里带 `t="array"`）按数组逐元素计算；`SUMPRODUCT`、`LOOKUP` 的参数本身就按数组算，不必按数组公式输入。同样的写法作为**普通公式**时走隐式交集（ECMA-376 §18.17.2）：把多格区域交给只收单个值的地方，取与公式同一行（区域是一列时）或同一列（区域是一行时）的那一格，没有交点是 `#VALUE!`；
+> - **定义名称**（`=SUM(销量)`）照常计算：同名时本表的局部名称优先于整本的；名称里的计算式按数组公式算；未定义的名称是 `#NAME?`，`IFERROR` 兜得住。读 xlsx 时名称一并读进 `Workbook.getNames()`、写回时原样保留；`.xls` 的名称公式暂未读出，用到它的格保留缓存值；
+> - `OFFSET`、`INDIRECT`（含 R1C1 写法 `INDIRECT("R[-1]C",FALSE)`）返回的是**引用**，可以放在 `SUM`、`COUNTIF`、`ROWS`、`INDEX` 等要区域的参数里；在普通公式里直接取一个多格区域的值时同样走隐式交集；
+> - `SUBTOTAL` 的 1–11 含隐藏行、101–111 跳过隐藏行，区域里本身是 `SUBTOTAL` 的格不重复计入。筛选掉的行与手动隐藏的行在文件里分不出来，1–11 会把筛选掉的行也算进去；
+> - 公式里的数组常量（`{1,2;3,4}`，如个税速算 `MAX(A1*{0.03,0.1}-{0,210},0)`）与直接写的错误值（`#REF!`）都能算；`VLOOKUP` / `HLOOKUP` / `MATCH` 查数组常量暂不支持；
+> - **表格与结构化引用**照常计算（[MS-XLSX] §2.2.2）：`表1[金额]`（数据行）、`表1[[#This Row],[单价]]`（本行）、`表1[[#Totals],[金额]]`、`表1[[单价]:[数量]]`、`#All` / `#Headers` 等；写在表格里的公式可以省略表名。读 xlsx 时表格一并读进 `Sheet.getTables()`、写回时原样保留（差异格式编号、筛选条件、排序状态不保留）；
+> - 不支持三维引用（`Sheet1:Sheet3!A1`）与外部工作簿引用（`[1]Sheet1!A1`）；`INDEX` 取整行 / 整列（行号或列号为 0）只在数组公式里可用；
 > - 日期函数按 1900 日期系统计算（ECMA-376 §18.17.4.1）；`YEAR` / `MONTH` / `DAY` 对序列值 0–60 沿用 Excel 的读法（空格是 1900 年 1 月 0 日，`MONTH(空格)` 为 1）；`date1904` 的工作簿暂不换算；
 > - 条件函数（`COUNTIF`、`SUMIFS` 等）里空格只配「空」条件、不当 0 比大小；条件引用的是空格时按 0；文本 "1001" 与数字条件 1001 相等；
-> - 求值出错时写真实的错误码（`#N/A`、`#DIV/0!`、`#REF!`、`#NUM!`、`#VALUE!`）。
+> - 求值出错时写真实的错误码（`#N/A`、`#DIV/0!`、`#REF!`、`#NUM!`、`#NAME?`、`#VALUE!`）。
 > 核实当前版本：
 > ```bash
 > grep -oE 'case "[A-Z]+"' ../officia/officia-cells/src/main/java/plus/ruoyi/officia/cells/formula/FormulaEngine.java | sort -u
@@ -190,7 +195,7 @@ public class ReportPipeline {
 |---|---|---|
 | `toCsv` 只有一个 sheet 的数据 | 设计如此——只导首个工作表 | 需要多表就分别处理源文件 |
 | CSV 某些行字段数少 | 合并单元格，按实际输出不补齐 | 下游解析要容忍不定列数，或先在 Excel 里取消合并 |
-| 公式算不出 / 抛异常 | 函数不在 80 个支持清单内、循环引用、网格非法 | 核对函数名；检查是否互相引用 |
+| 公式算不出 / 抛异常 | 函数不在 85 个支持清单内、循环引用、网格非法 | 核对函数名；检查是否互相引用 |
 | 文件里显示是 100，算出来不一样 | officia **实算**，不信缓存值——Excel 里的缓存可能过期 | 以实算为准；确认公式依赖的单元格值 |
 | 报「暂不支持加密的 xls」 | 文件设了**打开密码**（不是工作表保护） | 在 Excel/WPS 里去掉打开密码后另存 |
 | 报「仅支持 BIFF8」 | 文件是 Excel 5.0/95 的更老格式 | 用 Excel/WPS 打开后另存为 .xls（97-2003）或 .xlsx |

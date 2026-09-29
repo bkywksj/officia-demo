@@ -157,7 +157,7 @@
       "demo 测试台 39 个 /api 端点与 Batch.run() 的 10 个回归用例（端点数以 /api/health 的 endpoints 字段为准，勿抄本行）",
       "在线编辑（officia-editor，2026-09-08 新增技能）：Java 六组门面 open / save / toImages / openWorkbook / recalc / saveWorkbook；EditorFormat 只有 DOCX 与 PDF（工作簿走 saveWorkbook 那条闭环）；前端产物 officia-editor.js 打在 META-INF/resources/officia-editor/ 随 jar 分发，Servlet 3.0+ 容器自动暴露为 /officia-editor/officia-editor.js（demo 用 JDK HttpServer，故在 DemoServer.serveStatic 显式映射一条）",
       "前端公开导出取自 officia-editor/web/src/index.ts：mountEditable / mount（只读）/ mountRibbon / mountWordsShell / mountCellsShell / Cells.mountWorkbook / runWordsCommand / runCellsCommand / RIBBONS / RIBBON_CSS / SHELL_CSS / WORDS_UNWIRED / WORDS_HOST_CAPS / CELLS_UNWIRED / CELLS_HOST_CAPS；示例用法取自 demo 自己的 src/main/resources/web/index.html（edEnsureLib / edRender / edMountRibbon / edMountShell）",
-      "功能区 145 个控件（Words 78 / Cells 67）与三态分布（words 53 normal·14 readonly·11 disabled；cells 47 normal·0 readonly·20 disabled）取自 ../officia/docs/design/online-editor/toolbar-capability.tsv，由 ToolbarCapabilityTest 逐行机检",
+      "功能区 147 个控件（Words 78 / Cells 69）与三态分布（words 66 normal·1 readonly·11 disabled；cells 51 normal·2 readonly·16 disabled）取自 ../officia/docs/design/online-editor/toolbar-capability.tsv，由 ToolbarCapabilityTest 逐行机检",
       "属性面板标签：Words 段落/表格/页面/检查，Cells 单元格/工作表/页面/检查（shell/words-fields.ts、cells-fields.ts 的 PANES 定义）",
       "编辑器的 6 个 demo 端点：/api/editor/open、/save、/roundtrip、/workbook/open、/workbook/recalc、/workbook/save（ApiRoutes.registerEditor）"
     ],
@@ -204,7 +204,7 @@
       "在线编辑明确不做（DESIGN.md §9）：实时协同（OT/CRDT）、修订/批注/脚注的编辑（只读透传）、浮动对象拖拽与图文环绕的编辑（只读）、pptx 在线编辑、前端引入 UI 框架",
       "在线编辑已知缺口（代码里的 UNWIRED，可被前端读出原因）：下标（前端 VerticalAlign 只有 NONE/SUPERSCRIPT）、单元格边距（CellPropsPatch 无 marT/marL/marB/marR）、标题行跨页重复（TableRow.header 无对应命令）、Cells 的格式刷（两步交互，工具栏不持有该状态）",
       "在线编辑：OfficiaEditor.save(json, PDF) 与 OfficiaWords.toPdf(docx) 走同一条排版渲染链，同一份 IR 必然同字节；但 toPdf(docx) 会额外叠加 docx 内嵌字体，save 只拿得到 JSON、用基础字体表，故内嵌字体的文档两者字节可以不同——是信息量差异不是缺陷",
-      "在线编辑：saveWorkbook 刻意不自动重算（要兜底就串 saveWorkbook(recalc(json))）；recalc 用的是 Officia.Cells 那 80 个函数的同一个引擎，浏览器端没有第二套求值器；算不出来的格写 #VALUE! 并把原因附在根级 recalcErrors，不让整表失败"
+      "在线编辑：saveWorkbook 刻意不自动重算（要兜底就串 saveWorkbook(recalc(json))）；recalc 用的是 Officia.Cells 那 85 个函数的同一个引擎，浏览器端没有第二套求值器；算不出来的格写与 Excel 一致的错误码并把原因附在根级 recalcErrors，不让整表失败；引擎算不了的写法（三维引用、RANDBETWEEN 等）保留 Excel 存下的值；定义名称随契约字段 names、表格随 sheets[].tables 往返，结构化引用照常算，编辑器里不能新建名称与表格、表头格只许改格式"
     ]
   },
   "not_included": {
