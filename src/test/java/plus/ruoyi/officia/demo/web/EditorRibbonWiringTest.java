@@ -82,7 +82,9 @@ class EditorRibbonWiringTest {
         List<String> missing = new ArrayList<>();
         for (String cap : new String[]{
                 "缩放", "页面视图", "图片",                       // Words 侧
-                "立即重算", "错误检查", "网格线", "行列标题", "编辑栏", "普通", "导入 CSV",
+                // 「网格线」「行列标题」不在这里：它们写的是工作表（showGrid / showHeaders），由库里的
+                // runCellsCommand 处理，测试台只管 syncCellsRibbon 同步复选框
+                "立即重算", "错误检查", "编辑栏", "普通", "导入 CSV",
         }) {
             if (!html.contains("e.cap==='" + cap + "'")) {
                 missing.add(cap);

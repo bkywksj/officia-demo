@@ -763,7 +763,7 @@ let exEditor=null, exJson=null, exRibbon=null, exName='', exShell=null;
 // Cells 的重算读数：服务端算出来的，不在工作簿里，交给「检查」页当 probe
 let exProbe={};
 // Cells 侧的纯视图开关：只影响渲染参数，不写工作簿（与功能区「视图」页的徽标口径一致）
-const exView={header:true,formulaBar:true};
+const exView={formulaBar:true};
 
 async function edEnsureLib(){
   if(window.OfficiaEditor)return true;
@@ -1305,7 +1305,6 @@ function exRibbonCommand(e){
   // 视图开关与要服务端往返的那几个（CELLS_HOST_CAPS）
   if(e.cap==='立即重算'){exRecalc();return}
   if(e.cap==='错误检查'){exCheckErrors();return}
-  if(e.cap==='行列标题'){exView.header=(e.value!=='false');exRepaint();return}
   if(e.cap==='编辑栏'){exView.formulaBar=(e.value!=='false');exToggleFormulaBar();return}
   if(e.cap==='普通'){toast('已是普通视图（paintGrid）');return}
   if(e.cap==='导入 CSV'){document.getElementById('exCsvFile').click();return}
@@ -1324,24 +1323,11 @@ function exRefText(){
 }
 
 /**
- * 工具栏上跟着工作表走的开关（「网格线」写的是工作表的 showGrid）同步成当前表的状态：
+ * 工具栏上跟着工作表走的开关（「网格线」「行列标题」写的是工作表的 showGrid / showHeaders）同步成当前表的状态：
  * 装载后、切表后、每次改动（含撤销 / 重做）后各调一次。
  */
 function exSyncRibbon(){
   if(exRibbon&&exEditor)OfficiaEditor.syncCellsRibbon(exRibbon,exEditor);
-}
-
-/** 视图开关只改渲染参数，不写工作簿——重挂一次网格即可。 */
-function exRepaint(){
-  if(!exEditor)return;
-  const wb=exEditor.view.wb, host=document.getElementById('exHost');
-  exEditor.destroy();host.textContent='';
-  exEditor=OfficiaEditor.Cells.mountWorkbook(host,wb,{onCellCommitted:exOnCommit,onChange:exOnCommit,
-    onActiveSheetChange:exSyncRibbon,
-    headerWidth:exView.header?undefined:0,headerHeight:exView.header?undefined:0});
-  exToggleFormulaBar();
-  if(exShell)exMountShell();
-  document.getElementById('exPainted').textContent=exEditor.paintedCellCount;
 }
 
 function exToggleFormulaBar(){
