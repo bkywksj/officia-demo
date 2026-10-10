@@ -878,7 +878,7 @@ function edOnChange(st){
       const b=edRibbon.control(cap);
       if(b)b.style.opacity=can?'1':'.35';
     }
-    // 库侧报 canEditStructure=false 时插入类命令置灰。自 1.1.5 起多分节文档也可增删块（恒为 true），留着兜底
+    // 库侧报 canEditStructure=false 时插入类命令置灰。1.1.4 之后的版本多分节文档也可增删块（恒为 true），留着兜底
     for(const cap of ['表格','分页符','分栏符','分节符']){
       const b=edRibbon.control(cap);
       if(b){b.style.opacity=st.canEditStructure?'1':'.35';
