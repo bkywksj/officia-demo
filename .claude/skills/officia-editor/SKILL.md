@@ -120,6 +120,9 @@ byte[] xlsx   = OfficiaEditor.saveWorkbook(next);        // 写回 xlsx
   「网格线」「行列标题」两个开关写的是工作表的 `showGrid` / `showHeaders`（与 Excel 一致，由 `runCellsCommand` 处理，
   **宿主不用再自己接「行列标题」**——它此前在 `CELLS_HOST_CAPS` 里、是宿主改的渲染参数，现已拿掉）；复选框要跟着当前表走——宿主在装载后、
   `onActiveSheetChange` 与 `onChange` 里调一次 `syncCellsRibbon(ribbon, editor)`。xls 打开时这三个开关同样读得出。
+- **网格列宽与转出的 PDF 一致**（1.1.4 之后的版本，尚未发布）：列宽按工作簿默认字体的数字宽度换算，`openWorkbook` 在根级给出
+  单位 `mdw`（宋体 8、Calibri 7，只出不进，存回时忽略），网格照它画——宿主原样把 JSON 交给 `mountWorkbook` 即可，别删它。
+  1.1.4 及之前网格一律按 Calibri 换算、每列还多算 5px，宋体的表在网格里和 PDF 里列宽对不上。
 - **打开时停在哪跟文件走**：契约里的 `activeSheet`（打开停在哪张表）与各表的 `topLeft`（滚到哪）、`active`（光标）、
   `sel`（选区，空格分隔几块）。编辑器打开时恢复，切表、点格子、滚动时**把位置写回这几个字段**（不进撤销栈、不算未保存），
   宿主照旧把 `editor.view.wb` 交给保存即可；插删行列时它们跟着内容走。宿主自己比对「内容有没有变」时要把这四个键剔掉。
