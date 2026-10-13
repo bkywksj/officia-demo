@@ -50,6 +50,7 @@ officia 的异常消息用统一前缀标注问题发生在哪一层（核实自
 | `源文档为空` | 输入校验 | 传进来的 `byte[]` 是空的 |
 | `读取输入流失败` / `读取文件失败:` / `写出文件失败:` | I/O | 路径、权限、流已关闭 |
 | `无法解码图片（ImageIO …` | 图像 | 格式不被 `javax.imageio` 支持 |
+| `Word 转 PDF失败（内部错误）：…` / `Excel 转 PDF失败…` / `PPT 转 PDF失败…` / `读取 Excel失败…` / `填充 Word 模板失败…` / `Markdown 转 …失败…` | officia 自身的缺陷 | 冒号后面是原始异常（如 `java.lang.IllegalArgumentException: …`），`getCause()` 里有完整堆栈。**这是我们的 bug，不是用户文件的错**——把文件和完整堆栈一起反馈。1.1.4 及之前这类缺陷会把 `IllegalArgumentException` / `ArrayIndexOutOfBoundsException` 原样抛给调用方，只 catch `OfficiaException` 的代码会漏掉它 |
 
 > 💡 看到 `MS-DOC` / `CFB` 开头 → 多半在处理 `.doc`。先确认这份 `.doc` 是不是加密的（**加密 DOC 明确不支持**）。
 >
