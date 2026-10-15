@@ -157,7 +157,7 @@
       "demo 测试台 39 个 /api 端点与 Batch.run() 的 10 个回归用例（端点数以 /api/health 的 endpoints 字段为准，勿抄本行）",
       "在线编辑（officia-editor，2026-09-08 新增技能）：Java 六组门面 open / save / toImages / openWorkbook / recalc / saveWorkbook；EditorFormat 只有 DOCX 与 PDF（工作簿走 saveWorkbook 那条闭环）；前端产物 officia-editor.js 打在 META-INF/resources/officia-editor/ 随 jar 分发，Servlet 3.0+ 容器自动暴露为 /officia-editor/officia-editor.js（demo 用 JDK HttpServer，故在 DemoServer.serveStatic 显式映射一条）",
       "前端公开导出取自 officia-editor/web/src/index.ts：mountEditable / mount（只读）/ mountRibbon / mountWordsShell / mountCellsShell / Cells.mountWorkbook / runWordsCommand / runCellsCommand / RIBBONS / RIBBON_CSS / SHELL_CSS / WORDS_UNWIRED / WORDS_HOST_CAPS / CELLS_UNWIRED / CELLS_HOST_CAPS；示例用法取自 demo 自己的 src/main/resources/web/index.html（edEnsureLib / edRender / edMountRibbon / edMountShell）",
-      "功能区 147 个控件（Words 78 / Cells 69）与三态分布（words 66 normal·1 readonly·11 disabled；cells 51 normal·2 readonly·16 disabled）取自 ../officia/docs/design/online-editor/toolbar-capability.tsv，由 ToolbarCapabilityTest 逐行机检",
+      "功能区 147 个控件（Words 78 / Cells 69）与三态分布（words 66 normal·2 readonly·10 disabled；cells 51 normal·11 readonly·7 disabled，2026-10-13 实算）取自 ../officia/docs/design/online-editor/toolbar-capability.tsv，由 ToolbarCapabilityTest 逐行机检",
       "属性面板标签：Words 段落/表格/页面/检查，Cells 单元格/工作表/页面/检查（shell/words-fields.ts、cells-fields.ts 的 PANES 定义）",
       "编辑器的 6 个 demo 端点：/api/editor/open、/save、/roundtrip、/workbook/open、/workbook/recalc、/workbook/save（ApiRoutes.registerEditor）"
     ],
