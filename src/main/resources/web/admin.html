@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>反馈后台 · Officia 测试台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+<!-- 登录 -->
+<div id="loginView" class="hidden min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white rounded-lg border border-slate-200 shadow-sm w-full max-w-sm p-6">
+    <div class="font-semibold text-lg flex items-center gap-2"><i data-lucide="lock" class="w-5 h-5 text-amber-600"></i>反馈后台</div>
+    <div class="text-sm text-slate-500 mt-1">Officia 测试台 · 只有开发者能登录</div>
+    <form onsubmit="login(event)" class="mt-5 space-y-3 text-sm">
+      <div><label class="text-slate-600">账号</label>
+        <input id="lUser" value="admin" autocomplete="username" class="mt-1 w-full border border-slate-300 rounded-md px-2.5 py-1.5"></div>
+      <div><label class="text-slate-600">口令</label>
+        <input id="lPass" type="password" autocomplete="current-password" class="mt-1 w-full border border-slate-300 rounded-md px-2.5 py-1.5"></div>
+      <div id="lErr" class="text-rose-600 hidden"></div>
+      <button class="w-full bg-amber-600 text-white rounded-md py-2 hover:opacity-90">登录</button>
+    </form>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div id="mainView" class="hidden">
+  <header class="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-10">
+    <div class="font-semibold flex items-center gap-2"><i data-lucide="inbox" class="w-5 h-5 text-amber-600"></i>反馈后台
+      <span id="used" class="text-xs font-normal text-slate-400"></span></div>
+    <div class="flex items-center gap-2 text-sm">
+      <a href="/" class="border border-slate-300 px-3 py-1.5 rounded-md hover:border-amber-500">回测试台</a>
+      <button onclick="openPwd()" class="border border-slate-300 px-3 py-1.5 rounded-md hover:border-amber-500">改口令</button>
+      <button onclick="logout()" class="border border-slate-300 px-3 py-1.5 rounded-md hover:border-rose-400">退出</button>
+    </div>
+  </header>
+  <div class="p-6 flex gap-5 items-start">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-3 text-sm">
+        <select id="fStatus" onchange="renderList()" class="border border-slate-300 rounded-md px-2 py-1.5 bg-white"></select>
+        <input id="fText" oninput="renderList()" placeholder="搜文件名 / 备注 / 功能" class="border border-slate-300 rounded-md px-2.5 py-1.5 w-64">
+        <button onclick="loadList()" class="border border-slate-300 px-3 py-1.5 rounded-md hover:border-amber-500 flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>刷新</button>
+        <span id="count" class="text-slate-400"></span>
+      </div>
+      <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 text-slate-500 text-xs"><tr>
+            <th class="text-left px-3 py-2">时间</th><th class="text-left px-3 py-2">文件</th><th class="text-left px-3 py-2">功能</th>
+            <th class="text-left px-3 py-2">备注</th><th class="text-left px-3 py-2">状态</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div id="empty" class="hidden p-10 text-center text-slate-400 text-sm">还没有反馈</div>
+      </div>
+    </div>
+    <div id="detail" class="w-[440px] shrink-0 bg-white rounded-lg border border-slate-200 p-4 text-sm hidden sticky top-20"></div>
+  </div>
+</div>
+
+<!-- 改口令 -->
+<div id="pwdModal" class="hidden fixed inset-0 z-40 bg-slate-900/40 flex items-center justify-center p-4">
+  <div class="bg-white rounded-lg shadow-xl w-full max-w-sm p-5 text-sm space-y-3">
+    <div class="font-medium">修改口令</div>
+    <input id="pOld" type="password" placeholder="原口令" autocomplete="current-password" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5">
+    <input id="pNew" type="password" placeholder="新口令（6～128 个字符）" autocomplete="new-password" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5">
+    <div class="flex justify-end gap-2">
+      <button onclick="closePwd()" class="border border-slate-300 px-3 py-1.5 rounded-md">取消</button>
+      <button onclick="savePwd()" class="bg-amber-600 text-white px-3 py-1.5 rounded-md">保存</button></div>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-6 right-6 z-50 space-y-2"></div>
+
+<script>
+let ITEMS=[], STATUSES={}, CUR=null;
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmt(n){return n>1048576?(n/1048576).toFixed(1)+' MB':n>1024?(n/1024).toFixed(0)+' KB':n+' B'}
+function toast(msg,ok=true){
+  const d=document.createElement('div');
+  d.className='px-4 py-2.5 rounded-lg shadow-lg text-sm text-white '+(ok?'bg-emerald-600':'bg-red-600');
+  d.textContent=msg;document.getElementById('toast').appendChild(d);setTimeout(()=>d.remove(),3200);
+}
+/** 后台接口：改动类请求带 X-Officia-Admin（服务端据此挡跨站伪造）；401 回登录页。 */
+async function api(path,opt){
+  opt=opt||{};opt.headers=Object.assign({'X-Officia-Admin':'1'},opt.headers||{});
+  const r=await fetch(path,opt);
+  const ct=r.headers.get('content-type')||'';
+  const j=ct.includes('json')?await r.json():{};
+  if(r.status===401&&!path.endsWith('/login')){show('login');throw new Error(j.message||'请先登录')}
+  if(!r.ok||j.error)throw new Error(j.message||('HTTP '+r.status));
+  return j;
+}
+function post(path,body){return api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})})}
+function show(v){
+  document.getElementById('loginView').classList.toggle('hidden',v!=='login');
+  document.getElementById('mainView').classList.toggle('hidden',v!=='main');
+  lucide.createIcons();
+}
+
+async function boot(){
+  try{
+    const j=await api('/api/admin/session');
+    if(j.loggedIn){show('main');loadList()}else show('login');
+  }catch(e){
+    // 端点不存在 = 本实例没开反馈（没设 OFFICIA_FEEDBACK_DIR）
+    document.body.innerHTML='<div class="p-10 text-center text-slate-500">本测试台没有开启反馈功能。</div>';
+  }
+}
+async function login(e){
+  e.preventDefault();
+  const err=document.getElementById('lErr');err.classList.add('hidden');
+  try{await post('/api/admin/login',{username:lUser.value,password:lPass.value});
+    lPass.value='';show('main');loadList();}
+  catch(x){err.textContent=x.message;err.classList.remove('hidden')}
+}
+async function logout(){try{await post('/api/admin/logout')}catch(e){}show('login')}
+
+async function loadList(){
+  try{
+    const j=await api('/api/admin/items');
+    ITEMS=j.items||[];STATUSES=j.statuses||{};
+    document.getElementById('used').textContent='已用 '+fmt(j.usedBytes||0);
+    const sel=document.getElementById('fStatus'),keep=sel.value;
+    sel.innerHTML='<option value="">全部状态</option>'+Object.keys(STATUSES).map(k=>'<option value="'+k+'">'+esc(STATUSES[k])+'</option>').join('');
+    sel.value=keep;
+    renderList();
+    if(CUR){const still=ITEMS.find(x=>x.id===CUR);if(still)renderDetail(still);else hideDetail()}
+  }catch(e){toast(e.message,false)}
+}
+const BADGE={new:'bg-rose-50 text-rose-700',processing:'bg-sky-50 text-sky-700',fixed:'bg-emerald-50 text-emerald-700',wontfix:'bg-slate-100 text-slate-500'};
+function renderList(){
+  const st=document.getElementById('fStatus').value,t=document.getElementById('fText').value.trim().toLowerCase();
+  const list=ITEMS.filter(x=>(!st||x.status===st)&&(!t||[(x.source||{}).name,x.note,x.capability].join(' ').toLowerCase().includes(t)));
+  document.getElementById('count').textContent='共 '+list.length+' 条';
+  document.getElementById('empty').classList.toggle('hidden',list.length>0);
+  document.getElementById('rows').innerHTML=list.map(x=>
+    '<tr onclick="pickItem(\''+esc(x.id)+'\')" class="border-t border-slate-100 cursor-pointer hover:bg-amber-50/50 '+(x.id===CUR?'bg-amber-50':'')+'">'
+    +'<td class="px-3 py-2 text-slate-500 whitespace-nowrap">'+esc((x.createdAt||'').replace('T',' ').slice(0,16))+'</td>'
+    +'<td class="px-3 py-2 max-w-[220px] truncate">'+esc((x.source||{}).name)+'</td>'
+    +'<td class="px-3 py-2 whitespace-nowrap">'+esc(x.capability)+'</td>'
+    +'<td class="px-3 py-2 max-w-[280px] truncate text-slate-600">'+esc(x.note)+'</td>'
+    +'<td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-xs '+(BADGE[x.status]||'')+'">'+esc(STATUSES[x.status]||x.status)+'</span></td></tr>').join('');
+}
+function pickItem(id){CUR=id;const x=ITEMS.find(i=>i.id===id);if(x){renderDetail(x);renderList()}}
+function hideDetail(){CUR=null;document.getElementById('detail').classList.add('hidden')}
+function fileRow(x,which,label){
+  const f=x[which];if(!f)return '<div class="text-slate-400">'+label+'：未提交</div>';
+  return '<div class="flex items-center justify-between gap-2"><span class="truncate">'+label+'：'+esc(f.name)+' · '+fmt(f.size)+'</span>'
+    +'<a href="/api/admin/file?id='+encodeURIComponent(x.id)+'&which='+which+'" class="shrink-0 text-amber-700 hover:underline">下载</a></div>';
+}
+function renderDetail(x){
+  const env=x.env||{};
+  const d=document.getElementById('detail');d.classList.remove('hidden');
+  d.innerHTML='<div class="flex items-center justify-between"><span class="font-medium">'+esc(x.id)+'</span>'
+    +'<button onclick="hideDetail()" class="text-slate-400 hover:text-slate-600">&#10005;</button></div>'
+    +'<div class="mt-3 space-y-1.5">'
+    +'<div class="text-slate-500">提交于 '+esc((x.createdAt||'').replace('T',' ').slice(0,19))+' · '+esc(x.capability)+'</div>'
+    +fileRow(x,'source','原文件')+fileRow(x,'output','转换结果')
+    +(x.op?'<div class="text-xs text-slate-400 break-all">接口：'+esc(x.op)+'</div>':'')
+    +'</div>'
+    +'<div class="mt-3"><div class="text-slate-500 text-xs">用户备注</div><div class="mt-1 whitespace-pre-wrap bg-slate-50 rounded p-2.5">'+esc(x.note)+'</div></div>'
+    +(x.contact?'<div class="mt-2 text-slate-600">联系方式：'+esc(x.contact)+'</div>':'')
+    +'<div class="mt-2 text-xs text-slate-400">officia '+esc(env.officia)+' · Java '+esc(env.java)+' · '+esc(env.ip)+'<br>'+esc(env.userAgent)+'</div>'
+    +'<div class="mt-4 border-t border-slate-100 pt-3 space-y-2">'
+    +'<div class="flex items-center gap-2"><span class="text-slate-500">状态</span><select id="dStatus" class="border border-slate-300 rounded-md px-2 py-1 bg-white">'
+    +Object.keys(STATUSES).map(k=>'<option value="'+k+'"'+(k===x.status?' selected':'')+'>'+esc(STATUSES[k])+'</option>').join('')+'</select></div>'
+    +'<textarea id="dRemark" rows="4" maxlength="5000" class="w-full border border-slate-300 rounded-md px-2.5 py-2" placeholder="处理记录（只有你看得到）">'+esc(x.remark)+'</textarea>'
+    +'<div class="flex flex-wrap gap-2">'
+    +'<button onclick="saveItem()" class="bg-amber-600 text-white px-3 py-1.5 rounded-md">保存</button>'
+    +'<button onclick="reproduce()" class="border border-slate-300 px-3 py-1.5 rounded-md hover:border-amber-500 flex items-center gap-1"><i data-lucide="play" class="w-3.5 h-3.5"></i>在测试台复现</button>'
+    +'<button onclick="delItem()" class="border border-rose-200 text-rose-600 px-3 py-1.5 rounded-md hover:border-rose-400 ml-auto">删除</button></div>'
+    +'<div id="dRepro" class="text-xs text-slate-500"></div>'
+    +'</div>';
+  lucide.createIcons();
+}
+async function saveItem(){
+  try{await post('/api/admin/update?id='+encodeURIComponent(CUR),{status:dStatus.value,remark:dRemark.value});
+    toast('已保存');loadList();}catch(e){toast(e.message,false)}
+}
+async function delItem(){
+  if(!confirm('删除这条反馈和它的文件？删除后找不回来。'))return;
+  try{await post('/api/admin/delete?id='+encodeURIComponent(CUR));toast('已删除');hideDetail();loadList();}
+  catch(e){toast(e.message,false)}
+}
+/** 用当前版本重跑当时的操作：后端把原文件放回结果仓、给出换了新 id 的接口路径，这里照路径调一次。 */
+async function reproduce(){
+  const box=document.getElementById('dRepro');box.textContent='复现中…';
+  try{
+    const r=await post('/api/admin/reproduce?id='+encodeURIComponent(CUR));
+    if(!r.op){box.innerHTML='原文件已载入测试台（这条是直接提交的，没有记录当时的操作）。到 <a href="/" class="text-amber-700 underline">测试台</a> 选对应功能重新上传即可。';return}
+    const j=await api(r.op,{method:'POST'});
+    box.innerHTML='当前版本结果：<a target="_blank" href="/api/result/'+encodeURIComponent(j.id)+'" class="text-amber-700 underline">'+esc(j.name||'打开')+'</a>'
+      +(j.pages!==undefined?' · '+j.pages+' 页':'')+(j.ms?' · '+j.ms+' ms':'');
+  }catch(e){box.textContent='复现失败：'+e.message}
+}
+function openPwd(){pOld.value='';pNew.value='';document.getElementById('pwdModal').classList.remove('hidden')}
+function closePwd(){document.getElementById('pwdModal').classList.add('hidden')}
+async function savePwd(){
+  try{await post('/api/admin/password',{old:pOld.value,new:pNew.value});toast('口令已修改');closePwd()}
+  catch(e){toast(e.message,false)}
+}
+boot();
+</script>
+</body>
+</html>
