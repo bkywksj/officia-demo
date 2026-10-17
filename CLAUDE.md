@@ -89,7 +89,7 @@ java -jar target/officia-demo-1.0.0.jar 9090 --no-open
 mvn -o test
 ```
 
-> 测试台服务用 JDK 内置 `com.sun.net.httpserver.HttpServer`，**demo 自身同样零第三方依赖**；上传文件只存内存、重启即清，不落盘不入库。
+> 测试台服务用 JDK 内置 `com.sun.net.httpserver.HttpServer`，**demo 自身同样零第三方依赖**；上传文件只存内存、重启即清，不落盘不入库。例外：线上站点开了「效果不佳？反馈」（设 `OFFICIA_FEEDBACK_DIR`），用户**主动**提交的文件存到 `deploy/data/feedback`（目录 + JSON，不用数据库），后台 `/admin`；本机 `java -jar` 默认不开、不落盘。
 
 ---
 

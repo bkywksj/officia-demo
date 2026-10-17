@@ -366,6 +366,9 @@ ssh user@host 'gunzip -c /tmp/officia-demo.tar.gz | docker load'
 | `docker build` 报找不到 jar | 构建上下文不是项目根目录 | `docker build -f deploy/Dockerfile … .`（末尾的 `.` 是根目录） |
 | 多阶段构建拉不到 officia | 本地仓依赖 | 改宿主构建 + COPY jar，见第六节 |
 | 重启后上传的文件全没了 | 只存内存，设计如此 | 无需挂卷；要留存请下载结果 |
+| 想收集用户反馈的问题文件 | 「效果不佳？反馈」默认关 | `.env` 设 `OFFICIA_FEEDBACK_DIR=/data/feedback` 与 `OFFICIA_ADMIN_PASSWORD`（只首次用，存为哈希），compose 已挂 `./data:/data` 且以 `DEMO_UID:DEMO_GID`（默认 1000）运行；后台 `https://<站点>/admin`，账号 admin；备份 `tar czf fb.tgz deploy/data` |
+| 反馈后台登不进、忘了口令 | 口令以 `data/feedback/admin.json` 的哈希为准 | 删掉 admin.json 再重启，按 `.env` 里的 `OFFICIA_ADMIN_PASSWORD` 重新生成 |
+| 反馈后台里记的 IP 全是反代地址、限频成了全站共用 | 反代的直连地址不在可信段里，`X-Forwarded-For` 被忽略 | 默认信回环、私有网段与 100.64.0.0/10（Tailscale）；反代在别的网段时设 `OFFICIA_TRUSTED_PROXIES`（逗号分隔 IPv4 CIDR，整体替换默认值）。2026-10-17 msi 实测：反代经 Tailscale 从 100.100.100.10 转来 |
 | `docker logs` 中文乱码 | 少见（无 console 时程序按 UTF-8 输出） | 确认终端按 UTF-8 读；`docker compose logs` 不要经 GBK 管道转存 |
 
 ---
