@@ -11,3 +11,6 @@ target/
 # 容器编排的本地配置（含端口/内存等本机取值）；.env.example 才是入库的模板
 deploy/.env
 deploy/fonts/
+
+# 反馈功能的数据目录（用户提交的文件与后台口令哈希），只在服务器上，绝不入库
+deploy/data/

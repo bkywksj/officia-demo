@@ -6,9 +6,11 @@
 #     docker compose up -d --build
 #     curl http://127.0.0.1:18080/api/health
 #
-# 【为什么没有数据库、没有数据卷】
-# 测试台上传的文件只存内存（Store），重启即清、不落盘不入库；没有任何持久化状态，
-# 所以不需要 logs / upload / temp 卷。唯一可能要挂的是 License 与自备字体，见下方（默认关闭）。
+# 【为什么没有数据库；唯一的数据卷是什么】
+# 测试台上传的文件只存内存（Store），重启即清、不落盘不入库。
+# 唯一落盘的是用户**主动**点「效果不佳？反馈」提交的文件（./data/feedback，目录 + JSON，不用数据库），
+# 只在 .env 设了 OFFICIA_FEEDBACK_DIR 时启用；后台 /admin，初始口令取自 OFFICIA_ADMIN_PASSWORD。
+# 不设就和以前一样完全无状态。另可挂 License 与自备字体，见下方。
 services:
   officia-demo:
     build:
@@ -17,6 +19,9 @@ services:
       dockerfile: deploy/Dockerfile
     image: officia-demo:1.0.0
     container_name: officia-demo
+    # 以宿主普通用户身份运行（默认 1000:1000）：反馈数据卷里的文件归该用户所有，
+    # 宿主上不用 sudo 就能备份、清理；进程也不再是容器里的 root。
+    user: "${DEMO_UID:-1000}:${DEMO_GID:-1000}"
 
     ports:
       # 🔴 默认只发布到宿主回环（BIND_ADDR=127.0.0.1）。
@@ -33,16 +38,25 @@ services:
       OFFICIA_DEMO_PORT: 18080
       OFFICIA_FONTS_DIR: ${OFFICIA_FONTS_DIR:-/usr/share/fonts}
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp}
+      # 非 root 运行时没有可写的家目录，JVM 的字体缓存等写到 /tmp
+      HOME: /tmp
+      # 「效果不佳的文件」反馈：设了才启用（见文件头说明）；口令只在首次生成 admin.json 时用，之后以哈希文件为准
+      OFFICIA_FEEDBACK_DIR: ${OFFICIA_FEEDBACK_DIR:-}
+      OFFICIA_ADMIN_PASSWORD: ${OFFICIA_ADMIN_PASSWORD:-}
       # 授权：把 .lic 用下面的 volumes 挂进来后，再放开这一行。
       # 🔴 .lic 绝不 COPY 进镜像层、绝不入库（.gitignore 已拦 *.lic）。
       # 不配也能跑：未授权只是降级（水印 + 限页），能力全部可用。
       # OFFICIA_LICENSE: /etc/officia/officia.lic
 
-    # volumes:
+    volumes:
+      # 自备字体目录（只读）：14 款免费商用字体，见 fonts/README.txt。
+      # 走挂载而不是打进镜像——字体只留在本机、不进任何可分发产物
+      #（OPPO Sans 等明确禁止"向他方提供其他下载渠道"）。
+      - ./fonts:/opt/officia/fonts:ro
+      # 反馈数据（只有开了 OFFICIA_FEEDBACK_DIR=/data/feedback 才会写）。备份就是打包这个目录
+      - ./data:/data
     #   # 授权文件：只读挂载，宿主放一份 deploy/officia.lic（不会被提交）
     #   - ./officia.lic:/etc/officia/officia.lic:ro
-    #   # 自备字体目录：镜像内字体不够用时挂进来，并把 OFFICIA_FONTS_DIR 指到这里
-    #   - ./fonts:/opt/officia/fonts:ro
 
     # 内存上限直接决定能传多大文件：
     #   容器内存 → JVM 堆（MaxRAMPercentage=75）→ 单次上传上限（堆 ÷ 8，夹在 [64MB, 1GB]）
