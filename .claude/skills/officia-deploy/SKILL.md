@@ -23,7 +23,7 @@ allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 
 ## 概述
 
-officia 运行时零第三方依赖（只要 JDK 17+），所以容器化本身很简单——**难点全在四个本项目特有的边界上**：
+officia 运行时零第三方依赖（officia 本身 JDK 8u161+ 即可；本测试台源码只写 Java 8（锁 1.1.4 期间按 17 编译，发 1.1.5 起按 8），容器沿用 `eclipse-temurin:17-jre`，没必要为此改镜像），所以容器化本身很简单——**难点全在四个本项目特有的边界上**：
 监听地址、内存联动、字体入口、授权注入。这四个每一个踩错，表现都是"看起来起来了，实际不能用"。
 
 编排文件在 `deploy/`：`Dockerfile` / `docker-compose.yml` / `.env.example` / `README.md`。
@@ -38,7 +38,7 @@ officia 运行时零第三方依赖（只要 JDK 17+），所以容器化本身�
 
 - 系统/架构、CPU、**内存 + swap**、磁盘可用空间
 - 已装什么：**Docker / docker compose**、1Panel、端口 18080 是否被占
-- 本地构建环境：JDK 17+、Maven、**本地仓有没有 officia**（`ls ~/.m2/repository/plus/ruoyi/officia-all/`）
+- 本地构建环境：JDK 17+（`release=8` 只需 9+ 的 javac，17 是本机常备）、Maven、**本地仓有没有 officia**（`ls ~/.m2/repository/plus/ruoyi/officia-all/`）
 
 ### 第 1 步 · 把探测结果 + 方案讲给用户，停下等确认
 

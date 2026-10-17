@@ -57,7 +57,7 @@
 
 ## Officia 能力速览（17 模块 / 10 门面）
 
-引 `officia-all` 一次得全部能力，**运行时零第三方依赖**（只依赖 JDK 17+）。
+引 `officia-all` 一次得全部能力，**运行时零第三方依赖**（officia 1.1.5 起只依赖 JDK 8u161+，8 / 11 / 17 / 21+ 同一份 jar；本测试台源码 2026-10-17 起只写 Java 8；pom 锁已发布的 1.1.4（Java 17 字节码）期间仍按 `release=17` 编译，发 1.1.5 时与 `officia.version` 一起改成 8，之后在 JDK 8 上可直接 `java -jar`（开发期验证：`-Dofficia.version=1.1.5 -Dmaven.compiler.release=8`）。**测试台代码同样只写 Java 8 语法与 API**，也不许借用 officia 内部的 `Compat*` 工具（非公开 API，发布版会被混淆））。
 
 | 门面类 | 模块 | 主要能力 | 对应技能 |
 |---|---|---|---|

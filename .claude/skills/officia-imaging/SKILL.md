@@ -37,7 +37,10 @@ byte[] out = OfficiaImaging.convert(src, "png");   // 目标格式：png / jpg /
                                                    // 不区分大小写，可带前导点（".png" 也行）
 ```
 
-**支持的格式**：PNG / JPEG / BMP / GIF（`javax.imageio` 内置）。WebP / AVIF / TIFF **不在其中**。
+**支持的格式**：
+- **读入**：PNG / JPEG / BMP / GIF（`javax.imageio` 内置），以及 **TIFF**（JDK 9+ 由 `javax.imageio` 解；JDK 8 上 officia 自带解码器接手，含黑白传真常用的 CCITT G3 / G4；JPEG 压缩等少见 TIFF 需 JDK 9+）。
+- **写出**：png / jpg / jpeg / bmp / gif。
+- WebP / AVIF **不支持**。
 
 > 💡 **透明通道处理**：目标格式不支持透明（JPEG / BMP）时，若源图含 alpha，officia **自动铺白底转 RGB**——不会出现黑块或转换失败。这是常见坑，officia 已内置处理。
 
@@ -109,7 +112,8 @@ byte[] published = OfficiaImaging.textWatermark(src, "(C) 2026", 20, 30, 18f, 0x
 | 现象 | 原因 | 处置 |
 |---|---|---|
 | 转 JPEG 后透明区变**黑块** | 一般库的通病 | officia **已自动铺白底**；仍有黑块请确认源图确实含 alpha 且格式被正确识别 |
-| WebP / AVIF / TIFF 读不了 | `javax.imageio` 不支持 | 先用其它工具转成 PNG/JPEG 再进 officia |
+| WebP / AVIF 读不了 | `javax.imageio` 不支持 | 先用其它工具转成 PNG/JPEG 再进 officia |
+| 个别 TIFF 读不了（JDK 8） | JPEG / Deflate 压缩、YCbCr 等少见 TIFF 超出 officia 自带解码器范围，JDK 8 的 `javax.imageio` 也不认 | 换 JDK 9+，或先转成 PNG |
 | `resize` 后变形 | 传的是绝对宽高，不保持比例 | 自己按原图比例算目标尺寸 |
 | 水印看不见 | `opacity` 太低 / 颜色与背景同色 / x,y 在画布外 | 调 `opacity`、换 `rgb`、确认坐标在图内 |
 | `blur` 很慢 | radius 大 + 图大 | 先 `resize` 再滤镜 |

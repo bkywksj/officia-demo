@@ -26,7 +26,7 @@ Officia 以标准 Maven 产物发布，坐标前缀 `plus.ruoyi`。**运行时�
 
 | 项 | 要求 | 校验 |
 |---|---|---|
-| JDK | **17+**（Officia 以 Java 17 为基线） | `java -version` |
+| JDK | **8u161+**，11 / 17 / 21+ 均可，同一份 jar（1.1.5 起；1.1.4 及以前需 17+）。8u161 是 AES-256 加密 PDF 的下限 | `java -version` |
 | 构建工具 | Maven 或 Gradle | `mvn -v` |
 | 网络 | 不需要（officia 运行期不联网，授权也是离线验签） | — |
 
@@ -153,7 +153,7 @@ ls ~/.m2/repository/plus/ruoyi/officia-all/1.1.3/
 | 症状 | 原因 | 处置 |
 |---|---|---|
 | `Could not resolve dependencies ... plus.ruoyi:officia-all:jar:1.1.3` | 本地仓没有 | 去 `../officia` 跑 `mvn install -DskipTests` |
-| `class file has wrong version 61.0` | JDK < 17 | 升到 JDK 17+，或检查 `maven.compiler.target` |
+| `class file has wrong version 61.0` | 用的是 officia 1.1.4 及以前（Java 17 字节码），而 JDK < 17 | 升到 officia 1.1.5+（支持 JDK 8u161+），或升 JDK 17+ |
 | 编译期找不到 `OfficiaWords` | 只引了 `officia-pdf` 等单模块 | 改引 `officia-all`，或补引 `officia-words` |
 | 离线 `mvn -o` 报插件缺失 | 插件未缓存 | 联网跑一次完整构建预热，或在 `pluginManagement` 固定已缓存版本（本 demo `pom.xml` 就这么做的） |
 | 依赖树里多出陌生的第三方包 | **不是 officia 带的** | `mvn dependency:tree` 看来源；officia 运行时零第三方依赖 |
@@ -229,7 +229,8 @@ ENTRYPOINT ["java","-jar","/app/app.jar"]
 |---|---|
 | 运行时零第三方依赖 | ✅ officia 只用 JDK 标准库，不引 POI / PDFBox / iText / Aspose |
 | 你的项目也必须零依赖 | ❌ **不需要**。那是 officia 库自身的开发铁律，与使用方无关，你想引什么引什么 |
-| 不需要 JDK 之外的运行时 | ✅ JDK 17+ 即可，不需装 LibreOffice / Word / 字体服务 |
+| 不需要 JDK 之外的运行时 | ✅ JDK 8u161+ 即可（1.1.5 起），不需装 LibreOffice / Word / 字体服务 |
+| JDK 8 上的差异 | ✅ 基本没有：JDK 8 的 `javax.imageio` 不认 TIFF，officia 自带解码器接手（含 CCITT 传真压缩），照样能画；JDK 9+ 仍用 JDK 自带的 TIFF 解码，与以前完全一样。细节差异：8 位灰度 TIFF 在 JDK 9+ 上显示偏亮一些；JPEG / Deflate 压缩等少见 TIFF 需 JDK 9+（JDK 8 上该张图跳过，其余照常） |
 | 完全不需要字体文件 | ❌ 中文 PDF 需要能找到中文 TTF，见 `officia-chinese-font` |
 
 ## 验证接入成功

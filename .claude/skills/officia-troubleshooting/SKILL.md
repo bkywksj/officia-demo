@@ -71,7 +71,7 @@ officia 的异常消息用统一前缀标注问题发生在哪一层（核实自
 | `CFB … 超过安全上限` | 触发 `CfbLimits` 内存安全边界 | 这是**保护机制**不是 bug，见 `officia-performance` |
 | `License 无效` / `License 为空` | 显式 `setLicense` 传了坏令牌 | 重新下载 `.lic`，见 `officia-license` |
 | `Code39 不支持的字符: 'X'` | 该码制字符集不含此字符 | 换 Code128 或 QR，见 `officia-barcode` |
-| `无法解码图片（ImageIO …` | WebP/AVIF/TIFF 等不支持的格式 | 先转成 PNG/JPEG |
+| `无法解码图片（ImageIO …` | WebP/AVIF 等不支持的格式；JDK 8 上还有 JPEG / Deflate 压缩的少见 TIFF | 先转成 PNG/JPEG（TIFF 也可换 JDK 9+） |
 | `文档不含表格` | `toCsv` 的输入 xlsx 没有可导出的表 | 确认工作表内容 |
 | `这份文件设了打开密码（加密的 OOXML …` | xlsx 设了**打开密码**：产出的不是 ZIP 而是 CFB，真正的内容在 `EncryptedPackage` 流里被整份加密 | 在 Excel 里打开、输入密码后「另存为」一份不带密码的副本再上传。**不要**被"这是 CFB"误导成 .doc 的问题 |
 | `CFB 容器不是 Excel 工作簿：缺少必需流 Workbook` | 确实不是 Excel（消息里会列出实际流名，出现 `WordDocument` 即是 .doc） | 按实际流名改走对应能力 |

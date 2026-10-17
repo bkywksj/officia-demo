@@ -10,7 +10,7 @@
  *   { session_id, prompt, cwd, hook_event_name, ... }
  *
  * Codex 输出：
- *   - {additionalContext: "..."} → 加入上下文
+ *   - {hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: "..."}} → 加入上下文
  *   - {} → 不注入
  */
 
@@ -65,5 +65,12 @@ const context = `## 强制技能评估流程（officia-demo）
 2. **.lic 与授权令牌绝不入库** —— 不生成/不硬编码/不提交，不给绕过水印的建议。
 3. **UTF-8 无 BOM** —— 所有新建修改文件。`;
 
-process.stdout.write(JSON.stringify({ additionalContext: context }));
+// Codex 校验 UserPromptSubmit 输出 schema：顶层 additionalContext 会被判为
+// "invalid user prompt submit JSON output"，必须放进 hookSpecificOutput 嵌套结构
+process.stdout.write(JSON.stringify({
+  hookSpecificOutput: {
+    hookEventName: 'UserPromptSubmit',
+    additionalContext: context,
+  },
+}));
 process.exit(0);
