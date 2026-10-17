@@ -17,13 +17,11 @@
     <properties>
         <!-- officia 版本只写这一处：依赖坐标与页面上显示的版本号都取它，避免两边各自漂移
              （曾出现页面写死 1.0.0、实际跑 1.1.2，排查线上问题时误导了判断） -->
-        <officia.version>1.1.4</officia.version>
-        <!-- 编译目标与 officia 版本绑在一起改：
-             · 源码 2026-10-17 起只写 Java 8 语法与 API，officia 1.1.5 起支持 JDK 8，测试台在 JDK 8 上也能 java -jar；
-             · 但已发布的 1.1.4 及以前是 Java 17 字节码（含 record），按 release=8 编译会报「无法访问 java.lang.Record」，
-               所以锁 1.1.4 期间这里保持 17。
-             发 1.1.5 把 officia.version 升上去时，这里同步改成 8（并写进发版清单）。
-             开发期验证 JDK 8：mvn -o clean package -Dofficia.version=1.1.5 -Dmaven.compiler.release=8
+        <officia.version>1.1.5</officia.version>
+        <!-- 编译目标：测试台自身按 17 编译、部署在 JDK 17+ 上（2026-10-17 用户定：demo 保持新 JDK）。
+             · 源码只写 Java 8 语法与 API，officia 1.1.5 起支持 JDK 8——客户想在 JDK 8 上跑测试台，
+               自己用 mvn -o clean package -Dmaven.compiler.release=8 打包即可（2026-10-17 在 msi 上用 JDK 8 容器实测：批量回归 14/14）；
+             · officia 1.1.4 及以前是 Java 17 字节码（含 record），配它时只能按 17 编译（按 8 编会报「无法访问 java.lang.Record」）。
              release 比 source/target 严：javac 按目标 JDK 的 API 表检查，写了 9+ 的方法会直接编译失败。 -->
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

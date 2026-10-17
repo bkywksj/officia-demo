@@ -23,7 +23,7 @@ allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 
 ## 概述
 
-officia 运行时零第三方依赖（officia 本身 JDK 8u161+ 即可；本测试台源码只写 Java 8（锁 1.1.4 期间按 17 编译，发 1.1.5 起按 8），容器沿用 `eclipse-temurin:17-jre`，没必要为此改镜像），所以容器化本身很简单——**难点全在四个本项目特有的边界上**：
+officia 运行时零第三方依赖（officia 本身 JDK 8u161+ 即可；本测试台源码只写 Java 8、默认按 17 编译，容器沿用 `eclipse-temurin:17-jre`，没必要为此改镜像），所以容器化本身很简单——**难点全在四个本项目特有的边界上**：
 监听地址、内存联动、字体入口、授权注入。这四个每一个踩错，表现都是"看起来起来了，实际不能用"。
 
 编排文件在 `deploy/`：`Dockerfile` / `docker-compose.yml` / `.env.example` / `README.md`。
