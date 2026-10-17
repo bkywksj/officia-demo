@@ -23,6 +23,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -70,7 +71,7 @@ final class Batch {
         cases.add(run("Pdf", "两份 PDF 合并 merge", () -> {
             byte[] a = OfficiaCells.csvToPdf("A,B\n1,2");
             byte[] b = OfficiaCells.csvToPdf("C,D\n3,4");
-            byte[] m = OfficiaPdf.merge(List.of(a, b));
+            byte[] m = OfficiaPdf.merge(Arrays.asList(a, b));
             assertPdf(m);
             int p = OfficiaPdf.pageCount(m);
             if (p < 2) {
@@ -122,7 +123,7 @@ final class Batch {
         // 那条边界由单测 PdfToWordTest 覆盖（用 PdfDocument 直接造空白页，构造可控）。
         cases.add(run("Pdf", "转 Word 产物容器完整性", () -> {
             byte[] docx = OfficiaPdf.toWord(OfficiaCells.csvToPdf("列A,列B\n值1,值2"));
-            var pkg = plus.ruoyi.officia.ooxml.opc.OpcPackage.load(docx);
+            plus.ruoyi.officia.ooxml.opc.OpcPackage pkg = plus.ruoyi.officia.ooxml.opc.OpcPackage.load(docx);
             String[] required = {"[Content_Types].xml", "_rels/.rels", "word/document.xml",
                     "word/_rels/document.xml.rels", "word/styles.xml"};
             for (String part : required) {

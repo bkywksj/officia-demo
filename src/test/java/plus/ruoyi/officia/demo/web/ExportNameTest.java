@@ -79,7 +79,11 @@ class ExportNameTest {
     @Test
     @DisplayName("超长名字截断——不让一个长入参撑爆响应头")
     void overlong_name_is_truncated() {
-        String name = "长".repeat(500) + ".docx";
+        StringBuilder longName = new StringBuilder();
+        for (int i = 0; i < 500; i++) {
+            longName.append("长");
+        }
+        String name = longName + ".docx";
 
         assertThat(ApiRoutes.downloadName(name, FALLBACK)).hasSize(120);
     }

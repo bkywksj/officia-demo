@@ -163,7 +163,8 @@ public final class DemoServer {
         }
         String disp = "1".equals(q.get("download")) ? "attachment" : "inline";
         // 文件名用 RFC 5987 编码，保证中文名下载正常
-        String encoded = java.net.URLEncoder.encode(b.name(), StandardCharsets.UTF_8).replace("+", "%20");
+        // 用字符集名的重载：接 Charset 的那个要 JDK 10
+        String encoded = java.net.URLEncoder.encode(b.name(), "UTF-8").replace("+", "%20");
         ex.getResponseHeaders().set("Content-Disposition", disp + "; filename*=UTF-8''" + encoded);
         Http.send(ex, 200, b.mime(), b.data());
     }
@@ -182,7 +183,7 @@ public final class DemoServer {
                 Http.error(ex, 404, "资源不存在: " + path);
                 return;
             }
-            Http.send(ex, 200, Http.mimeOf(res), in.readAllBytes());
+            Http.send(ex, 200, Http.mimeOf(res), Http.readAll(in));
         }
     }
 
@@ -237,15 +238,27 @@ public final class DemoServer {
     /**
      * 启动横幅：把访问链接打得足够醒目（多数终端可直接 Ctrl/⌘+点击打开）。
      *
-     * <p>用 {@code native.encoding}（JDK17+ 给出的 OS 默认字符集）重建 stdout——
-     * Windows 控制台是 GBK 而 JVM 默认 UTF-8，直接 println 中文会乱码。</p>
+     * <p>按控制台字符集重建 stdout——Windows 控制台是 GBK 而 JDK 18+ 默认 UTF-8，直接 println 中文会乱码。</p>
      */
+    /**
+     * 控制台字符集。{@code Console.charset()} 要 JDK 17，本测试台还要跑在 JDK 8 上，改读 JVM 设的系统属性：
+     * JDK 19 起是 {@code stdout.encoding}；更早的 JDK 在 Windows 控制台上设 {@code sun.stdout.encoding}（如 cp936）；
+     * 都没有时（如 Linux 终端）用默认字符集——JDK 8～17 取自系统区域设置，与终端一致。
+     */
+    private static String consoleEncoding() {
+        String enc = System.getProperty("stdout.encoding");
+        if (enc == null) {
+            enc = System.getProperty("sun.stdout.encoding");
+        }
+        return enc != null ? enc : java.nio.charset.Charset.defaultCharset().name();
+    }
+
     private static void banner(String url, int port, java.net.InetAddress bind) {
         try {
             // 有真实控制台 → 用控制台字符集（Windows 多为 GBK，直接显示中文正常）；
             // 被重定向到文件/管道 → 用 UTF-8（日志文件按 UTF-8 读才正常）。
             java.io.Console con = System.console();
-            String enc = con != null ? con.charset().name() : "UTF-8";
+            String enc = con != null ? consoleEncoding() : "UTF-8";
             System.setOut(new java.io.PrintStream(
                 new java.io.FileOutputStream(java.io.FileDescriptor.out), true, enc));
         } catch (Exception ignore) {

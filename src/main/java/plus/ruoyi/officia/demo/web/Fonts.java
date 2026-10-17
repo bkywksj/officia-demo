@@ -110,16 +110,16 @@ final class Fonts {
     // 只能直接测这段解析逻辑——它正是此前漏掉挂载目录的那处
     static String[] operatorFontFiles() {
         String cfg = System.getProperty("officia.fonts.dir");
-        if (cfg == null || cfg.isBlank()) {
+        if (cfg == null || Http.blank(cfg)) {
             cfg = System.getenv("OFFICIA_FONTS_DIR");
         }
-        if (cfg == null || cfg.isBlank()) {
+        if (cfg == null || Http.blank(cfg)) {
             return new String[0];
         }
         List<String> out = new ArrayList<>();
         for (String dir : cfg.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
             File d = new File(dir.trim());
-            if (dir.isBlank() || !d.isDirectory()) {
+            if (Http.blank(dir) || !d.isDirectory()) {
                 continue;
             }
             File[] files = d.listFiles(f -> {

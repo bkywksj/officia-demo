@@ -43,7 +43,7 @@ class DownloadWiringTest {
         try (InputStream in = DownloadWiringTest.class.getClassLoader()
                 .getResourceAsStream("web/index.html")) {
             assertThat(in).as("取不到测试台页面 web/index.html").isNotNull();
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(Http.readAll(in), StandardCharsets.UTF_8);
         }
     }
 

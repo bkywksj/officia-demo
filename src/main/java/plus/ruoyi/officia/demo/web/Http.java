@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -80,7 +81,12 @@ final class Http {
     }
 
     private static String dec(String s) {
-        return URLDecoder.decode(s, StandardCharsets.UTF_8);
+        // 用字符集名的重载：接 Charset 的那个要 JDK 10；UTF-8 是 JDK 必备字符集，异常不会发生
+        try {
+            return URLDecoder.decode(s, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /**
@@ -133,6 +139,36 @@ final class Http {
     }
 
     /** 字节数转易读文本（错误消息与启动横幅共用）：不足 1 GB 用 MB，否则用 GB。 */
+    /**
+     * 是否为 null、空串或只含空白。按 {@link Character#isWhitespace(int)} 逐码点判断，
+     * 与 Java 11 的 {@code String.isBlank} 一致——本测试台要跑在 JDK 8 上，没有那个方法；
+     * 不用 {@code trim().isEmpty()} 代替：它只认 {@code <= ' '}，全角空格会判成「非空」。
+     */
+    static boolean blank(String s) {
+        if (s == null) {
+            return true;
+        }
+        for (int i = 0; i < s.length(); ) {
+            int cp = s.codePointAt(i);
+            if (!Character.isWhitespace(cp)) {
+                return false;
+            }
+            i += Character.charCount(cp);
+        }
+        return true;
+    }
+
+    /** 读完输入流，不关闭（Java 8 没有 {@code InputStream.readAllBytes}）。 */
+    static byte[] readAll(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
+    }
+
     static String humanSize(long bytes) {
         double mib = bytes / 1024.0 / 1024.0;
         return mib < 1024 ? String.format("%.1f MB", mib) : String.format("%.1f GB", mib / 1024.0);

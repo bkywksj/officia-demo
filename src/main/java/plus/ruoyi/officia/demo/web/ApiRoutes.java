@@ -301,7 +301,7 @@ final class ApiRoutes {
                 .format(q.getOrDefault("format", "png"));
 
             String wmText = q.get("watermark");
-            if (wmText != null && !wmText.isBlank()) {
+            if (wmText != null && !Http.blank(wmText)) {
                 WatermarkOptions wm = WatermarkOptions.text(wmText);
                 if ("1".equals(q.get("tile"))) {
                     wm.tile(true).fontSizePt(13).opacity(0.13f);
@@ -576,15 +576,15 @@ final class ApiRoutes {
         r.add("/api/pdf/toimages", (ex, q) -> {
             byte[] pdf = Store.bytes(q.get("id"));
             ImageRenderOptions opts = ImageRenderOptions.defaults();
-            if (q.get("dpi") != null && !q.get("dpi").isBlank()) {
+            if (q.get("dpi") != null && !Http.blank(q.get("dpi"))) {
                 opts.dpi(Integer.parseInt(q.get("dpi")));
             }
-            if (q.get("format") != null && !q.get("format").isBlank()) {
+            if (q.get("format") != null && !Http.blank(q.get("format"))) {
                 opts.format(q.get("format"));
             }
 
             String wmText = q.get("watermark");
-            if (wmText != null && !wmText.isBlank()) {
+            if (wmText != null && !Http.blank(wmText)) {
                 WatermarkOptions wm = WatermarkOptions.text(wmText);
                 if ("1".equals(q.get("tile"))) {
                     wm.tile(true).fontSizePt(13).opacity(0.13f);
@@ -944,7 +944,7 @@ final class ApiRoutes {
                 m.getAttachments().forEach(a -> atts.add(Json.obj()
                     .put("name", a.getFilename()).put("size", a.getSize())));
             }
-            String body = m.getHtmlBody() != null && !m.getHtmlBody().isBlank()
+            String body = m.getHtmlBody() != null && !Http.blank(m.getHtmlBody())
                 ? m.getHtmlBody() : m.getTextBody();
             Http.json(ex, j.put("attachments", atts).put("body", body == null ? "" : body).end());
         });
@@ -959,13 +959,25 @@ final class ApiRoutes {
     // ==================== 结果命名 ====================
 
     /** 图像操作 → 中文标记：产物名进的是中文界面与中文文件系统，不该混英文 op 名。 */
-    private static final Map<String, String> IMG_TAG = Map.ofEntries(
-        Map.entry("grayscale", "灰度"), Map.entry("sepia", "怀旧"), Map.entry("invert", "反色"),
-        Map.entry("sharpen", "锐化"), Map.entry("blur", "模糊"), Map.entry("binarize", "二值化"),
-        Map.entry("posterize", "色调分离"), Map.entry("brightness", "亮度"), Map.entry("contrast", "对比度"),
-        Map.entry("flipH", "水平翻转"), Map.entry("flipV", "垂直翻转"), Map.entry("resize", "缩放"),
-        Map.entry("crop", "裁剪"), Map.entry("rotate", "旋转"),
-        Map.entry("textmark", "文字水印"), Map.entry("imgmark", "图片水印"));
+    private static final Map<String, String> IMG_TAG = new LinkedHashMap<>();
+    static {
+        IMG_TAG.put("grayscale", "灰度");
+        IMG_TAG.put("sepia", "怀旧");
+        IMG_TAG.put("invert", "反色");
+        IMG_TAG.put("sharpen", "锐化");
+        IMG_TAG.put("blur", "模糊");
+        IMG_TAG.put("binarize", "二值化");
+        IMG_TAG.put("posterize", "色调分离");
+        IMG_TAG.put("brightness", "亮度");
+        IMG_TAG.put("contrast", "对比度");
+        IMG_TAG.put("flipH", "水平翻转");
+        IMG_TAG.put("flipV", "垂直翻转");
+        IMG_TAG.put("resize", "缩放");
+        IMG_TAG.put("crop", "裁剪");
+        IMG_TAG.put("rotate", "旋转");
+        IMG_TAG.put("textmark", "文字水印");
+        IMG_TAG.put("imgmark", "图片水印");
+    }
 
     /**
      * 结果文件名：沿用源文件名，只换扩展名（{@code 年度报告.docx} → {@code 年度报告.pdf}）。
@@ -988,12 +1000,12 @@ final class ApiRoutes {
      * 下载时照样被浏览器加 "(1)"，还容易把原件覆盖混淆。</p>
      */
     private static String outName(String id, String tag, String ext, String fallback) {
-        Store.Blob b = id == null || id.isBlank() ? null : Store.get(id);
+        Store.Blob b = id == null || Http.blank(id) ? null : Store.get(id);
         String base = baseName(b == null ? fallback : b.name());
-        if (base.isBlank()) {
+        if (Http.blank(base)) {
             base = baseName(fallback);
         }
-        return base + (tag == null || tag.isBlank() ? "" : "-" + tag) + "." + ext;
+        return base + (tag == null || Http.blank(tag) ? "" : "-" + tag) + "." + ext;
     }
 
     /**
@@ -1002,7 +1014,7 @@ final class ApiRoutes {
      * @param ids 逗号分隔的 Blob id 列表
      */
     private static String mergedName(String ids, String tag, String ext, String fallback) {
-        String[] arr = ids == null || ids.isBlank() ? new String[0] : ids.split(",");
+        String[] arr = ids == null || Http.blank(ids) ? new String[0] : ids.split(",");
         if (arr.length == 0) {
             return baseName(fallback) + "." + ext;
         }
@@ -1328,7 +1340,7 @@ final class ApiRoutes {
             .setLanguage("en".equalsIgnoreCase(q.getOrDefault("lang", "zh"))
                 ? BuiltinModels.Language.ENGLISH : BuiltinModels.Language.CHINESE);
         String whitelist = q.get("charWhitelist");
-        if (whitelist != null && !whitelist.isBlank()) {
+        if (whitelist != null && !Http.blank(whitelist)) {
             opts.setCharWhitelist(whitelist);
         }
         return opts;
@@ -1339,12 +1351,12 @@ final class ApiRoutes {
         if (v == null) {
             return ScannedPdfConverter.Rotation.NONE;
         }
-        return switch (v.trim()) {
-            case "90", "cw" -> ScannedPdfConverter.Rotation.CLOCKWISE_90;
-            case "-90", "270", "ccw" -> ScannedPdfConverter.Rotation.COUNTER_CLOCKWISE_90;
-            case "180" -> ScannedPdfConverter.Rotation.HALF_TURN;
-            default -> ScannedPdfConverter.Rotation.NONE;
-        };
+        switch (v.trim()) {
+            case "90": case "cw": return ScannedPdfConverter.Rotation.CLOCKWISE_90;
+            case "-90": case "270": case "ccw": return ScannedPdfConverter.Rotation.COUNTER_CLOCKWISE_90;
+            case "180": return ScannedPdfConverter.Rotation.HALF_TURN;
+            default: return ScannedPdfConverter.Rotation.NONE;
+        }
     }
 
     // ==================== 小工具 ====================
@@ -1369,7 +1381,7 @@ final class ApiRoutes {
     // 包级可见（不是 private）：同包的 ExportNameTest 直接钉它的清洗规则。
     // 这条规则是对外端点的入参防线，值得单测，而不是只靠上层路由间接覆盖
     static String downloadName(String requested, String fallback) {
-        if (requested == null || requested.isBlank()) {
+        if (requested == null || Http.blank(requested)) {
             return fallback;
         }
         StringBuilder sb = new StringBuilder(requested.length());
@@ -1415,7 +1427,7 @@ final class ApiRoutes {
     private static List<byte[]> bytesOfIds(String ids) {
         List<byte[]> list = new ArrayList<>();
         for (String id : (ids == null ? "" : ids).split(",")) {
-            if (!id.isBlank()) {
+            if (!Http.blank(id)) {
                 list.add(Store.bytes(id.trim()));
             }
         }
@@ -1433,7 +1445,7 @@ final class ApiRoutes {
      * 用户看不懂。这里提前拦下并说清该换什么。</p>
      */
     private static byte[] fontBytes(String fontId) {
-        if (fontId != null && !fontId.isBlank()) {
+        if (fontId != null && !Http.blank(fontId)) {
             byte[] uploaded = Store.bytes(fontId);
             if (uploaded != null && !Fonts.usableForAscii(uploaded)) {
                 throw new IllegalArgumentException(
@@ -1452,7 +1464,7 @@ final class ApiRoutes {
     }
 
     private static int[] parseInts(String s) {
-        if (s == null || s.isBlank()) {
+        if (s == null || Http.blank(s)) {
             return new int[0];
         }
         String[] parts = s.split(",");
@@ -1465,17 +1477,17 @@ final class ApiRoutes {
 
     private static int intOf(Map<String, String> q, String key, int def) {
         String v = q.get(key);
-        return v == null || v.isBlank() ? def : Integer.parseInt(v.trim());
+        return v == null || Http.blank(v) ? def : Integer.parseInt(v.trim());
     }
 
     private static float floatOf(Map<String, String> q, String key, float def) {
         String v = q.get(key);
-        return v == null || v.isBlank() ? def : Float.parseFloat(v.trim());
+        return v == null || Http.blank(v) ? def : Float.parseFloat(v.trim());
     }
 
     private static double doubleOf(Map<String, String> q, String key, double def) {
         String v = q.get(key);
-        return v == null || v.isBlank() ? def : Double.parseDouble(v.trim());
+        return v == null || Http.blank(v) ? def : Double.parseDouble(v.trim());
     }
 
     private static boolean boolOf(Map<String, String> q, String key) {

@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Test;
 import plus.ruoyi.officia.pdf.OfficiaPdf;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assumptions.assumeThat;
@@ -134,7 +136,7 @@ class FontsTest {
         String prev = System.getProperty("officia.fonts.dir");
         try {
             Files.write(ttf, cjk);
-            Files.writeString(noise, "许可说明，不是字体");
+            Files.write(noise, "许可说明，不是字体".getBytes(StandardCharsets.UTF_8));
             System.setProperty("officia.fonts.dir", dir.toString());
 
             String[] found = Fonts.operatorFontFiles();
@@ -184,7 +186,7 @@ class FontsTest {
         for (String p : paths) {
             File f = new File(p);
             if (f.isFile() && f.length() > 0) {
-                return Files.readAllBytes(Path.of(p));
+                return Files.readAllBytes(Paths.get(p));
             }
         }
         return null;

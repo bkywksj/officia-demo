@@ -38,7 +38,10 @@ class CellsDemoTest {
     @Test
     @DisplayName("公式便捷求值：=A1+A2")
     void evaluateFormula() {
-        Object v = OfficiaCells.evaluateFormula(java.util.Map.of("A1", "1", "A2", "2"), "=A1+A2");
+        java.util.Map<String, String> cells = new java.util.HashMap<>();
+        cells.put("A1", "1");
+        cells.put("A2", "2");
+        Object v = OfficiaCells.evaluateFormula(cells, "=A1+A2");
         assertThat(((Number) v).doubleValue()).isEqualTo(3.0);
     }
 }

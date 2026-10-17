@@ -3,8 +3,8 @@ package plus.ruoyi.officia.demo.web;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,7 +58,7 @@ class JsonTest {
         m.put("x", 1);
         String s = Json.obj()
             .put("map", m)
-            .put("list", List.of("a", 2, false))
+            .put("list", Arrays.asList("a", 2, false))
             .put("inner", Json.obj().put("deep", "v"))
             .end();
         assertThat(s).isEqualTo("{\"map\":{\"x\":1},\"list\":[\"a\",2,false],\"inner\":{\"deep\":\"v\"}}");

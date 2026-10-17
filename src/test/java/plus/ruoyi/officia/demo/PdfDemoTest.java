@@ -6,7 +6,7 @@ import plus.ruoyi.officia.cells.OfficiaCells;
 import plus.ruoyi.officia.pdf.OfficiaPdf;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,7 +29,7 @@ class PdfDemoTest {
     void mergePdfs() {
         byte[] a = pdfOf("A,B\n1,2");
         byte[] b = pdfOf("C,D\n3,4");
-        byte[] merged = OfficiaPdf.merge(List.of(a, b));
+        byte[] merged = OfficiaPdf.merge(Arrays.asList(a, b));
         assertThat(new String(merged, 0, 5, StandardCharsets.ISO_8859_1)).startsWith("%PDF-");
         assertThat(OfficiaPdf.pageCount(merged)).isGreaterThanOrEqualTo(2);
     }

@@ -19,7 +19,8 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -46,11 +47,14 @@ public final class Demo {
             + new String(pdf, 0, 8, StandardCharsets.ISO_8859_1).trim());
 
         // 2) 公式求值
-        Object sum = OfficiaCells.evaluateFormula(Map.of("A1", "10", "A2", "32"), "=A1+A2");
+        Map<String, String> cells = new HashMap<>();
+        cells.put("A1", "10");
+        cells.put("A2", "32");
+        Object sum = OfficiaCells.evaluateFormula(cells, "=A1+A2");
         System.out.println("[Cells] =A1+A2 = " + sum);
 
         // 3) PDF 合并 + 文本抽取（读写闭环：自己生成的 PDF 自己读回来）
-        byte[] merged = OfficiaPdf.merge(List.of(pdf, OfficiaCells.csvToPdf("X,Y\n1,2")));
+        byte[] merged = OfficiaPdf.merge(Arrays.asList(pdf, OfficiaCells.csvToPdf("X,Y\n1,2")));
         System.out.println("[Pdf] 合并后 " + OfficiaPdf.pageCount(merged) + " 页，抽取文本含 Alice="
             + OfficiaPdf.extractText(merged).contains("Alice"));
 
@@ -72,7 +76,8 @@ public final class Demo {
         //    这里用【字符白名单】走确定性路径——票据号/编号场景就该这么用：
         //    候选被塌缩到白名单内，结果可精确校验。通用文档反而不要给白名单
         //    （会退到需要字体同源的模板匹配路径上）
-        String text = OfficiaOcr.recognize(png, OcrOptions.digitsOnly()).strip();
+        //    （白名单只有数字，首尾只可能是 ASCII 空白，trim 就够；Java 8 没有 strip）
+        String text = OfficiaOcr.recognize(png, OcrOptions.digitsOnly()).trim();
         System.out.println("[OCR] 票据号识别: " + text + "（原文 20260826，"
             + ("20260826".equals(text) ? "精确命中" : "有出入") + "）");
         //    🔴 通用识别务必显式指定语种：OcrOptions 默认英文，中文图走英文模型
