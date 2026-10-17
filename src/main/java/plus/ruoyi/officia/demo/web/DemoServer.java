@@ -135,6 +135,9 @@ public final class DemoServer {
                 return;
             }
             serveStatic(ex, path);
+        } catch (FeedbackRoutes.Denied e) {
+            // 反馈后台：未登录 401 / 来源不对 403 / 方法不对 405
+            safeError(ex, e.code, e.getMessage());
         } catch (Http.PayloadTooLargeException e) {
             // 请求体超限 → 413
             safeError(ex, 413, e.getMessage());
@@ -175,9 +178,16 @@ public final class DemoServer {
         // （Servlet 3.0 规范约定的静态资源目录）。本 demo 用的是 JDK 内置 HttpServer，
         // 没有容器帮忙自动暴露，故在此显式映射一条——顺带验证「产物随 jar 分发」
         // 这个设计在真实消费方里确实跑得通，客户不必额外拷任何文件。
-        String res = path.startsWith("/officia-editor/")
-            ? "/META-INF/resources" + path
-            : ("/".equals(path) || path.isEmpty() ? "/web/index.html" : "/web" + path);
+        String res;
+        if (path.startsWith("/officia-editor/")) {
+            res = "/META-INF/resources" + path;
+        } else if ("/".equals(path) || path.isEmpty()) {
+            res = "/web/index.html";
+        } else if ("/admin".equals(path) || "/admin/".equals(path)) {
+            res = "/web/admin.html";            // 反馈后台（页面本身不含数据，数据接口要登录）
+        } else {
+            res = "/web" + path;
+        }
         try (InputStream in = DemoServer.class.getResourceAsStream(res)) {
             if (in == null) {
                 Http.error(ex, 404, "资源不存在: " + path);

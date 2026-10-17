@@ -126,7 +126,14 @@ final class ApiRoutes {
         registerEmail(r);
         registerOcr(r);
         registerEditor(r);
+        // 「效果不佳的文件」反馈：只在设置了 OFFICIA_FEEDBACK_DIR 的线上站点注册（见 FeedbackRoutes）
+        FeedbackRoutes.register(r);
         return r;
+    }
+
+    /** 本次构建引用的 officia 版本（反馈的环境信息里记一笔，复现时知道当时跑的是哪版）。 */
+    static String officiaVersion() {
+        return OFFICIA_VERSION;
     }
 
     // ==================== 通用 ====================
@@ -140,6 +147,7 @@ final class ApiRoutes {
             .put("endpoints", endpointCount())
             .put("maxUpload", Http.MAX_BODY_BYTES)
             .put("officia", OFFICIA_VERSION)
+            .put("feedback", FeedbackRoutes.enabled())
             .put("maxHeap", Runtime.getRuntime().maxMemory()).end()));
 
         r.add("/api/upload", (ex, q) -> {

@@ -9,7 +9,9 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -138,7 +140,6 @@ final class Http {
         return total;
     }
 
-    /** 字节数转易读文本（错误消息与启动横幅共用）：不足 1 GB 用 MB，否则用 GB。 */
     /**
      * 是否为 null、空串或只含空白。按 {@link Character#isWhitespace(int)} 逐码点判断，
      * 与 Java 11 的 {@code String.isBlank} 一致——本测试台要跑在 JDK 8 上，没有那个方法；
@@ -169,9 +170,124 @@ final class Http {
         return out.toByteArray();
     }
 
+    /** 字节数转易读文本（错误消息与启动横幅共用）：不足 1 GB 用 MB，否则用 GB。 */
     static String humanSize(long bytes) {
         double mib = bytes / 1024.0 / 1024.0;
         return mib < 1024 ? String.format("%.1f MB", mib) : String.format("%.1f GB", mib / 1024.0);
+    }
+
+    /** 请求头（大小写不敏感），没有返回 null。 */
+    static String header(HttpExchange ex, String name) {
+        return ex.getRequestHeaders().getFirst(name);
+    }
+
+    /**
+     * 可信反代的地址段：直连地址落在这里面才采信转发头。默认回环 + 私有网段 + 100.64.0.0/10
+     * （运营商级 NAT 段，Tailscale 用它——msi 的 HTTPS 反代正是经 Tailscale 从 100.100.100.10 转过来，
+     * 2026-10-17 上线验收时发现不加这段，记下的 IP 全是反代、限频变成全站共用一个额度）。
+     * 环境变量 {@code OFFICIA_TRUSTED_PROXIES} 可整体替换，逗号分隔的 IPv4 CIDR。
+     */
+    private static final List<int[]> TRUSTED_PROXIES = trustedProxies(System.getenv("OFFICIA_TRUSTED_PROXIES"));
+
+    static List<int[]> trustedProxies(String cfg) {
+        String spec = blank(cfg) ? "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10" : cfg;
+        List<int[]> out = new ArrayList<>();
+        for (String part : spec.split(",")) {
+            String p = part.trim();
+            if (p.isEmpty()) {
+                continue;
+            }
+            int slash = p.indexOf('/');
+            int bits = slash < 0 ? 32 : Integer.parseInt(p.substring(slash + 1).trim());
+            Integer addr = ipv4(slash < 0 ? p : p.substring(0, slash).trim());
+            if (addr != null && bits >= 0 && bits <= 32) {
+                out.add(new int[]{addr, bits});
+            }
+        }
+        return out;
+    }
+
+    /** 直连地址是否落在可信反代段里（IPv6 只认回环）。 */
+    static boolean trusted(java.net.InetAddress peer, List<int[]> proxies) {
+        if (peer.isLoopbackAddress()) {
+            return true;
+        }
+        Integer a = ipv4(peer.getHostAddress());
+        if (a == null) {
+            return false;
+        }
+        for (int[] net : proxies) {
+            int mask = net[1] == 0 ? 0 : -1 << (32 - net[1]);
+            if ((a & mask) == (net[0] & mask)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 点分 IPv4 → int；不是 IPv4 返回 null。 */
+    private static Integer ipv4(String s) {
+        String[] p = s.split("\\.");
+        if (p.length != 4) {
+            return null;
+        }
+        int v = 0;
+        for (String x : p) {
+            int n;
+            try {
+                n = Integer.parseInt(x);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+            if (n < 0 || n > 255) {
+                return null;
+            }
+            v = (v << 8) | n;
+        }
+        return v;
+    }
+
+    /**
+     * 客户端 IP。线上经 HTTPS 反代转发到本机端口，直连地址是反代自己，真实来源在
+     * {@code X-Forwarded-For} / {@code X-Real-IP} 里——但这两个头谁都能伪造，
+     * 所以只有直连地址落在可信反代段（{@link #TRUSTED_PROXIES}）里时才采信。
+     */
+    static String clientIp(HttpExchange ex) {
+        java.net.InetAddress peer = ex.getRemoteAddress().getAddress();
+        String direct = peer.getHostAddress();
+        if (trusted(peer, TRUSTED_PROXIES)) {
+            String fwd = header(ex, "X-Forwarded-For");
+            if (!blank(fwd)) {
+                return fwd.split(",")[0].trim();      // 最左边是最初的客户端
+            }
+            String real = header(ex, "X-Real-IP");
+            if (!blank(real)) {
+                return real.trim();
+            }
+        }
+        return direct;
+    }
+
+    /** 请求是否经 HTTPS 到达（反代把原始协议放在 X-Forwarded-Proto 里）。决定 Cookie 要不要带 Secure。 */
+    static boolean viaHttps(HttpExchange ex) {
+        return "https".equalsIgnoreCase(header(ex, "X-Forwarded-Proto"));
+    }
+
+    /** 读一个小请求体（JSON 表单等），超过 max 字节判为请求过大。 */
+    static String smallBody(HttpExchange ex, int max) throws IOException {
+        try (InputStream in = ex.getRequestBody()) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                if (out.size() + n > max) {
+                    drain(in, out.size() + n);
+                    throw new PayloadTooLargeException("请求内容过长（上限 " + max / 1024 + " KB）");
+                }
+                out.write(buf, 0, n);
+            }
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        }
     }
 
     /** 请求体超限（映射为 HTTP 413）。 */

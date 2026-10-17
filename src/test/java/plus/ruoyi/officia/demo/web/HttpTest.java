@@ -3,6 +3,8 @@ package plus.ruoyi.officia.demo.web;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.net.InetAddress;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,5 +63,22 @@ class HttpTest {
     @DisplayName("请求体上限常量存在且合理（防超大文件撑爆内存）")
     void bodyLimit() {
         assertThat(Http.MAX_BODY_BYTES).isPositive().isLessThanOrEqualTo(1024 * 1024 * 1024);
+    }
+
+    @Test
+    @DisplayName("可信反代段：默认含回环、私有网段与 100.64.0.0/10（msi 的反代经 Tailscale 从 100.100.100.10 转来）；公网地址不信")
+    void trustedProxyRanges() throws Exception {
+        List<int[]> def = Http.trustedProxies(null);
+        for (String ok : new String[]{"127.0.0.1", "10.1.2.3", "172.20.0.1", "192.168.1.5", "100.100.100.10", "100.64.0.1"}) {
+            assertThat(Http.trusted(InetAddress.getByName(ok), def)).as(ok).isTrue();
+        }
+        for (String bad : new String[]{"207.246.110.73", "8.8.8.8", "100.128.0.1", "172.32.0.1"}) {
+            assertThat(Http.trusted(InetAddress.getByName(bad), def)).as(bad).isFalse();
+        }
+        // 环境变量整体替换：只信指定的一台
+        List<int[]> one = Http.trustedProxies("100.100.100.10");
+        assertThat(Http.trusted(InetAddress.getByName("100.100.100.10"), one)).isTrue();
+        assertThat(Http.trusted(InetAddress.getByName("100.100.100.11"), one)).isFalse();
+        assertThat(Http.trusted(InetAddress.getByName("127.0.0.1"), one)).as("回环恒信").isTrue();
     }
 }
