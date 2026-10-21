@@ -11,7 +11,9 @@ import plus.ruoyi.officia.ocr.recog.BuiltinModels;
 import plus.ruoyi.officia.ocr.result.OcrResult;
 import plus.ruoyi.officia.ocr.scan.ScannedPdfConverter;
 import plus.ruoyi.officia.license.OfficiaLicense;
+import plus.ruoyi.officia.ofd.OfficiaOfd;
 import plus.ruoyi.officia.pdf.OfficiaPdf;
+import plus.ruoyi.officia.words.OfficiaWords;
 
 import javax.imageio.ImageIO;
 import java.awt.Color;
@@ -212,6 +214,27 @@ final class Batch {
             // 识别文本只回填给人看，不参与判定（见上面为什么）
             return "切出 " + probe.lineCount() + " 行，docx " + docx.length + " B｜识别："
                 + probe.text().replace('\n', '/');
+        }));
+
+        // 9.5) Word → OFD → 读回 / 转 PDF：自产自销的闭环（markdown 现造 docx，不依赖外部样本）
+        cases.add(run("Ofd", "Word → OFD → 文本 / PDF 闭环", () -> {
+            byte[] docx = OfficiaWords.markdownToDocx(
+                "# 结算单\n\n本期服务费合计 12800 元。".getBytes(StandardCharsets.UTF_8));
+            byte[] ofd = OfficiaWords.toOfd(docx);
+            if (ofd.length < 4 || ofd[0] != (byte) 0x50 || ofd[1] != (byte) 0x4B) {
+                throw new AssertionError("OFD 应是 ZIP 容器（以 PK 开头）");
+            }
+            int pages = OfficiaOfd.pageCount(ofd);
+            if (pages < 1) {
+                throw new AssertionError("OFD 页数应 ≥1，实际 " + pages);
+            }
+            String text = OfficiaOfd.extractText(ofd);
+            if (text == null || !text.contains("12800")) {
+                throw new AssertionError("从 OFD 读回的文本丢了原文数字");
+            }
+            byte[] pdf = OfficiaOfd.toPdf(ofd);
+            assertPdf(pdf);
+            return "OFD " + pages + " 页 / " + ofd.length + " B → PDF " + OfficiaPdf.pageCount(pdf) + " 页，文本存活";
         }));
 
         // 10) 授权门控：评估 vs 授权（同一份数据的页数差）

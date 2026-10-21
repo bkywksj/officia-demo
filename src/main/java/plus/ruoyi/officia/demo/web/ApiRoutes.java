@@ -18,6 +18,11 @@ import plus.ruoyi.officia.ocr.recog.BuiltinModels;
 import plus.ruoyi.officia.ocr.result.OcrLine;
 import plus.ruoyi.officia.ocr.result.OcrResult;
 import plus.ruoyi.officia.ocr.scan.ScannedPdfConverter;
+import plus.ruoyi.officia.engine.api.ConvertOptions;
+import plus.ruoyi.officia.engine.api.ConvertResult;
+import plus.ruoyi.officia.ofd.OfficiaOfd;
+import plus.ruoyi.officia.ofd.invoice.OfdInvoice;
+import plus.ruoyi.officia.ofd.sign.OfdSignatureVerification;
 import plus.ruoyi.officia.pdf.OfficiaPdf;
 import plus.ruoyi.officia.pdf.sign.KeyMaterial;
 import plus.ruoyi.officia.pdf.sign.SignOptions;
@@ -121,6 +126,7 @@ final class ApiRoutes {
         registerCells(r);
         registerSlides(r);
         registerPdf(r);
+        registerOfd(r);
         registerImaging(r);
         registerBarCode(r);
         registerEmail(r);
@@ -156,6 +162,8 @@ final class ApiRoutes {
             Store.Blob b = Store.put(name, Http.mimeOf(name), data);
             if (name.toLowerCase().endsWith(".pdf")) {
                 b.withPages(pagesOrUnknown(data));
+            } else if (name.toLowerCase().endsWith(".ofd")) {
+                b.withPages(ofdPagesOrUnknown(data));
             }
             Http.json(ex, b.toJson().end());
         });
@@ -259,7 +267,7 @@ final class ApiRoutes {
 
     private static Json licenseStatus() {
         List<Object> mods = new ArrayList<>();
-        for (String m : new String[]{"words", "cells", "slides", "pdf", "email", "imaging", "barcode", "total"}) {
+        for (String m : new String[]{"words", "cells", "slides", "pdf", "ofd", "email", "imaging", "barcode", "ocr", "total"}) {
             mods.add(Json.obj().put("code", m).put("granted", OfficiaLicense.hasModule(m)));
         }
         long exp = OfficiaLicense.getExpiresEpoch();
@@ -847,6 +855,116 @@ final class ApiRoutes {
 
     // ==================== Imaging ====================
 
+    // ==================== Ofd ====================
+
+    /**
+     * OFD（GB/T 33190）四件事：Word → OFD、OFD → PDF、电子发票解析、签章验证，外加文本 / 元数据读取。
+     *
+     * <p>与 Words 的 topdf 一样只传 id；产物进 Store，前端按 id 下载。
+     * 发票与验签返回结构化 JSON——这两项正是客户接 OFD 最常见的诉求（报销入账、防篡改核验）。</p>
+     */
+    private static void registerOfd(Router r) {
+        // docx / doc → OFD：与 topdf 共用解析与排版，只换输出后端
+        r.add("/api/words/toofd", (ex, q) -> {
+            byte[] src = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            ConvertResult res = OfficiaWords.convertToOfd(src, ConvertOptions.defaults());
+            Store.Blob b = store(outName(q.get("id"), "ofd", "words.ofd"), "application/ofd", res.getData(), t0)
+                .withPages(res.getPageCount());
+            Http.json(ex, b.toJson()
+                .put("evaluation", OfficiaLicense.isEvaluation())
+                .put("enforced", OfficiaLicense.isEnforced())
+                .put("fontSubstitutions", res.getFontSubstitutions().size())
+                .end());
+        });
+
+        // OFD → PDF：发票里的 JBIG2 二维码也会解出来，转出后可直接扫码
+        r.add("/api/ofd/topdf", (ex, q) -> {
+            byte[] ofd = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            OfficiaOfd.OfdToPdfResult res = OfficiaOfd.convertToPdf(ofd, ConvertOptions.defaults());
+            Http.json(ex, result(outName(q.get("id"), "pdf", "ofd.pdf"), "application/pdf", res.getPdf(), t0)
+                .put("warnings", res.getWarnings())
+                .end());
+        });
+
+        // 电子发票 → 结构化数据（评估态下关键值部分遮盖，isEvaluation=true）
+        r.add("/api/ofd/invoice", (ex, q) -> {
+            long t0 = System.nanoTime();
+            OfdInvoice inv = OfficiaOfd.parseInvoice(Store.bytes(q.get("id")));
+            List<Object> items = new ArrayList<>();
+            for (OfdInvoice.Item it : inv.getItems()) {
+                items.add(Json.obj().put("name", it.getName()).put("unit", it.getUnit())
+                    .put("quantity", it.getQuantity()).put("amount", it.getAmount())
+                    .put("taxRate", it.getTaxRate()).put("taxAmount", it.getTaxAmount()));
+            }
+            Http.json(ex, Json.obj()
+                .put("invoiceType", inv.getInvoiceType())
+                .put("invoiceCode", inv.getInvoiceCode())
+                .put("invoiceNumber", inv.getInvoiceNumber())
+                .put("issueDate", inv.getIssueDate())
+                .put("checkCode", inv.getCheckCode())
+                .put("buyerName", inv.getBuyerName())
+                .put("buyerTaxId", inv.getBuyerTaxId())
+                .put("sellerName", inv.getSellerName())
+                .put("sellerTaxId", inv.getSellerTaxId())
+                .put("amountExcludingTax", inv.getAmountExcludingTax())
+                .put("taxAmount", inv.getTaxAmount())
+                .put("totalAmount", inv.getTotalAmount())
+                .put("totalAmountInWords", inv.getTotalAmountInWords())
+                .put("drawer", inv.getDrawer())
+                .put("remark", inv.getRemark())
+                .put("items", items)
+                .put("evaluation", inv.isEvaluation())
+                .put("ms", (System.nanoTime() - t0) / 1_000_000)
+                .end());
+        });
+
+        // 签章验证（SM2 + SM3）：逐个签章报「文件是否被改、签名值是否通过」
+        r.add("/api/ofd/verify", (ex, q) -> {
+            long t0 = System.nanoTime();
+            OfdSignatureVerification v = OfficiaOfd.verify(Store.bytes(q.get("id")));
+            List<Object> sigs = new ArrayList<>();
+            for (OfdSignatureVerification.Signature s : v.getSignatures()) {
+                sigs.add(Json.obj().put("id", s.getId()).put("type", s.getType())
+                    .put("provider", s.getProvider()).put("signTime", s.getSignTime())
+                    .put("signer", s.getSignerName()).put("seal", s.getSealName())
+                    .put("valid", s.isValid()).put("signatureMatch", s.getSignatureMatch())
+                    .put("checkedFiles", s.getCheckedFiles())
+                    .put("modifiedFiles", s.getModifiedFiles()).put("problem", s.getProblem()));
+            }
+            Http.json(ex, Json.obj()
+                .put("signed", v.isSigned()).put("valid", v.isValid()).put("summary", v.getSummary())
+                .put("signatures", sigs)
+                .put("ms", (System.nanoTime() - t0) / 1_000_000)
+                .end());
+        });
+
+        // 文本 / 页数 / 页面尺寸 / 元数据 / 附件名（附件只列名字与大小，不回传字节）
+        r.add("/api/ofd/info", (ex, q) -> {
+            byte[] ofd = Store.bytes(q.get("id"));
+            long t0 = System.nanoTime();
+            List<String> pages = OfficiaOfd.extractTextByPage(ofd);
+            List<Object> files = new ArrayList<>();
+            for (Map.Entry<String, byte[]> e : OfficiaOfd.attachments(ofd).entrySet()) {
+                files.add(Json.obj().put("name", e.getKey()).put("bytes", e.getValue().length));
+            }
+            // 自写 Json 不认原始类型数组，[宽, 高] 转成列表再输出
+            List<Object> sizes = new ArrayList<>();
+            for (double[] wh : OfficiaOfd.pageSizes(ofd)) {
+                sizes.add(java.util.Arrays.asList(wh[0], wh[1]));
+            }
+            Http.json(ex, Json.obj()
+                .put("pages", OfficiaOfd.pageCount(ofd))
+                .put("pageSizesMm", sizes)
+                .put("metadata", OfficiaOfd.metadata(ofd))
+                .put("attachments", files)
+                .put("textByPage", pages)
+                .put("ms", (System.nanoTime() - t0) / 1_000_000)
+                .end());
+        });
+    }
+
     private static void registerImaging(Router r) {
         r.add("/api/imaging/op", (ex, q) -> {
             byte[] src = Store.bytes(q.get("id"));
@@ -1410,6 +1528,15 @@ final class ApiRoutes {
         return store(name, mime, data, t0).toJson()
             .put("evaluation", OfficiaLicense.isEvaluation())
             .put("enforced", OfficiaLicense.isEnforced());
+    }
+
+    /** 读 OFD 页数；损坏的 OFD 返回 -1（不视为失败，真正的错误留给具体操作报）。 */
+    private static int ofdPagesOrUnknown(byte[] ofd) {
+        try {
+            return OfficiaOfd.pageCount(ofd);
+        } catch (RuntimeException ignore) {
+            return -1;
+        }
     }
 
     /** 读 PDF 页数；加密或异常 PDF 返回 -1（不视为失败）。 */

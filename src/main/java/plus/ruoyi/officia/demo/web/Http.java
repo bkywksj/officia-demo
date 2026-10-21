@@ -43,6 +43,7 @@ final class Http {
 
     static {
         MIME.put(".pdf", "application/pdf");
+        MIME.put(".ofd", "application/ofd");
         MIME.put(".html", "text/html; charset=utf-8");
         MIME.put(".js", "application/javascript; charset=utf-8");
         MIME.put(".css", "text/css; charset=utf-8");

@@ -44,6 +44,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
     <a data-p="email" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="mail" class="w-4 h-4 mr-3"></i>Email · EML</a>
     <div class="px-5 py-1.5 mt-2 text-xs font-medium text-slate-400">处理与生成</div>
     <a data-p="pdf" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="file-cog" class="w-4 h-4 mr-3"></i>PDF 工具箱</a>
+    <a data-p="ofd" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="receipt" class="w-4 h-4 mr-3"></i>OFD · 发票/版式</a>
     <a data-p="img" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="image" class="w-4 h-4 mr-3"></i>Imaging · 图像</a>
     <a data-p="bar" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="scan-barcode" class="w-4 h-4 mr-3"></i>BarCode · 条码</a>
     <a data-p="ocr" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="scan-text" class="w-4 h-4 mr-3"></i>OCR · 图片/扫描件</a>
@@ -91,7 +92,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
   <section id="dash" class="panel active">
     <div class="grid grid-cols-4 gap-4 mb-5">
       <div class="bg-white rounded-lg border border-slate-200 p-4"><div class="flex items-center justify-between"><span class="text-sm text-slate-500">已覆盖能力</span><i data-lucide="boxes" class="w-4 h-4 text-primary"></i></div>
-        <div class="text-2xl font-bold mt-2">7 <span class="text-sm font-normal text-slate-400">大模块</span></div><div class="text-xs text-slate-400 mt-1">Words/Cells/Slides/Pdf/Email/Imaging/BarCode</div></div>
+        <div class="text-2xl font-bold mt-2">10 <span class="text-sm font-normal text-slate-400">大模块</span></div><div class="text-xs text-slate-400 mt-1" title="Words/Cells/Slides/Pdf/Ofd/Email/Imaging/BarCode/OCR/Editor">Words/Cells/Slides/Pdf/Ofd/Email/Imaging/BarCode/OCR/Editor</div></div>
       <div class="bg-white rounded-lg border border-slate-200 p-4"><div class="flex items-center justify-between"><span class="text-sm text-slate-500">本次会话任务</span><i data-lucide="activity" class="w-4 h-4 text-accent"></i></div>
         <div class="text-2xl font-bold mt-2" id="mTasks">0 <span class="text-sm font-normal text-slate-400">次</span></div><div class="text-xs text-slate-400 mt-1" id="mTaskSub">尚无任务</div></div>
       <div class="bg-white rounded-lg border border-slate-200 p-4"><div class="flex items-center justify-between"><span class="text-sm text-slate-500">最近耗时</span><i data-lucide="timer" class="w-4 h-4 text-accent"></i></div>
@@ -108,6 +109,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
         <div onclick="go('cells')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="table-2" class="w-4 h-4 text-primary"></i>Officia.Cells</div><div class="text-xs text-slate-500 mt-1.5">XLSX → PDF / CSV<br>公式求值 · 整表重算</div></div>
         <div onclick="go('slides')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="presentation" class="w-4 h-4 text-primary"></i>Officia.Slides</div><div class="text-xs text-slate-500 mt-1.5">PPTX → PDF<br>版式保真模式</div></div>
         <div onclick="go('pdf')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="file-cog" class="w-4 h-4 text-primary"></i>Officia.Pdf</div><div class="text-xs text-slate-500 mt-1.5">合并/拆分/抽页/旋转/水印<br>抽文字图片 · RC4 & AES-256</div></div>
+        <div onclick="go('ofd')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="receipt" class="w-4 h-4 text-primary"></i>Officia.Ofd</div><div class="text-xs text-slate-500 mt-1.5">Word → OFD · OFD → PDF<br>电子发票解析 · SM2 验签</div></div>
         <div onclick="go('img')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="image" class="w-4 h-4 text-primary"></i>Officia.Imaging</div><div class="text-xs text-slate-500 mt-1.5">格式转换 · 16 种滤镜/变换<br>文字&图片水印 · 图片→PDF</div></div>
         <div onclick="go('bar')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="scan-barcode" class="w-4 h-4 text-primary"></i>Officia.BarCode</div><div class="text-xs text-slate-500 mt-1.5">Code128/39/93 · EAN · UPC-A · ITF-14<br>QR 全 40 版本 · 4 档纠错</div></div>
         <div onclick="go('email')" class="border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-primary hover:shadow-sm transition"><div class="flex items-center gap-2 font-medium text-sm"><i data-lucide="mail" class="w-4 h-4 text-primary"></i>Officia.Email</div><div class="text-xs text-slate-500 mt-1.5">EML 解析 / 生成<br>邮件归档 → PDF</div></div>
@@ -378,6 +380,41 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
       </div>
     </div>
     <div id="pdfOut"></div>
+  </section>
+
+  <!-- OFD -->
+  <section id="ofd" class="panel">
+    <div class="grid grid-cols-3 gap-5">
+      <div class="col-span-1 space-y-4">
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="file-output" class="w-4 h-4 text-primary"></i>Word → OFD</div>
+          <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('ofdwFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'ofdw')">
+            <i data-lucide="file-up" class="w-7 h-7 text-slate-400 mx-auto"></i>
+            <div class="text-sm mt-2 text-slate-600">上传 .docx / .doc</div></div>
+          <input type="file" id="ofdwFile" class="hidden" accept=".doc,.docx" onchange="upload(this.files[0],'ofdw')">
+          <div id="ofdwInfo" class="mt-3 text-xs text-slate-400">尚未选择文件</div>
+          <div class="text-xs text-slate-500 mt-2">OfficiaWords.toOfd — 与转 PDF 共用解析与排版，字体子集嵌入，数科 / 福昕 / WPS 均可打开</div>
+          <button onclick="ofdFromWord()" class="w-full mt-3 bg-primary text-white py-2.5 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="play" class="w-4 h-4"></i>转成 OFD</button>
+        </div>
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="receipt" class="w-4 h-4 text-primary"></i>读 OFD（发票 / 公文）</div>
+          <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('ofdFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="drop(event,'ofd')">
+            <i data-lucide="file-up" class="w-7 h-7 text-slate-400 mx-auto"></i>
+            <div class="text-sm mt-2 text-slate-600">上传 .ofd</div>
+            <div class="text-xs text-slate-400 mt-1">电子发票、电子公文；或先在上方把 Word 转成 OFD</div></div>
+          <input type="file" id="ofdFile" class="hidden" accept=".ofd" onchange="upload(this.files[0],'ofd')">
+          <div id="ofdInfo" class="mt-3 text-xs text-slate-400">尚未选择文件</div>
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <button onclick="ofdOp('topdf')" class="border border-slate-300 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer">转 PDF</button>
+            <button onclick="ofdOp('invoice')" class="border border-slate-300 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer">解析发票</button>
+            <button onclick="ofdOp('verify')" class="border border-slate-300 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer">签章验证</button>
+            <button onclick="ofdOp('info')" class="border border-slate-300 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer">文本 / 元数据</button>
+          </div>
+          <div class="text-xs text-slate-400 mt-2">验签按 SM2 + SM3 逐个签章核对；发票二维码（JBIG2）转 PDF 后可直接扫码</div>
+        </div>
+      </div>
+      <div class="col-span-2 space-y-4" id="ofdOut"></div>
+    </div>
   </section>
 
   <!-- Imaging -->
@@ -720,7 +757,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
 
 <script>
 const T={dash:'能力总览',words:'Words · DOC/DOCX',tpl:'模板填充 · 邮件合并',cells:'Cells · XLSX/CSV',slides:'Slides · PPTX',
- email:'Email · EML',pdf:'PDF 工具箱',img:'Imaging · 图像',bar:'BarCode · 条码',ocr:'OCR · 图片/扫描件',lic:'授权门控与对比',batch:'批量回归',editor:'Editor · Words 编辑',editorx:'Editor · Cells 网格',fb:'反馈问题文件'};
+ email:'Email · EML',pdf:'PDF 工具箱',ofd:'OFD · 发票/版式',img:'Imaging · 图像',bar:'BarCode · 条码',ocr:'OCR · 图片/扫描件',lic:'授权门控与对比',batch:'批量回归',editor:'Editor · Words 编辑',editorx:'Editor · Cells 网格',fb:'反馈问题文件'};
 const S={};              // 各面板选中的文件 id
 let tasks=[];            // 最近任务
 let ecc='M';
@@ -1704,7 +1741,7 @@ async function probePdf(blob){
 // 换一份文件重测时，原本要滚回页面上方重新选文件、再把参数看一遍、再点一次按钮。
 // 这里把这三步收进结果卡片：选完文件就用【当前面板的参数】重跑，页面不动。
 const ACCEPT={words:'.doc,.docx',tpl:'.docx',cells:'.xlsx,.csv',slides:'.pptx',
-  pdf:'.pdf',img:'image/*',ocr:'image/*,.pdf',eml:'.eml'};
+  pdf:'.pdf',img:'image/*',ocr:'image/*,.pdf',eml:'.eml',ofdw:'.doc,.docx',ofd:'.ofd'};
 let RERUN=null;
 /** 各面板动作在开头登记自己，供结果卡片重跑。 */
 function again(key,fn,arg){RERUN={key:key,fn:fn,arg:arg}}
@@ -1916,6 +1953,79 @@ async function slidesRun(){
   try{const j=await api('/api/slides/topdf?id='+S.slides,{method:'POST'});
     show('slidesOut',card('PPTX → PDF',j));logTask('Slides',j);toast('完成，'+j.pages+' 页');
   }catch(e){show('slidesOut','');toast(e.message,false)}
+}
+// —— OFD ——
+async function ofdFromWord(){
+  again('ofdw',ofdFromWord);
+  if(!need('ofdw','请先上传 .doc / .docx'))return;
+  busy('ofdOut','转换中…');
+  try{const j=await api('/api/words/toofd?id='+S.ofdw,{method:'POST'});
+    // OFD 浏览器预览不了：给一键接力，把产物直接交给下方「读 OFD」验证能读回、能转 PDF
+    const extra='<div class="px-4 py-3 border-t border-slate-100 text-xs text-slate-500 flex items-center gap-3">'
+      +'<span>浏览器无法直接预览 OFD，可下载后用数科 / 福昕 / WPS 打开，或</span>'
+      +'<button onclick="ofdUseResult(\''+j.id+'\',\''+esc(j.name)+'\','+j.pages+','+j.size+')" class="border border-slate-300 bg-white px-3 py-1.5 rounded-md hover:border-primary hover:text-primary transition cursor-pointer">交给「读 OFD」继续验证</button>'
+      +(j.fontSubstitutions?'<span class="text-amber-600">字体替换 '+j.fontSubstitutions+' 处</span>':'')+'</div>';
+    show('ofdOut',card('Word → OFD',j,extra));logTask('Ofd',j);toast('转换完成，'+j.pages+' 页');
+  }catch(e){show('ofdOut','');toast(e.message,false)}
+}
+function ofdUseResult(id,name,pages,size){
+  S.ofd=id;S.ofdBlob={id:id,name:name,pages:pages,size:size};renderInfo('ofd');
+  toast('已选中 '+name+'，可点「转 PDF / 文本 / 元数据」');
+}
+function ofdKv(rows){
+  return '<table class="w-full text-sm">'+rows.filter(r=>r[1]!==undefined&&r[1]!==null&&r[1]!=='')
+    .map(r=>'<tr class="border-b border-slate-50"><td class="px-4 py-2 text-slate-500 w-40">'+r[0]+'</td><td class="px-4 py-2">'+esc(r[1])+'</td></tr>').join('')+'</table>';
+}
+/** 连续同尺寸的页合并成「210.0×297.0 ×14 页」，几十页的公文不必列几十遍 */
+function ofdSizes(list){
+  const out=[];
+  for(const s of list){const k=s[0].toFixed(1)+'×'+s[1].toFixed(1);
+    if(out.length&&out[out.length-1].k===k)out[out.length-1].n++;else out.push({k:k,n:1});}
+  return out.map(x=>x.k+(x.n>1?' ×'+x.n+' 页':'')).join('、');
+}
+function ofdPanel(title,body){
+  return '<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm flex items-center gap-2">'
+    +'<i data-lucide="file-check-2" class="w-4 h-4 text-emerald-600"></i>'+title+'</div>'+body+'</div>';
+}
+async function ofdOp(op){
+  again('ofd',ofdOp,op);
+  if(!need('ofd','请先上传 .ofd'))return;
+  busy('ofdOut','处理中…');
+  try{const j=await api('/api/ofd/'+op+'?id='+S.ofd,{method:'POST'});
+    let html;
+    if(op==='topdf'){
+      const w=(j.warnings||[]);
+      html=card('OFD → PDF',j,w.length?'<div class="px-4 py-3 border-t border-slate-100 text-xs text-amber-700">'+w.map(esc).join('<br>')+'</div>':'');
+      toast('完成，'+j.pages+' 页');
+    }else if(op==='invoice'){
+      const items=(j.items||[]).map(it=>'<tr class="border-b border-slate-50"><td class="px-4 py-2">'+esc(it.name)+'</td><td class="px-4 py-2">'+esc(it.quantity)+' '+esc(it.unit)
+        +'</td><td class="px-4 py-2 text-right">'+esc(it.amount)+'</td><td class="px-4 py-2 text-right">'+esc(it.taxRate)+'</td><td class="px-4 py-2 text-right">'+esc(it.taxAmount)+'</td></tr>').join('');
+      html=ofdPanel('电子发票 · '+(j.ms||0)+' ms'+(j.evaluation?' <span class="text-amber-600 text-xs">评估版：关键值部分遮盖</span>':''),
+        ofdKv([['票种',j.invoiceType],['发票代码',j.invoiceCode],['发票号码',j.invoiceNumber],['开票日期',j.issueDate],['校验码',j.checkCode],
+            ['购买方',j.buyerName],['购买方税号',j.buyerTaxId],['销售方',j.sellerName],['销售方税号',j.sellerTaxId],
+            ['金额（不含税）',j.amountExcludingTax],['税额',j.taxAmount],['价税合计',j.totalAmount],['大写',j.totalAmountInWords],
+            ['开票人',j.drawer],['备注',j.remark]])
+        +(items?'<table class="w-full text-sm border-t border-slate-100"><tr class="text-xs text-slate-400"><td class="px-4 py-2">项目</td><td class="px-4 py-2">数量</td><td class="px-4 py-2 text-right">金额</td><td class="px-4 py-2 text-right">税率</td><td class="px-4 py-2 text-right">税额</td></tr>'+items+'</table>':''));
+      toast('解析完成');
+    }else if(op==='verify'){
+      const sigs=(j.signatures||[]).map(s=>'<div class="px-4 py-3 border-t border-slate-100 text-sm">'
+        +'<span class="inline-flex px-2 py-0.5 rounded-full text-xs '+(s.valid?'bg-emerald-50 text-emerald-700':'bg-red-50 text-red-700')+'">'+(s.valid?'有效':'无效')+'</span> '
+        +esc(s.seal||s.id)+' · '+esc(s.signer||'')+' · '+esc(s.signTime||'')
+        +'<div class="text-xs text-slate-500 mt-1">核对文件 '+s.checkedFiles+' 个'+(s.modifiedFiles&&s.modifiedFiles.length?'，被改：'+esc(s.modifiedFiles.join('、')):'')
+        +(s.problem?'，'+esc(s.problem):'')+'</div></div>').join('');
+      html=ofdPanel('签章验证 · '+(j.ms||0)+' ms','<div class="px-4 py-3 text-sm '+(j.valid?'text-emerald-700':(j.signed?'text-red-700':'text-slate-500'))+'">'+esc(j.summary)+'</div>'+sigs);
+      toast(j.signed?(j.valid?'签章有效':'签章无效'):'文件未签章',j.valid||!j.signed);
+    }else{
+      const meta=Object.keys(j.metadata||{}).map(k=>[k,j.metadata[k]]);
+      const files=(j.attachments||[]).map(a=>esc(a.name)+'（'+fmt(a.bytes)+'）').join('、');
+      html=ofdPanel('文本与元数据 · '+j.pages+' 页 · '+(j.ms||0)+' ms',
+        ofdKv([['页面尺寸（mm）',ofdSizes(j.pageSizesMm||[])]].concat(meta))
+        +(files?'<div class="px-4 py-2 text-xs text-slate-500 border-t border-slate-100">附件：'+files+'</div>':'')
+        +(j.textByPage||[]).map((t,i)=>'<div class="px-4 py-3 border-t border-slate-100"><div class="text-xs text-slate-400 mb-1">第 '+(i+1)+' 页</div><pre class="text-xs whitespace-pre-wrap">'+esc(t)+'</pre></div>').join(''));
+      toast('读取完成');
+    }
+    show('ofdOut',html);logTask('Ofd',j);
+  }catch(e){show('ofdOut','');toast(e.message,false)}
 }
 // —— PDF ——
 async function pdfOp(op){
