@@ -83,6 +83,7 @@ codex
 | 生成条码 / 二维码 | `officia-barcode` |
 | 图片处理 / 图片转 PDF | `officia-imaging` |
 | 解析邮件 / 邮件归档 | `officia-email` |
+| OFD 电子发票解析 / 验签 / 转 PDF、Word 转 OFD | `officia-ofd` |
 
 ### 「我遇到问题了」
 

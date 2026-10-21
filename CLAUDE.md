@@ -61,13 +61,14 @@
 
 | 门面类 | 模块 | 主要能力 | 对应技能 |
 |---|---|---|---|
-| `OfficiaWords` | officia-words | docx/doc → PDF；docx 模板填充 / 邮件合并 | `officia-words`、`officia-template` |
+| `OfficiaWords` | officia-words | docx/doc → PDF / OFD；docx 模板填充 / 邮件合并 | `officia-words`、`officia-template`、`officia-ofd` |
 | `OfficiaCells` | officia-cells | xlsx → PDF/CSV；CSV → PDF；公式求值与重算 | `officia-cells` |
 | `OfficiaSlides` | officia-slides | pptx → PDF（内容提取式 / 版式保真式） | `officia-slides` |
 | `OfficiaPdf` | officia-pdf | 合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图·加密·元数据 | `officia-pdf` |
 | `OfficiaBarCode` | officia-barcode | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR | `officia-barcode` |
 | `OfficiaImaging` | officia-imaging | 15 种滤镜/变换、格式互转、图片 → PDF | `officia-imaging` |
 | `OfficiaEmail` | officia-email | EML 解析、邮件归档 → PDF、写出 EML | `officia-email` |
+| `OfficiaOfd` | officia-ofd | OFD 电子发票解析、签章验证（SM2+SM3）、OFD → PDF、文本 / 元数据 / 附件 | `officia-ofd` |
 | `OfficiaOcr` | officia-ocr | 图片/扫描件识别成文字（中英两档权重内置） | 见 `officia-capability-map` |
 | `OfficiaEditor` | officia-editor | **在线编辑**：docx/xlsx ⇄ JSON 契约，前端 `officia-editor.js` 随 jar 分发 | `officia-editor` |
 | `OfficiaLicense` | officia-license | 授权加载、门控查询、评估态判定 | `officia-license` |
@@ -105,7 +106,7 @@ mvn -o test
 | `officia-setup` | 引依赖、Maven/Gradle 坐标、JDK 版本、本地仓安装、离线部署、打包 |
 | `officia-license` | 加载 `.lic`、去水印、评估态判定、模块门控、`enableEnforcement` |
 
-### 能力使用（9）
+### 能力使用（10）
 
 | 技能 | 什么时候用 |
 |---|---|
@@ -117,6 +118,7 @@ mvn -o test
 | `officia-barcode` | 条码/二维码生成、码制选型、纠错级别、尺寸参数 |
 | `officia-imaging` | 图片滤镜变换、格式互转、图片 → PDF、水印 |
 | `officia-email` | EML 解析、邮件归档 PDF、构造 EML |
+| `officia-ofd` | OFD 电子发票解析、签章验证、OFD → PDF、Word → OFD |
 | `officia-editor` | 在线编辑：`OfficiaEditor` 六组门面 + 前端 `officia-editor.js`（功能区/属性面板/网格）、工作簿重算、能力边界 |
 
 ### 排坑与工程化（6）

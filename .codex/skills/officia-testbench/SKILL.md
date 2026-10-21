@@ -55,6 +55,7 @@ java -Xmx8g -jar target/officia-demo-1.0.0.jar          # 大文件（设计型 
 | **Cells · XLSX/CSV** | XLSX→PDF、XLSX→CSV、CSV→PDF、CSV 解析、单元格公式求值、整表重算 | `officia-cells` |
 | **Slides · PPTX** | PPTX→PDF（版式保真），看页数 / 耗时 / 体积并内嵌预览 | `officia-slides` |
 | **PDF 工具箱** | 合并·拆分·抽页·删页·旋转·**水印（平铺/字号/透明度/角度/颜色/间距可调，支持 {datetime} 等动态变量）**·页码·抽文字·抽图片·RC4-128·AES-256·信息·**转 Word**·**转图片**·**数字签名 / 会签 / 验签 / 篡改演示** | `officia-pdf` |
+| **OFD · 发票/版式** | Word → OFD（产物可一键交给下半区验证）；上传 `.ofd` → 转 PDF、**电子发票解析**、**签章验证**、文本 / 页面尺寸 / 元数据 / 附件 | `officia-ofd` |
 | **Imaging · 图像** | 滤镜/变换全项 + 格式转换 + 图片→PDF，**处理前后并排对比** | `officia-imaging` |
 | **BarCode · 条码** | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR（4 档纠错）+ **全码制一键预览** | `officia-barcode` |
 | **Email · EML** | EML 解析（主题/收发件/附件/正文）、邮件归档 → PDF | `officia-email` |
@@ -93,6 +94,12 @@ POST /api/license/enforce            开关门控（用于并排对比）
 POST /api/words/topdf                Word → PDF
 POST /api/words/toimages             Word → 一页一张图片（dpi / format / watermark / tile）
 POST /api/words/template             模板填充（mode=single|merged|each|docx）
+POST /api/words/toofd                Word → OFD（返回页数、字体替换数）
+
+POST /api/ofd/topdf                  OFD → PDF（附 warnings）
+POST /api/ofd/invoice                电子发票 → 结构化 JSON（评估态关键值遮盖）
+POST /api/ofd/verify                 签章验证（逐签章：有效否 / 被改文件 / 问题）
+POST /api/ofd/info                   页数 / 页面尺寸 / 元数据 / 附件名 / 逐页文本
 
 POST /api/cells/topdf   /tocsv   /csvtopdf   /parsecsv   /formula   /recalc
 POST /api/slides/topdf
@@ -149,6 +156,9 @@ curl -X POST http://127.0.0.1:8080/api/batch/run     # 全能力回归，返回 
 | Imaging | 灰度滤镜 + 图片→PDF | PNG 魔数 + `%PDF-` 头 |
 | Email | EML 生成 → 解析**往返一致** | 字段回读一致 |
 | Email | EML → PDF 归档 | `%PDF-` 头 |
+| Ocr | 模板匹配识别数字 | 识别结果精确匹配 |
+| Ocr | 扫描件 PDF → Word | ZIP 容器 + `word/document.xml` 在 |
+| Ofd | Word → OFD → 文本 / PDF 闭环 | ZIP 容器 + 页数 ≥1 + 读回文本含原文 + `%PDF-` 头 |
 | License | 门控：评估降级 vs 完整 | 页数/水印差异 |
 
 返回 JSON 含 `total` / `pass` / `fail` / `totalMs` 与逐行结果。

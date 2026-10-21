@@ -17,9 +17,11 @@
    | pptx → PDF | `OfficiaSlides.toPdf(...)` |
    | 图片 → PDF | `OfficiaImaging.toPdf(...)` |
    | eml → PDF | `OfficiaEmail.toPdf(...)` |
+   | docx/doc → OFD | `OfficiaWords.toOfd(byte[])` |
+   | OFD → PDF | `OfficiaOfd.toPdf(byte[])` |
    | PDF ↔ PDF | `OfficiaPdf.*` / `OfficiaPdf.edit(...)` 链式 |
 
-3. **激活对应技能**读取完整用法（`officia-words` / `officia-cells` / `officia-slides` / `officia-pdf` / `officia-imaging` / `officia-email` / `officia-template`）。
+3. **激活对应技能**读取完整用法（`officia-words` / `officia-cells` / `officia-slides` / `officia-pdf` / `officia-imaging` / `officia-email` / `officia-ofd` / `officia-template`）。
 
 4. **产出可运行代码**，并按场景决定：
    - 输出很大 / 要写文件或 HTTP 响应 → 用**流式**重载

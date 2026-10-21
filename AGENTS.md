@@ -62,13 +62,14 @@
 
 | 门面类 | 模块 | 主要能力 |
 |---|---|---|
-| `OfficiaWords` | officia-words | docx/doc → PDF；docx 模板填充 / 邮件合并 |
+| `OfficiaWords` | officia-words | docx/doc → PDF / OFD；docx 模板填充 / 邮件合并 |
 | `OfficiaCells` | officia-cells | xlsx → PDF/CSV；CSV → PDF；公式求值与重算 |
 | `OfficiaSlides` | officia-slides | pptx → PDF（内容提取式 / 版式保真式） |
 | `OfficiaPdf` | officia-pdf | 合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图·加密·元数据 |
 | `OfficiaBarCode` | officia-barcode | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR |
 | `OfficiaImaging` | officia-imaging | 滤镜变换、格式互转、图片 → PDF |
 | `OfficiaEmail` | officia-email | EML 解析、邮件归档 → PDF、写出 EML |
+| `OfficiaOfd` | officia-ofd | OFD 电子发票解析、签章验证（SM2+SM3）、OFD → PDF、文本 / 元数据 / 附件 |
 | `OfficiaOcr` | officia-ocr | 图片/扫描件识别成文字（中英两档权重内置） |
 | `OfficiaEditor` | officia-editor | 在线编辑：docx/xlsx ⇄ JSON 契约，前端 `officia-editor.js` 随 jar 分发 |
 | `OfficiaLicense` | officia-license | 授权加载、门控查询、评估态判定 |
@@ -77,7 +78,7 @@
 
 ---
 
-## 技能清单（28 个 = 21 能力技能 + 7 命令技能）
+## 技能清单（29 个 = 22 能力技能 + 7 命令技能）
 
 Codex 启动时已自动加载全部 SKILL.md 的 frontmatter。按 description 的触发场景匹配后，读取完整正文再动手。
 
@@ -89,7 +90,7 @@ Codex 启动时已自动加载全部 SKILL.md 的 frontmatter。按 description 
 | `officia-setup` | Maven/Gradle 坐标、JDK 基线、本地仓安装、离线部署、打包 |
 | `officia-license` | `.lic` 加载、去水印、门控排查、构建期开关差异 |
 
-### 能力使用（9）
+### 能力使用（10）
 
 | 技能 | 用途 |
 |---|---|
@@ -101,6 +102,7 @@ Codex 启动时已自动加载全部 SKILL.md 的 frontmatter。按 description 
 | `officia-barcode` | 8 种码制、输入约束与校验位、QR 四档纠错 |
 | `officia-imaging` | 滤镜变换、格式互转、水印、图片 → PDF |
 | `officia-email` | EML 解析、归档 PDF、构造写出 |
+| `officia-ofd` | OFD 发票解析、验签、转 PDF、Word → OFD |
 | `officia-editor` | 在线编辑：`OfficiaEditor` 六组门面 + `officia-editor.js` 前端（功能区/属性面板/网格）、工作簿重算、能力边界 |
 
 ### 排坑与工程化（6）

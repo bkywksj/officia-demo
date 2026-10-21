@@ -46,8 +46,8 @@ Officia 以标准 Maven 产物发布，坐标前缀 `plus.ruoyi`。**运行时�
 implementation 'plus.ruoyi:officia-all:1.1.3'
 ```
 
-**`officia-all` 已聚合以下模块**（核实自 `../officia/officia-all/pom.xml`，2026-09-08 复核）：
-`officia-words`、`officia-cells`、`officia-slides`、`officia-pdf`、`officia-email`、`officia-imaging`、`officia-barcode`、`officia-ocr`、**`officia-editor`**、**`officia-license`**。
+**`officia-all` 已聚合以下模块**（核实自 `../officia/officia-all/pom.xml`，2026-10-21 复核）：
+`officia-words`、`officia-cells`、`officia-slides`、`officia-pdf`、`officia-ofd`（1.1.6 起）、`officia-email`、`officia-imaging`、`officia-barcode`、`officia-ocr`、**`officia-editor`**、**`officia-license`**。
 
 > 💡 所以引了 `officia-all` **就已经有授权客户端了**，不必再单独引 `officia-license`。
 
@@ -103,11 +103,12 @@ Maven 会自动带上该模块依赖的底座（如 `officia-pdf` → `officia-r
 | `officia-barcode` | `OfficiaBarCode` | 条码 / 二维码 |
 | `officia-imaging` | `OfficiaImaging` | 图像处理 |
 | `officia-email` | `OfficiaEmail` | 邮件 EML |
+| `officia-ofd` | `OfficiaOfd` | OFD 发票解析 / 验签 / 转 PDF（Word → OFD 在 `OfficiaWords.toOfd`） |
 | `officia-ocr` | `OfficiaOcr` | 图片/扫描件识别成文字 |
 | `officia-editor` | `OfficiaEditor` | 在线编辑（Java 门面 + 随 jar 分发的 `officia-editor.js`） |
 | `officia-license` | `OfficiaLicense` | 授权加载与门控 |
 
-底座模块（`officia-common` / `officia-ooxml` / `officia-cfb` / `officia-engine` / `officia-render-pdf` / `officia-render-image`）**不用手动引**，由能力模块传递带入。
+底座模块（`officia-common` / `officia-gm` / `officia-ooxml` / `officia-cfb` / `officia-engine` / `officia-render-pdf` / `officia-render-image` / `officia-render-ofd`）**不用手动引**，由能力模块传递带入。
 
 > ⚠️ **`officia-editor` 单引时注意**：前端产物 `officia-editor.js` 打在这个 jar 的
 > `META-INF/resources/officia-editor/` 里。Servlet 3.0+ 容器（Spring Boot 等）会自动把它暴露为

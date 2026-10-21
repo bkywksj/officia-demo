@@ -59,7 +59,7 @@ const instructions = `## 强制技能激活流程（必须执行）
 - officia-license: 授权、license、lic、水印、评估态、去水印、门控、enforcement、限页、激活
 
 【能力使用】
-- officia-words: Word、docx、doc、转PDF、word转换、文档转换、流式转换、页数、耗时
+- officia-words: Word、docx、doc、转PDF、转OFD、word转换、文档转换、流式转换、页数、耗时
 - officia-template: 模板、填充、占位符、邮件合并、批量生成、合同、报表、{{}}、循环、条件、格式器
 - officia-cells: Excel、xlsx、CSV、表格、公式、求值、重算、导出CSV
 - officia-slides: PPT、pptx、幻灯片、演示文稿、版式保真
@@ -67,6 +67,7 @@ const instructions = `## 强制技能激活流程（必须执行）
 - officia-barcode: 条码、条形码、二维码、QR、Code128、EAN、UPC、ITF、纠错
 - officia-imaging: 图片、图像、缩放、裁剪、滤镜、灰度、模糊、锐化、水印、格式转换、图片转PDF
 - officia-email: 邮件、EML、邮件解析、邮件归档、附件、收发件人
+- officia-ofd: OFD、ofd、版式文档、电子发票、数电票、发票解析、验签、签章验证、电子签章、国密、OFD转PDF、Word转OFD
 - officia-editor: 在线编辑、网页编辑、编辑器、OfficiaEditor、可编辑、officia-editor.js、mountEditable、mountRibbon、mountWorkbook、功能区、属性面板、往返、重算、recalc、ONLYOFFICE
 
 【排坑与工程化】

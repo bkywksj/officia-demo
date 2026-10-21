@@ -125,7 +125,7 @@ docker compose up -d --build
 # 3) 验收三连
 docker compose logs officia-demo | head -30            # 启动横幅：监听地址 / 字体 / 授权 / 内存上限
 curl -s http://127.0.0.1:18080/api/health               # {"ok":true,...,"maxUpload":...,"maxHeap":...}
-curl -s -X POST http://127.0.0.1:18080/api/batch/run    # 全能力回归，期望 "pass":10,"fail":0
+curl -s -X POST http://127.0.0.1:18080/api/batch/run    # 全能力回归，期望 "fail":0 且 pass = total（条数随版本增加，1.1.6 为 15）
 ```
 
 > 🌟 `/api/batch/run` 是本项目最强的验收手段：用 officia 自造输入跑 10 个用例（Cells/Pdf/BarCode/Imaging/Email/License），

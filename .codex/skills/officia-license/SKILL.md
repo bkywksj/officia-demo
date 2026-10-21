@@ -88,7 +88,7 @@ OfficiaLicense.isEnforced();       // 门控是否开启
 OfficiaLicense.reset();            // 复位（主要用于测试）
 ```
 
-**模块码**：`words` / `cells` / `slides` / `pdf` / `email` / `imaging` / `barcode`，另有 `total` 表示放行全部。
+**模块码**：`words` / `cells` / `slides` / `pdf` / `ofd` / `email` / `imaging` / `barcode` / `ocr`，另有 `total` 表示放行全部。
 
 启动自检片段：
 

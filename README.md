@@ -50,6 +50,7 @@ mvn -o exec:java -Dexec.mainClass=plus.ruoyi.officia.demo.Demo   # 或直接 run
 | Cells · XLSX/CSV | XLSX→PDF、XLSX→CSV、CSV→PDF、CSV 解析、单元格公式求值、整表重算 |
 | Slides · PPTX | PPTX→PDF，标准 / 版式保真双模式 |
 | PDF 工具箱 | 合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图片·RC4-128·AES-256·信息 |
+| OFD · 发票/版式 | Word → OFD、OFD → PDF、电子发票解析、签章验证（SM2 + SM3）、文本 / 元数据 |
 | Imaging · 图像 | 15 种滤镜/变换 + 格式转换 + 图片→PDF，处理前后并排对比 |
 | BarCode · 条码 | Code128/39/93、EAN-13/8、UPC-A、ITF-14、QR（4 档纠错）+ 全码制一键预览 |
 | Email · EML | EML 解析（主题/收发件/附件/正文）、邮件归档 → PDF |

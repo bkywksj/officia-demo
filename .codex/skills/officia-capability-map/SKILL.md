@@ -62,6 +62,10 @@ Officia 对外只暴露 **10 个门面类**（`OfficiaWords` / `OfficiaCells` / 
 | 一段文本/网址 | 条码/二维码 PNG | `OfficiaBarCode.qrPng(String)` 等 | `officia-barcode` |
 | 图片字节 | 处理后图片 / PDF | `OfficiaImaging.*` | `officia-imaging` |
 | `.eml` | 结构化对象 / PDF | `OfficiaEmail.parseEml(...)` / `toPdf(...)` | `officia-email` |
+| `.docx` / `.doc` | **OFD**（国产版式，政务 / 档案） | `OfficiaWords.toOfd(byte[])` | `officia-ofd` |
+| `.ofd` 电子发票 | 结构化发票数据（号码、金额、购销方、明细） | `OfficiaOfd.parseInvoice(byte[])` | `officia-ofd` |
+| `.ofd` | **签章验证**（SM2 + SM3，文件是否被改） | `OfficiaOfd.verify(byte[])` | `officia-ofd` |
+| `.ofd` | PDF / 文本 / 元数据 / 附件 | `OfficiaOfd.toPdf(..)` / `extractText(..)` / `metadata(..)` / `attachments(..)` | `officia-ofd` |
 | `.docx` / `.doc` | **在网页里编辑**（打字、改格式、存回 docx/PDF） | `OfficiaEditor.open(byte[])` → JSON，前端 `mountEditable`，存回 `OfficiaEditor.save(json, EditorFormat.DOCX)` | `officia-editor` |
 | `.xlsx` | **在网页里编辑**（改格、算公式、存回 xlsx） | `OfficiaEditor.openWorkbook(byte[])` → JSON，前端 `Cells.mountWorkbook`，重算 `recalc`，存回 `saveWorkbook` | `officia-editor` |
 
@@ -79,7 +83,10 @@ OfficiaSlides.toPdf(pptx)                   // PPT（版式保真，每张幻灯
 OfficiaImaging.toPdf(imageBytes)            // 单张图片 → PDF
 OfficiaImaging.toPdf(List<byte[]> images)   // 多张图片 → 一份 PDF
 OfficiaEmail.toPdf(eml)                     // 邮件归档 → PDF
+OfficiaOfd.toPdf(ofd)                       // OFD（电子发票 / 公文）→ PDF
 ```
+
+出 **OFD** 的入口目前只有 Word：`OfficiaWords.toOfd(docx)`（Excel / PPT / PDF → OFD 尚未提供）。
 
 出**图片**的入口：
 
@@ -119,6 +126,9 @@ OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选�
 | DOC 内 **宏 / OLE / 数字签名负载**的内部解析 | ❌ 明确不支持 | 只跳过，不解析其内容 |
 | 数字签名的**可见签章**（页面红章 / 手写签名图） | ❌ 不含 | 当前为不可见签名，只在阅读器签名面板可见 |
 | 证书**吊销**（CRL / OCSP） | ❌ 不含 | 私有 CA 只做建根与签发；签出的证书在有效期内无法作废 |
+| OFD 验签的**证书链 / 吊销 / 印章制发方**校验 | ❌ 不含 | `OfficiaOfd.verify` 只做密码学验证（文件未改、签名值正确）；「是不是真税务局章」要靠业务系统的信任根与官方查验渠道 |
+| Excel / PPT / PDF → **OFD** | ❌ 尚未提供 | 只有 Word → OFD；其它源可先转 PDF |
+| OFD → PDF 里的**部分 JBIG2 编码**（符号字典 / 文本区域 / 半调 / MMR） | ⚠️ 不解码 | 记入 `convertToPdf(..).getWarnings()`，其余内容照常输出；常见的发票二维码（通用区域编码）已支持 |
 | **竖排文本**与 **RTL 文本框** | ⚠️ 已知缺口 | 排版层未覆盖 |
 | DOC **内嵌字体** | ⚠️ 已知缺口 | 规范链路已核对，但字体数据为 W3C EOT 格式、该规范未归档，故不实现 |
 | `.doc` 二进制输入整体 | 🚧 主链路可用、绿测覆盖，**未宣布生产就绪** | 见 `../officia/status.json` 的 `doc_binary_input`。生产上大批量 `.doc` 前先用测试台实测一批真实样本 |
@@ -165,6 +175,8 @@ OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选�
 │   └─ 要认出上面的字        → OfficiaOcr.recognize(..)             → officia-pdf
 ├─ 要生成条码/二维码         → OfficiaBarCode.*                     → officia-barcode
 ├─ 输入是邮件 .eml           → OfficiaEmail.*                       → officia-email
+├─ 输入是 .ofd（发票/公文）   → OfficiaOfd.*（解析/验签/转 PDF）      → officia-ofd
+├─ 要交 OFD                  → OfficiaWords.toOfd（仅 Word 源）      → officia-ofd
 └─ 输出有水印/被限页         → 不是 bug，是评估态                    → officia-license
 ```
 

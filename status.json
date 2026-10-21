@@ -34,8 +34,8 @@
     "phase6_5_usage_guide": "docs/usage-guide.md 已生成"
   },
   "skills": {
-    "total": 21,
-    "completed": 21,
+    "total": 22,
+    "completed": 22,
     "categories": {
       "entry_and_setup": {
         "count": 3,
@@ -46,7 +46,7 @@
         ]
       },
       "capability_usage": {
-        "count": 9,
+        "count": 10,
         "list": [
           "officia-words",
           "officia-template",
@@ -56,6 +56,7 @@
           "officia-barcode",
           "officia-imaging",
           "officia-email",
+          "officia-ofd",
           "officia-editor"
         ]
       },
@@ -118,8 +119,8 @@
   "codex_mirror": {
     "enabled": true,
     "built_at": "2026-07-30",
-    "skills": 28,
-    "mirrored_skills": 21,
+    "skills": 29,
+    "mirrored_skills": 22,
     "command_skills": 7,
     "hooks_generated": 4,
     "config_files_generated": true,
@@ -135,6 +136,7 @@
       "officia-barcode/.../OfficiaBarCode.java",
       "officia-imaging/.../OfficiaImaging.java",
       "officia-email/.../OfficiaEmail.java",
+      "officia-ofd/.../OfficiaOfd.java（+ invoice/OfdInvoice、sign/OfdSignatureVerification）",
       "officia-editor/.../OfficiaEditor.java",
       "officia-editor/web/src/index.ts（前端产物的导出清单，与 Java 门面同为对外契约）",
       "officia-license/.../OfficiaLicense.java"

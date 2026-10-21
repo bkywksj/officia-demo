@@ -1,7 +1,7 @@
 ---
 name: officia-words
 description: |
-  用 OfficiaWords 把 Word 转成 PDF：docx / doc（自动识别）、四种入参形态、流式转换省内存、
+  用 OfficiaWords 把 Word 转成 PDF（以及 OFD、一页一张图片）：docx / doc（自动识别）、四种入参形态、流式转换省内存、
   取页数与耗时、ConvertOptions 配置（纸张 / 字体目录 / 字体嵌入 / 图像降采样 / 超时）。
   也包含 Markdown → docx / PDF（Markdown 是 Words 的一种输入格式）。
 
@@ -13,7 +13,7 @@ description: |
   - 要改纸张大小、指定字体目录
   - .doc 老格式能不能转、有什么限制
 
-  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积、Markdown、md、markdownToDocx、markdownToPdf、md转word、md转docx、md转pdf、转图片、toImages、一页一张、文档预览、在线预览、PNG、DPI、ImageRenderOptions
+  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积、Markdown、md、markdownToDocx、markdownToPdf、md转word、md转docx、md转pdf、转图片、toImages、一页一张、文档预览、在线预览、PNG、DPI、ImageRenderOptions、OFD、转OFD、toOfd、Word转OFD
 disable-model-invocation: false
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 ---
@@ -157,6 +157,20 @@ OfficiaWords.toImages(docx, null, ImageRenderOptions.defaults()
 
 > ℹ️ **自定义水印**见下方 `WatermarkOptions`；它与未授权评估水印互不影响——
 > 评估水印永远画在最上层，盖不掉。
+
+### 转 OFD（国产版式文档，officia 1.1.6 起）
+
+政务、档案、电子发票场景常要求交 OFD（GB/T 33190）。与 `toPdf` 共用解析、排版与绘制，
+**同一份 Word 转出的 PDF 与 OFD 版面逐字一致**；入参形态与 `toPdf` 一一对应：
+
+```java
+byte[] ofd = OfficiaWords.toOfd(docxBytes);                          // 也有 (byte[], ConvertOptions) / (InputStream) / (File)
+int pages  = OfficiaWords.toOfd(new File("in.docx"), new File("out.ofd"));   // 边生成边写盘，最省内存
+int pages  = OfficiaWords.toOfd(docxBytes, out);                     // 流式，也有 (byte[], ConvertOptions, OutputStream) / (InputStream, OutputStream)
+ConvertResult r = OfficiaWords.convertToOfd(docxBytes, options);     // 页数 / 耗时 / 字体替换
+```
+
+授权与转 PDF 同口径（模块码 `words`，评估态限 30 页 + 水印）。读 OFD、发票解析、验签、OFD → PDF 见 `officia-ofd`。
 
 ## `ConvertOptions` 配置
 
@@ -306,6 +320,7 @@ mvn -o package && java -jar target/officia-demo-1.0.0.jar
 | 接下来 | 用 |
 |---|---|
 | 按数据生成 Word / 批量出合同 | `officia-template` |
+| 读 OFD / 发票解析 / 验签 / OFD → PDF | `officia-ofd` |
 | 中文乱码 | `officia-chinese-font` |
 | 集成进 Web 接口 | `officia-spring-integration` |
 | 大文档慢 / OOM | `officia-performance` |
