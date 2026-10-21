@@ -38,12 +38,12 @@ Officia 以标准 Maven 产物发布，坐标前缀 `plus.ruoyi`。**运行时�
 <dependency>
   <groupId>plus.ruoyi</groupId>
   <artifactId>officia-all</artifactId>
-  <version>1.1.3</version>
+  <version>1.1.6</version>
 </dependency>
 ```
 
 ```groovy
-implementation 'plus.ruoyi:officia-all:1.1.3'
+implementation 'plus.ruoyi:officia-all:1.1.6'
 ```
 
 **`officia-all` 已聚合以下模块**（核实自 `../officia/officia-all/pom.xml`，2026-10-21 复核）：
@@ -58,7 +58,7 @@ implementation 'plus.ruoyi:officia-all:1.1.3'
 
 ### 🔴 Maven Central 上只有 `officia-all` 这一个构件
 
-发布到 Central 的是 shade 出来的**单一 uber-jar**（632 个类，含全部能力模块 + `officia-license`）。
+发布到 Central 的是 shade 出来的**单一 uber-jar**（含全部能力模块 + `officia-license`）。
 **`officia-license`、`officia-pdf`、`officia-words` 等子模块坐标在 Central 上不存在**，引用会解析失败：
 
 ```

@@ -17,7 +17,7 @@
     <properties>
         <!-- officia 版本只写这一处：依赖坐标与页面上显示的版本号都取它，避免两边各自漂移
              （曾出现页面写死 1.0.0、实际跑 1.1.2，排查线上问题时误导了判断） -->
-        <officia.version>1.1.5</officia.version>
+        <officia.version>1.1.6</officia.version>
         <!-- 编译目标：测试台自身按 17 编译、部署在 JDK 17+ 上（2026-10-17 用户定：demo 保持新 JDK）。
              · 源码只写 Java 8 语法与 API，officia 1.1.5 起支持 JDK 8——客户想在 JDK 8 上跑测试台，
                自己用 mvn -o clean package -Dmaven.compiler.release=8 打包即可（2026-10-17 在 msi 上用 JDK 8 容器实测：批量回归 14/14）；
