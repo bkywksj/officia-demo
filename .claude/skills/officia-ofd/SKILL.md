@@ -147,11 +147,15 @@ ConvertResult r = OfficiaWords.convertToOfd(byte[] docx, ConvertOptions options)
 | 操作 | 未加载 License 时 | 授权模块码 |
 |---|---|---|
 | OFD → PDF | 限 30 页 + 评估水印 | `ofd` |
-| 文本抽取 | 只返回前 30 页，开头带评估提示 | `ofd` |
+| 文本抽取 | 只返回前 30 页，开头带评估提示；**若是发票**，文字里的号码、金额、税号等同样遮盖（普通公文不受影响） | `ofd` |
 | 发票解析 | 字段齐全但关键值部分遮盖（`isEvaluation()=true`），可联调、**不可入账** | `ofd` |
 | 附件 `attachments` | **返回空表**（发票附件就是原始 XML，原样给出等于绕过上一条的遮盖） | `ofd` |
-| 验签 / 页数 / 元数据 | 不受限 | — |
-| Word → OFD | 与 Word → PDF 同口径：限 30 页 + 评估水印 | `words` |
+| 元数据 `metadata` | 标准项（Title / Author / DocID …）照常；`custom.*` 自定义项的值遮盖（税务系统生成的发票把号码、金额都写在这里） | `ofd` |
+| 验签 / 页数 / 页面尺寸 | 不受限 | — |
+| Word → OFD | 与 Word → PDF 同口径：限 30 页 + 评估水印；**计入 `words` 模块码**，只授权 `ofd` 不解除 | `words` |
+
+> 边界：**渲染可试用、结构化数据要授权**。OFD → PDF / 图片的画面是真实内容（带评估水印、限 30 页），
+> 评估态下人眼可以看清发票；被遮盖的是可直接被程序拿去入账的数据（解析字段、元数据、文本、附件）。
 
 ## 完整示例：发票批量入账（验签 + 解析 + 留 PDF 底）
 
@@ -183,6 +187,7 @@ for (File f : dir.listFiles((d, n) -> n.toLowerCase().endsWith(".ofd"))) {
 | 转出 PDF 的字体和原件不同 | OFD 没内嵌字形、本机缺该字体 | `setFontDirectory` 指到有对应字体的目录（见 `officia-chinese-font`）；字位置不受影响 |
 | Word → OFD 只有 30 页且带水印 | 评估态（`words` 模块未授权） | 加载 License |
 | `attachments()` 返回空 | 评估态刻意不给附件 | 加载 License；授权后照常返回 |
+| 发票的 `extractText` / `metadata()` 里有 `*` | 评估态遮盖（防止绕过发票解析的遮盖） | 加载 License，`ofd` 模块要在授权里 |
 
 ## 在测试台里实测
 

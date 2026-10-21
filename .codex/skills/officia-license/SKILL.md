@@ -89,6 +89,9 @@ OfficiaLicense.reset();            // 复位（主要用于测试）
 ```
 
 **模块码**：`words` / `cells` / `slides` / `pdf` / `ofd` / `email` / `imaging` / `barcode` / `ocr`，另有 `total` 表示放行全部。
+模块码按**入口门面**计：`OfficiaWords.toOfd` 走 `words`（与 Word → PDF 同口径），只授权 `ofd` 不解除它；
+`OfficiaOfd` 的读取、发票解析、元数据、转 PDF 走 `ofd`。用 officia-server 时，`GET /health` 的
+`licensed` / `evaluation` / `modules` 可直接确认授权是否生效。
 
 启动自检片段：
 
