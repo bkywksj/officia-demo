@@ -252,5 +252,5 @@ allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 |---|---|
 | 用法不清楚 | 问 AI（技能会自动匹配），或读 `../officia-docs/` 文档站 |
 | 确认能力边界 | `cat ../officia/status.json` 看实测事实 |
-| 授权购买咨询 | 见 `../officia-docs/docs/guide/licensing.md` |
+| 授权购买咨询 | 见 `../officia-docs/src/content/docs/guide/licensing.md`（线上 <https://officia.ruoyi.plus/guide/licensing.html>） |
 | 疑似 officia 的问题 | 先用测试台复现，带上文件头 4 字节 + 完整异常消息 + officia 版本反馈 |

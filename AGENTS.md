@@ -17,14 +17,14 @@
 - 独立 groupId `plus.ruoyi.demo`，**不属于** officia reactor。
 
 > 🎯 本技能体系面向**使用 officia 的开发者**（接入 / 调 API / 排错 / 集成）。
-> ⚠️ 它**不是**开发 officia 库本身的技能体系——改库请去同级 `../officia/`（那里有面向库开发者的 30 个技能）。
+> ⚠️ 它**不是**开发 officia 库本身的技能体系——改库请去同级 `../officia/`（那里有面向库开发者的 31 个技能）。
 
 ### 同级目录分工
 
 | 目录 | 是什么 | 何时进去 |
 |---|---|---|
 | `../officia/` | Officia 库**源码**（17 模块 reactor） | 查 API 真实签名/行为；改库本身 |
-| `../officia-docs/` | 文档站（VitePress） | 查面向用户的说明文档 |
+| `../officia-docs/` | 文档站（Astro，<https://officia.ruoyi.plus>；正文在 `src/content/docs/`） | 查面向用户的说明文档 |
 | `officia-demo/`（本目录） | 消费方示例 + 可视化测试台 | 学用法、实测能力、写验证、回归 |
 
 ---
@@ -40,7 +40,7 @@
 ```
 1. ../officia/ 源码（门面类 OfficiaXxx.java 的方法签名与 Javadoc）   ← 最高
 2. ../officia/ 的绿测（src/test/**）
-3. ../officia-docs/docs/ 文档站
+3. ../officia-docs/src/content/docs/ 文档站
 4. 各 README.md / 历史注释                                         ← 最低，可能过时
 ```
 
