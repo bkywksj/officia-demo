@@ -60,4 +60,4 @@ System.out.println("expires    = " + OfficiaLicense.getExpiresEpoch());
 - 🔴 **绝不**生成 / 伪造 / 猜测 License 令牌内容
 - 🔴 **绝不**把令牌写进源码或提交（`.gitignore` 已拦 `*.lic`）
 - 🔴 **绝不**给"绕过水印 / 破解门控"的建议——正确做法是购买并加载授权
-- 价格与条款以 `../officia-docs/docs/guide/licensing.md` 与商业合同为准，不要复述可能变动的数字
+- 价格与条款以 `../officia-docs/src/content/docs/guide/licensing.md` 与商业合同为准，不要复述可能变动的数字

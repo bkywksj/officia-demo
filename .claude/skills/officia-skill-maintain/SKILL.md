@@ -166,7 +166,7 @@ done > /tmp/facade-now.txt
 cat ../officia/status.json     # capabilities / explicitly_rejected / known_gaps / not_verified
 
 # 3) 变更日志
-cat ../officia-docs/docs/changelog.md
+cat ../officia-docs/src/content/docs/changelog.md
 ```
 
 ### 受影响技能对照
@@ -176,7 +176,7 @@ cat ../officia-docs/docs/changelog.md
 | 某门面新增/删除/改签名 | 对应能力技能（`officia-words` / `officia-cells` / …） |
 | `ConvertOptions` / `PageSize` 增减字段 | `officia-words`（配置表）+ 各转换类技能 |
 | 模板占位符语法扩展 | `officia-template` |
-| `FormulaEngine` 增减函数 | `officia-cells` 的函数表（现为 80 个） |
+| `FormulaEngine` 增减函数 | `officia-cells` 的函数表（现为 85 个） |
 | 条码码制/参数变化 | `officia-barcode` |
 | PDF 加密算法/`PdfEditor` 方法变化 | `officia-pdf` |
 | `CfbLimits` 默认值变化 | `officia-performance` |

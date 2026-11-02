@@ -43,7 +43,7 @@ mvn -o test
 
 ```bash
 # 文档站变更日志
-cat ../officia-docs/docs/changelog.md
+cat ../officia-docs/src/content/docs/changelog.md
 
 # 新版的能力状态 / 拒绝项 / 已知缺口
 cat ../officia/status.json
@@ -154,7 +154,7 @@ mvn -o clean test    # 确认回退后恢复全绿
 
 ```
 □ 升级前 mvn -o test 全绿（有基线）
-□ 读了 ../officia-docs/docs/changelog.md
+□ 读了 ../officia-docs/src/content/docs/changelog.md
 □ 对比了 ../officia/status.json 的 capabilities / explicitly_rejected / known_gaps
 □ pom 版本号已改，且本地仓确实有新版
 □ mvn -o dependency:tree 确认解析到新版
