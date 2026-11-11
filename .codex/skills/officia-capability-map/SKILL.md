@@ -48,6 +48,8 @@ Officia 对外只暴露 **10 个门面类**（`OfficiaWords` / `OfficiaCells` / 
 | CSV 文本 | PDF | `OfficiaCells.csvToPdf(String)` | `officia-cells` |
 | CSV 文本 | 行列网格 | `OfficiaCells.parseCsv(String)` | `officia-cells` |
 | `.pptx` | PDF | `OfficiaSlides.toPdf(byte[])` | `officia-slides` |
+| 多个 `.docx` / `.doc` | **一个可编辑 docx**（样式、编号、页眉页脚都保留） | `OfficiaWords.merge(List<byte[]>)`；要 PDF 用 `mergeToPdf` | `officia-words` |
+| `.doc` | `.docx` | `OfficiaWords.toDocx(byte[])` | `officia-words` |
 | 多个 PDF | 一个 PDF | `OfficiaPdf.merge(List<byte[]>)` | `officia-pdf` |
 | 一个 PDF | 多个单页 PDF | `OfficiaPdf.split(byte[])` | `officia-pdf` |
 | PDF | 纯文本 | `OfficiaPdf.extractText(byte[])` | `officia-pdf` |
@@ -111,6 +113,7 @@ OfficiaPdf.toImages(pdf)                    // PDF → 一页一张（自动选�
 | PDF 多步操作 | 逐个静态方法 | `OfficiaPdf.edit(pdf).xxx().yyy().toBytes()` | 两步以上用链式 `PdfEditor`，少一轮解析/序列化 |
 | Cells 公式求值 | `evaluateFormula(Map, ref)` | `evaluateCell(excel, ref)` | 没有文件、只想算一张散列表用 A；对真实 xlsx/xls 实算用 B（旧名 `evaluateXlsxCell` 已 `@Deprecated`，行为不变） |
 | 模板批量 | `fillTemplateEach` → N 份 | `fillTemplateMerged` → 1 份长文档 | 每人一份文件用 A；打印/归档成一份用 B |
+| 多份 Word 合成一份 | `OfficiaWords.merge` → docx | 各自 `toPdf` 后 `OfficiaPdf.merge` → PDF | 还要编辑用 A；只要 PDF 两者皆可（A 的 `mergeToPdf` 一步到位）。**别**先合 PDF 再 `toWord` 转回来，版面重建会丢样式与编号 |
 | 引依赖粒度 | `officia-all` | 单模块（`officia-pdf` 等） | 多数场景用 `officia-all` 最省心；只用一个能力可单引 |
 | 网页里给人**看**文档 vs 给人**改**文档 | `toPdf` / `toImages` | `OfficiaEditor.open` + 前端 `mountEditable` | 只读展示用 A（省事、无前端集成）；要用户改内容再存回 docx/xlsx 才用 B |
 | 在线编辑要不要另起服务 | — | — | **不需要**。没有 Document Server、没有新进程新端口，open/save 就是两次普通方法调用 |

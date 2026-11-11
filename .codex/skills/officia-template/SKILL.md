@@ -188,7 +188,8 @@ byte[]       fillTemplateMerged(byte[] tpl, List<Map<String,Object>> dataList)  
 byte[]       fillTemplateMergedToPdf(byte[] tpl, List<Map<String,Object>> dataList) // 合并成一份长 PDF
 ```
 
-> `Merged` 会做**图片关系重映射**，多份的图片不会串。
+> `Merged` 会做**图片关系重映射**，多份的图片不会串。1.1.7 起各份的编号列表各自从 1 开始（此前第 2 份会接着第 1 份续号），
+> 同名书签自动改名。不同模板生成的文档要拼成一份，用 `OfficiaWords.merge`（见 `officia-words`）。
 
 ### JSON 数据源（免手工构造 Map）
 

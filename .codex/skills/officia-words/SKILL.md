@@ -3,7 +3,7 @@ name: officia-words
 description: |
   用 OfficiaWords 把 Word 转成 PDF（以及 OFD、一页一张图片）：docx / doc（自动识别）、四种入参形态、流式转换省内存、
   取页数与耗时、ConvertOptions 配置（纸张 / 字体目录 / 字体嵌入 / 图像降采样 / 超时）。
-  也包含 Markdown → docx / PDF（Markdown 是 Words 的一种输入格式）。
+  也包含 Markdown → docx / PDF（Markdown 是 Words 的一种输入格式）、多份 Word 合并为一份、doc 转 docx。
 
   触发场景：
   - Word 转 PDF、docx 转 PDF、doc 转 PDF
@@ -12,8 +12,9 @@ description: |
   - 大文档转换想省内存 / 直接写进 HTTP 响应流
   - 要改纸张大小、指定字体目录
   - .doc 老格式能不能转、有什么限制
+  - 多个 Word 合并成一个、doc 转 docx
 
-  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积、Markdown、md、markdownToDocx、markdownToPdf、md转word、md转docx、md转pdf、转图片、toImages、一页一张、文档预览、在线预览、PNG、DPI、ImageRenderOptions、OFD、转OFD、toOfd、Word转OFD
+  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积、Markdown、md、markdownToDocx、markdownToPdf、md转word、md转docx、md转pdf、转图片、toImages、一页一张、文档预览、在线预览、PNG、DPI、ImageRenderOptions、OFD、转OFD、toOfd、Word转OFD、合并Word、Word合并、合并文档、merge、mergeToPdf、MergeOptions、toDocx、doc转docx
 disable-model-invocation: false
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 ---
@@ -26,7 +27,8 @@ allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 
 1. **转换**：`toPdf` / `convert` —— docx、doc 都走同一入口，**自动识别格式**（本技能）
 2. **Markdown 输入**：`markdownToDocx` / `markdownToPdf` —— Markdown 是 Words 的一种输入格式，不是独立模块（本技能）
-3. **模板填充 / 邮件合并**：`fillTemplate*` —— 见 `officia-template`
+3. **多份合并 / 转 docx**：`merge` / `mergeToPdf` / `toDocx`（本技能）
+4. **模板填充 / 邮件合并**：`fillTemplate*` —— 见 `officia-template`
 
 底层链路 `WordParser → DocModel(IR) → LayoutEngine → PdfRenderer` 已被门面完全屏蔽，你只管调静态方法。
 
@@ -253,6 +255,67 @@ int markdownToPdf(File inMarkdown, File outPdf)                          // 边�
 | 强调的交叉嵌套 | ⚠️ 用就近配对而非 CommonMark 的 delimiter run 栈；`*a **b* c**` 式写法有分歧（常规文本一致） |
 
 > 选型建议：**要成品直接看的用 `markdownToPdf`**（版式完整）；要交付可继续编辑的文稿再用 `markdownToDocx`（当前版式较素）。
+
+## 多份 Word 合并为一份 / 转 docx（officia 1.1.7 起）
+
+多份 Word 合并成一份 docx，doc 与 docx 可以混着传，按列表顺序拼。**直接在 Word 文档结构上拼接**，
+不经 PDF：命名样式、自动编号、页眉页脚、脚注、批注、超链接、图片、书签都保留，结果仍可编辑。
+
+> 🔴 别再走「Word → PDF → 合并 PDF → PDF 转 Word」：最后一步要从版面重建文档，样式、编号、表格结构都会损失。
+> 只要最终 PDF 的，`mergeToPdf` 一步到位；或各自 `toPdf` 后 `OfficiaPdf.merge`。
+
+```java
+import plus.ruoyi.officia.words.MergeOptions;
+import plus.ruoyi.officia.words.OfficiaWords;
+import java.io.File;
+import java.util.Arrays;
+
+byte[] docx = OfficiaWords.merge(Arrays.asList(cover, body, appendix));   // 默认：每份新起一节
+byte[] pdf  = OfficiaWords.mergeToPdf(Arrays.asList(cover, body, appendix));
+byte[] one  = OfficiaWords.merge(new File("a.docx"), new File("b.doc"));
+
+// 同一模板生成的多份：只插分页符、统一用第一份的样式
+byte[] same = OfficiaWords.merge(docs, MergeOptions.defaults()
+        .separator(MergeOptions.Separator.PAGE)
+        .styleMode(MergeOptions.StyleMode.USE_DESTINATION));
+
+byte[] converted = OfficiaWords.toDocx(docBytes);   // doc → docx；已是 docx 原样返回
+```
+
+### 全部方法（核实自 `OfficiaWords` 源码）
+
+```java
+byte[] merge(List<byte[]> docs)                        // 默认选项
+byte[] merge(List<byte[]> docs, MergeOptions options)  // options 可为 null
+byte[] merge(File... files)
+byte[] mergeToPdf(List<byte[]> docs)
+byte[] mergeToPdf(List<byte[]> docs, MergeOptions mergeOptions, ConvertOptions convertOptions)
+byte[] toDocx(byte[] doc)      // 另有 File / InputStream 重载
+```
+
+### `MergeOptions`
+
+| 选项 | 取值 | 效果 |
+|---|---|---|
+| `separator` | **`SECTION`**（默认） | 每份新起一节并换页：各自保留纸张、方向、页边距、页眉页脚（A4 竖版后接 A3 横版没问题） |
+| | `PAGE` | 只插分页符：后面各份沿用第一份的页面设置与页眉页脚 |
+| | `CONTINUOUS` | 新起一节但不换页 |
+| `styleMode` | **`KEEP_SOURCE`**（默认） | 每份保持原样：同名但定义不同的样式改名导入（如「标题 1_2」）；带编号的样式各份各自从头编号 |
+| | `USE_DESTINATION` | 同名样式一律用第一份的定义（统一外观；带编号的标题会接着第一份往下编） |
+
+段落里的普通编号列表**总是**各份从 1 开始，不会接着上一份续号。
+
+### 诚实边界（务必如实转告用户）
+
+| 项 | 状态 |
+|---|---|
+| 文档级设置（奇偶页不同页眉、兼容模式、文档网格） | ⚠️ 取**第 1 份**的 |
+| 主题字体 | ⚠️ 按第 1 份的主题解析；两份主题不同时，用主题字体的文字可能换字体 |
+| 图片项目符号 | ⚠️ 回退为文字符号 |
+| 内容控件的 customXml 数据绑定、批注的扩展信息（已解决状态等） | ⚠️ 不迁移，控件里显示的文字照常保留 |
+| 只有一份 | 返回它的 docx 形式（doc 会转成 docx） |
+| 授权 | `merge` / `toDocx` 出 docx，**不限页不加水印**；`mergeToPdf` 与 `toPdf` 同一门控口径 |
+| 异常 | 列表为空、某份为空或不是 Word → `OfficiaException`，消息里点明「第 N 份」 |
 
 ## `.doc`（老二进制格式）的真实状态
 
