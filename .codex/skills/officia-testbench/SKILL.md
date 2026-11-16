@@ -1,7 +1,7 @@
 ---
 name: officia-testbench
 description: |
-  使用 officia-demo 的可视化测试台：启动方式与参数、11 个面板分别能实测什么、
+  使用 officia-demo 的可视化测试台：启动方式与参数、各面板分别能实测什么、
   对应的 /api 端点、一键批量回归跑了哪些用例、上传自己的字体与 License 做门控对比。
   这是"验证 officia 能不能做某件事"最快的路径。
 
@@ -46,12 +46,13 @@ java -Xmx8g -jar target/officia-demo-1.0.0.jar          # 大文件（设计型 
 
 > 前置：本地仓要有 officia。没有就先在 `../officia` 跑 `mvn install -DskipTests`，见 `officia-setup`。
 
-## 11 个面板能实测什么
+## 各面板能实测什么
 
 | 面板 | 可实测的能力 | 对应技能 |
 |---|---|---|
 | **Words · DOC/DOCX** | 上传 `.doc`（CFB）/`.docx`（OOXML）→ PDF，**自动识别格式**；字节 / 流式两种输出；**转图片（一页一张，可加水印）** | `officia-words` |
 | **模板填充 · 邮件合并** | 模板 + JSON → 单条 / 合并一份 / 每条一份 / 只填 docx | `officia-template` |
+| **格式规范化 · 公文排版** | 上传（可多选）或直接录入文字 → 按规范统一标题、正文、表格、落款与页面，导出 Word / PDF；规范可选内置公文预设、上传 JSON 或从范文提取；只检查不改；存疑段落列出待确认、确认后重新处理；批量打包 zip（附汇总表） | `officia-words` |
 | **Cells · XLSX/CSV** | XLSX→PDF、XLSX→CSV、CSV→PDF、CSV 解析、单元格公式求值、整表重算 | `officia-cells` |
 | **Slides · PPTX** | PPTX→PDF（版式保真），看页数 / 耗时 / 体积并内嵌预览 | `officia-slides` |
 | **PDF 工具箱** | 合并·拆分·抽页·删页·旋转·**水印（平铺/字号/透明度/角度/颜色/间距可调，支持 {datetime} 等动态变量）**·页码·抽文字·抽图片·RC4-128·AES-256·信息·**转 Word**·**转图片**·**数字签名 / 会签 / 验签 / 篡改演示** | `officia-pdf` |
@@ -95,6 +96,15 @@ POST /api/words/topdf                Word → PDF
 POST /api/words/toimages             Word → 一页一张图片（dpi / format / watermark / tile）
 POST /api/words/template             模板填充（mode=single|merged|each|docx）
 POST /api/words/toofd                Word → OFD（返回页数、字体替换数）
+
+GET  /api/format/presets             内置格式规范清单（id 形如 preset:gongwen）
+POST /api/format/spec                校验上传的规范 JSON（id=Blob）并回显
+POST /api/format/extract             从范文提取规范，存成 JSON Blob，返回 specId
+POST /api/format/check               只检查（id、spec=preset:gongwen 或规范 Blob id）
+POST /api/format/normalize           单份规范化，返回 docx（pdf=1 另出 PDF）+ 报告
+POST /api/format/batch               批量（ids=a,b,c），逐份处理，打成 zip（附汇总 CSV），单份失败不影响其余
+                                     共用参数：overrides=12:HEADING:2,15:BODY（人工认定）、minConfidence、
+                                     removeEmpty=1、keepEmphasis=0、clearColors=0
 
 POST /api/ofd/topdf                  OFD → PDF（附 warnings）
 POST /api/ofd/invoice                电子发票 → 结构化 JSON（评估态关键值遮盖）

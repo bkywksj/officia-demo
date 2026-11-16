@@ -38,12 +38,12 @@ Officia 以标准 Maven 产物发布，坐标前缀 `plus.ruoyi`。**运行时�
 <dependency>
   <groupId>plus.ruoyi</groupId>
   <artifactId>officia-all</artifactId>
-  <version>1.1.7</version>
+  <version>1.1.8</version>
 </dependency>
 ```
 
 ```groovy
-implementation 'plus.ruoyi:officia-all:1.1.7'
+implementation 'plus.ruoyi:officia-all:1.1.8'
 ```
 
 **`officia-all` 已聚合以下模块**（核实自 `../officia/officia-all/pom.xml`，2026-10-21 复核）：

@@ -28,7 +28,7 @@ java -jar target/officia-demo-1.0.0.jar         # 启动后控制台打印访问
 java -jar target/officia-demo-1.0.0.jar 9090 --no-open   # 指定端口 / 不自动开浏览器
 ```
 
-浏览器里可**直接上传 doc/docx/xlsx/pptx/pdf/图片/eml 实测**：转换、模板填充、PDF 工具箱、图像滤镜、
+浏览器里可**直接上传 doc/docx/xlsx/pptx/pdf/图片/eml 实测**：转换、模板填充、格式规范化、PDF 工具箱、图像滤镜、
 条码生成、邮件归档、授权门控对比、一键批量回归——每步都显示页数/耗时/体积、内嵌预览、可下载。
 
 > 服务用 JDK 内置 `com.sun.net.httpserver.HttpServer`，**demo 自身同样零第三方依赖**；
@@ -47,6 +47,7 @@ mvn -o exec:java -Dexec.mainClass=plus.ruoyi.officia.demo.Demo   # 或直接 run
 |---|---|
 | Words · DOC/DOCX | 上传 .doc（CFB）/.docx（OOXML）→ PDF，自动识别格式；字节 / 流式两种输出 |
 | 模板填充 · 邮件合并 | 模板 + JSON → 单条 / 合并一份 / 每条一份 / 只填 docx |
+| 格式规范化 · 公文排版 | 上传（可多选）或直接录入文字 → 按规范统一各级标题、正文、表格、落款与页面，导出 Word / PDF；规范可选内置公文预设（GB/T 9704—2012）、上传 JSON 或从范文提取；只检查不改；判断不准的段落列出待确认、确认后重新处理；批量打包 zip（附汇总表）。需 officia 1.1.8+ |
 | Cells · XLSX/CSV | XLSX→PDF、XLSX→CSV、CSV→PDF、CSV 解析、单元格公式求值、整表重算 |
 | Slides · PPTX | PPTX→PDF，标准 / 版式保真双模式 |
 | PDF 工具箱 | 合并·拆分·抽页·删页·旋转·水印·页码·抽文字·抽图片·RC4-128·AES-256·信息 |

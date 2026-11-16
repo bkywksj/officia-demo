@@ -134,6 +134,8 @@ final class ApiRoutes {
         registerEditor(r);
         // 「效果不佳的文件」反馈：只在设置了 OFFICIA_FEEDBACK_DIR 的线上站点注册（见 FeedbackRoutes）
         FeedbackRoutes.register(r);
+        // 文档格式规范化（检查 / 规范化 / 批量 / 从范文提取规范）
+        FormatRoutes.register(r);
         return r;
     }
 
@@ -1125,7 +1127,7 @@ final class ApiRoutes {
      * <p>PDF→PDF、DOCX→DOCX 这类<b>不改格式</b>的操作必须用它：只换后缀的话结果与源文件同名，
      * 下载时照样被浏览器加 "(1)"，还容易把原件覆盖混淆。</p>
      */
-    private static String outName(String id, String tag, String ext, String fallback) {
+    static String outName(String id, String tag, String ext, String fallback) {
         Store.Blob b = id == null || Http.blank(id) ? null : Store.get(id);
         String base = baseName(b == null ? fallback : b.name());
         if (Http.blank(base)) {
@@ -1524,7 +1526,7 @@ final class ApiRoutes {
         return clean.length() > 120 ? clean.substring(0, 120) : clean;
     }
 
-    private static Json result(String name, String mime, byte[] data, long t0) {
+    static Json result(String name, String mime, byte[] data, long t0) {
         return store(name, mime, data, t0).toJson()
             .put("evaluation", OfficiaLicense.isEvaluation())
             .put("enforced", OfficiaLicense.isEnforced());

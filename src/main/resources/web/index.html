@@ -39,6 +39,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
     <div class="px-5 py-1.5 mt-2 text-xs font-medium text-slate-400">文档转换</div>
     <a data-p="words" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="file-text" class="w-4 h-4 mr-3"></i>Words · DOC/DOCX</a>
     <a data-p="tpl" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="file-input" class="w-4 h-4 mr-3"></i>模板填充 · 邮件合并</a>
+    <a data-p="fmt" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="wand-sparkles" class="w-4 h-4 mr-3"></i>格式规范化 · 公文排版</a>
     <a data-p="cells" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="table-2" class="w-4 h-4 mr-3"></i>Cells · XLSX/CSV</a>
     <a data-p="slides" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="presentation" class="w-4 h-4 mr-3"></i>Slides · PPTX</a>
     <a data-p="email" class="navitem flex items-center px-5 py-2.5 text-sm text-slate-600 cursor-pointer transition-colors hover:bg-slate-50"><i data-lucide="mail" class="w-4 h-4 mr-3"></i>Email · EML</a>
@@ -221,6 +222,63 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
         </div>
         <div id="tplOut"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- 格式规范化 -->
+  <section id="fmt" class="panel">
+    <div class="grid grid-cols-3 gap-5">
+      <div class="col-span-1 space-y-4">
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="upload" class="w-4 h-4 text-primary"></i>1 · 文档（可多选，批量处理）</div>
+          <div class="flex gap-1 mb-3 text-xs">
+            <button id="fmTabFile" onclick="fmTab('file')" class="flex-1 py-1.5 rounded border border-primary text-primary bg-primary/5">上传文件</button>
+            <button id="fmTabText" onclick="fmTab('text')" class="flex-1 py-1.5 rounded border border-slate-300 text-slate-500">直接录入</button>
+          </div>
+          <div id="fmFileBox">
+            <div class="dropzone rounded-lg p-5 text-center cursor-pointer" onclick="pick('fmFile')" ondragover="dz(event,1)" ondragleave="dz(event,0)" ondrop="fmDrop(event)">
+              <i data-lucide="files" class="w-8 h-8 text-slate-400 mx-auto"></i>
+              <div class="text-sm mt-2 text-slate-600">拖入或点击上传，可一次多选</div>
+              <div class="text-xs text-slate-400 mt-1">.docx / .doc</div></div>
+            <input type="file" id="fmFile" class="hidden" accept=".doc,.docx" multiple onchange="fmUpload(Array.from(this.files));this.value=''">
+          </div>
+          <div id="fmTextBox" class="hidden">
+            <textarea id="fmText" rows="8" class="w-full border border-slate-300 rounded-md px-2.5 py-2 text-sm outline-none focus:border-primary"
+              placeholder="直接粘贴文字，每行一段。例如：&#10;关于加强档案管理工作的通知&#10;各区县人民政府：&#10;为进一步规范……&#10;一、总体要求&#10;（一）加强组织领导"></textarea>
+            <button onclick="fmFromText()" class="mt-2 w-full border border-slate-300 py-2 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer">生成文档并加入列表</button>
+          </div>
+          <div id="fmList" class="mt-3 text-xs text-slate-400 space-y-1">尚未选择文件</div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="ruler" class="w-4 h-4 text-primary"></i>2 · 格式规范</div>
+          <select id="fmSpec" onchange="fmSpecChanged()" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm cursor-pointer"></select>
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <button onclick="pick('fmSpecFile')" class="border border-slate-300 py-1.5 rounded-md text-xs hover:border-primary hover:text-primary transition cursor-pointer" title="officia-format-spec/1 格式的 JSON">上传规范 JSON</button>
+            <button onclick="pick('fmSampleFile')" class="border border-slate-300 py-1.5 rounded-md text-xs hover:border-primary hover:text-primary transition cursor-pointer" title="上传一份排好的范文，自动提取规范">从范文提取</button>
+          </div>
+          <input type="file" id="fmSpecFile" class="hidden" accept=".json" onchange="fmSpecUpload(this.files[0]);this.value=''">
+          <input type="file" id="fmSampleFile" class="hidden" accept=".doc,.docx" onchange="fmExtract(this.files[0]);this.value=''">
+          <div id="fmSpecInfo" class="mt-2 text-xs text-slate-400"></div>
+        </div>
+
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+          <div class="font-medium text-sm mb-3 flex items-center gap-2"><i data-lucide="sliders-horizontal" class="w-4 h-4 text-primary"></i>3 · 处理选项</div>
+          <div class="space-y-1.5 text-xs text-slate-600">
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="fmPdf" checked class="accent-primary">同时导出 PDF</label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="fmColors" checked class="accent-primary">清除文字颜色、突出显示与底纹</label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="fmEmph" checked class="accent-primary">保留正文里局部加粗（整段加粗照样去掉）</label>
+            <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="fmEmpty" class="accent-primary">删除用来撑段距的空行</label>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <button onclick="fmCheck()" class="border border-slate-300 py-2.5 rounded-md text-sm hover:border-primary hover:text-primary transition cursor-pointer flex items-center justify-center gap-1.5"><i data-lucide="search-check" class="w-4 h-4"></i>只检查</button>
+            <button onclick="fmNormalize()" class="bg-primary text-white py-2.5 rounded-md text-sm hover:opacity-90 transition cursor-pointer flex items-center justify-center gap-1.5"><i data-lucide="wand-sparkles" class="w-4 h-4"></i>规范化</button>
+          </div>
+          <button onclick="fmBatch()" class="mt-2 w-full border border-emerald-300 bg-emerald-50 text-emerald-700 py-2.5 rounded-md text-sm hover:border-emerald-500 transition cursor-pointer flex items-center justify-center gap-2"><i data-lucide="package" class="w-4 h-4"></i>批量规范化全部文件（打包下载）</button>
+          <div class="text-xs text-slate-400 mt-2">判断不准的段落标为「待确认」、不会改动；在结果里确认后点「按确认结果重新处理」。</div>
+        </div>
+      </div>
+      <div class="col-span-2 space-y-4" id="fmOut"></div>
     </div>
   </section>
 
@@ -756,7 +814,7 @@ tailwind.config={theme:{extend:{colors:{primary:'#1E40AF','primary-light':'#3B82
 <div id="toast" class="fixed bottom-6 right-6 z-50 space-y-2"></div>
 
 <script>
-const T={dash:'能力总览',words:'Words · DOC/DOCX',tpl:'模板填充 · 邮件合并',cells:'Cells · XLSX/CSV',slides:'Slides · PPTX',
+const T={dash:'能力总览',words:'Words · DOC/DOCX',tpl:'模板填充 · 邮件合并',fmt:'格式规范化 · 公文排版',cells:'Cells · XLSX/CSV',slides:'Slides · PPTX',
  email:'Email · EML',pdf:'PDF 工具箱',ofd:'OFD · 发票/版式',img:'Imaging · 图像',bar:'BarCode · 条码',ocr:'OCR · 图片/扫描件',lic:'授权门控与对比',batch:'批量回归',editor:'Editor · Words 编辑',editorx:'Editor · Cells 网格',fb:'反馈问题文件'};
 const S={};              // 各面板选中的文件 id
 let tasks=[];            // 最近任务
@@ -1860,6 +1918,194 @@ function logTask(mod,j,ok=true){
     '<td class="px-4 py-2.5">—</td></tr>').join('');
 }
 function busy(target,text){show(target,'<div class="bg-white rounded-lg border border-slate-200 p-10 text-center text-slate-500 text-sm"><i data-lucide="loader-2" class="w-6 h-6 mx-auto spin text-primary"></i><div class="mt-2">'+(text||'处理中…')+'</div></div>')}
+
+// —— 格式规范化 ——
+// 文档列表、规范来源、人工确认结果都只在页面里；服务端无状态，确认结果随请求以 overrides 传回。
+const FM={files:[],cur:null,spec:'preset:gongwen',specs:[],ov:{}};
+const FM_ROLE={TITLE:'文档标题',HEADING:'标题',BODY:'正文',LIST_ITEM:'列举项',TABLE_CELL:'表格',CAPTION:'题注',
+  IMAGE:'图片',TOC:'目录',SIGNATURE:'落款',EMPTY:'空行',CODE:'代码',OTHER:'其他'};
+function fmRoleName(it){return it.role==='HEADING'?(it.level+' 级标题'):(FM_ROLE[it.role]||it.role)}
+function fmTab(t){
+  document.getElementById('fmFileBox').classList.toggle('hidden',t!=='file');
+  document.getElementById('fmTextBox').classList.toggle('hidden',t!=='text');
+  document.getElementById('fmTabFile').className='flex-1 py-1.5 rounded border '+(t==='file'?'border-primary text-primary bg-primary/5':'border-slate-300 text-slate-500');
+  document.getElementById('fmTabText').className='flex-1 py-1.5 rounded border '+(t==='text'?'border-primary text-primary bg-primary/5':'border-slate-300 text-slate-500');
+}
+function fmDrop(e){e.preventDefault();e.currentTarget.classList.remove('over');if(e.dataTransfer.files.length)fmUpload(Array.from(e.dataTransfer.files))}
+// 注意：FileList 是活的，input 一清空就没了——必须先复制成数组再交给异步上传
+async function fmUpload(files){
+  for(const f of files){
+    if(tooLarge(f))continue;
+    try{const j=await api('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:f});
+      FM.files.push({id:j.id,name:j.name,size:j.size});FM.cur=j.id;}catch(e){toast(e.message,false)}
+  }
+  FM.ov={};fmRenderList();
+}
+async function fmFromText(){
+  const raw=document.getElementById('fmText').value;
+  const lines=raw.split(/\r?\n/).map(s=>s.trim()).filter(s=>s);
+  if(!lines.length){toast('请先录入内容',false);return}
+  // markdown 里相邻两行会并成一段，这里每行之间空一行，保证一行就是一段
+  const md=lines.join('\n\n');
+  try{
+    const up=await api('/api/upload?name='+encodeURIComponent('录入内容.md'),{method:'POST',body:new Blob([md],{type:'text/markdown'})});
+    const j=await api('/api/words/mdtodocx?id='+up.id,{method:'POST'});
+    FM.files.push({id:j.id,name:j.name||'录入内容.docx',size:j.size});FM.cur=j.id;FM.ov={};
+    fmRenderList();toast('已生成文档：'+lines.length+' 段');
+  }catch(e){toast(e.message,false)}
+}
+function fmRenderList(){
+  const box=document.getElementById('fmList');
+  if(!FM.files.length){box.innerHTML='尚未选择文件';return}
+  box.innerHTML='<div class="flex items-center justify-between text-slate-500 mb-1"><span>共 '+FM.files.length+' 份；单份操作作用于「当前」</span>'
+    +'<button onclick="FM.files=[];FM.cur=null;FM.ov={};fmRenderList()" class="hover:text-rose-500">清空</button></div>'
+    +FM.files.map(b=>{const cur=b.id===FM.cur;
+      return '<div class="flex items-center justify-between rounded px-2.5 py-1.5 '+(cur?'bg-primary/10 border border-primary/30':'bg-slate-50')+'">'
+        +'<span class="flex items-center gap-1.5 min-w-0">'
+        +(cur?'<span class="text-[10px] text-primary border border-primary/40 rounded px-1 shrink-0">当前</span>'
+             :'<button onclick="FM.cur=\''+b.id+'\';FM.ov={};fmRenderList()" class="text-[10px] text-slate-400 border border-slate-300 rounded px-1 shrink-0 hover:border-primary hover:text-primary">选中</button>')
+        +'<span class="truncate text-slate-600">'+esc(b.name)+'</span></span>'
+        +'<span class="flex items-center gap-2 shrink-0"><span class="text-slate-400">'+fmt(b.size)+'</span>'
+        +'<button onclick="fmRemove(\''+b.id+'\')" title="移除" class="text-slate-400 hover:text-rose-500">&#10005;</button></span></div>';}).join('');
+}
+function fmRemove(id){
+  FM.files=FM.files.filter(b=>b.id!==id);
+  if(FM.cur===id){FM.cur=FM.files.length?FM.files[FM.files.length-1].id:null;FM.ov={}}
+  fmRenderList();
+}
+async function fmLoadPresets(){
+  try{const j=await api('/api/format/presets');FM.specs=j.presets.map(p=>({id:p.id,name:p.name}));}catch(e){FM.specs=[]}
+  fmRenderSpecs();
+}
+function fmRenderSpecs(){
+  const sel=document.getElementById('fmSpec');if(!sel)return;
+  sel.innerHTML=FM.specs.map(s=>'<option value="'+esc(s.id)+'"'+(s.id===FM.spec?' selected':'')+'>'+esc(s.name)+'</option>').join('');
+}
+function fmSpecChanged(){FM.spec=document.getElementById('fmSpec').value;FM.ov={};
+  const s=FM.specs.find(x=>x.id===FM.spec);document.getElementById('fmSpecInfo').innerHTML=s&&s.info?s.info:''}
+function fmAddSpec(id,name,info){
+  FM.specs=FM.specs.filter(s=>s.id!==id);FM.specs.push({id:id,name:name,info:info});FM.spec=id;FM.ov={};
+  fmRenderSpecs();document.getElementById('fmSpecInfo').innerHTML=info;
+}
+async function fmSpecUpload(f){
+  if(!f)return;
+  try{const up=await api('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:f});
+    const j=await api('/api/format/spec?id='+up.id,{method:'POST'});
+    fmAddSpec(j.specId,'上传：'+(j.name||f.name),'已读入规范「'+esc(j.name||f.name)+'」');toast('规范已读入');
+  }catch(e){toast('规范读不进来：'+e.message,false)}
+}
+async function fmExtract(f){
+  if(!f)return;
+  document.getElementById('fmSpecInfo').textContent='正在从范文提取规范…';
+  try{const up=await api('/api/upload?name='+encodeURIComponent(f.name),{method:'POST',body:f});
+    const j=await api('/api/format/extract?id='+up.id,{method:'POST'});
+    const s=j.spec.styles||{};
+    const parts=[];
+    if(s.body&&s.body.font)parts.push('正文 '+(s.body.font.eastAsia||'')+' '+(s.body.size||''));
+    for(let lv=1;lv<=4;lv++){const h=s['heading'+lv];if(h&&h.font)parts.push(lv+'级标题 '+(h.font.eastAsia||'')+' '+(h.size||''))}
+    fmAddSpec(j.specId,'提取自：'+f.name,'已从范文提取（'+j.ms+' ms）：'+esc(parts.join('；')||'未认出标题')
+      +' · <a class="text-primary" href="/api/result/'+j.specId+'?download=1">下载规范 JSON</a>（可修改后再上传）');
+    toast('规范已提取');
+  }catch(e){document.getElementById('fmSpecInfo').textContent='';toast('提取失败：'+e.message,false)}
+}
+function fmQuery(){
+  const ov=Object.keys(FM.ov).filter(k=>FM.ov[k]).map(k=>k+':'+FM.ov[k]).join(',');
+  return '&spec='+encodeURIComponent(FM.spec)
+    +'&clearColors='+(document.getElementById('fmColors').checked?'1':'0')
+    +'&keepEmphasis='+(document.getElementById('fmEmph').checked?'1':'0')
+    +'&removeEmpty='+(document.getElementById('fmEmpty').checked?'1':'0')
+    +(ov?'&overrides='+encodeURIComponent(ov):'');
+}
+function fmNeed(){if(!FM.cur){toast('请先上传或录入文档',false);return false}return true}
+async function fmCheck(){
+  if(!fmNeed())return;
+  busy('fmOut','检查中…');
+  try{const j=await api('/api/format/check?id='+FM.cur+fmQuery(),{method:'POST'});
+    show('fmOut',fmSummary('检查结果（未修改文档）',[['不合规项',j.issues],['待确认段落',j.uncertain],['耗时',j.ms+' ms']],'')
+      +fmReport(j.report,true));
+    toast(j.compliant?'全部合规':'发现 '+j.issues+' 处不合规');
+  }catch(e){show('fmOut','');toast(e.message,false)}
+}
+async function fmNormalize(){
+  if(!fmNeed())return;
+  busy('fmOut','规范化中…');
+  const pdf=document.getElementById('fmPdf').checked;
+  try{const j=await api('/api/format/normalize?id='+FM.cur+fmQuery()+(pdf?'&pdf=1':''),{method:'POST'});
+    const btn=(b,label)=>'<a href="/api/result/'+b.id+'?download=1" download="'+esc(b.name)+'" class="border border-slate-300 px-3 py-1.5 rounded-md text-xs hover:border-primary hover:text-primary transition cursor-pointer flex items-center gap-1"><i data-lucide="download" class="w-3.5 h-3.5"></i>'+label+'</a>';
+    const actions=btn(j.docx,'下载 Word')+(j.pdf?btn(j.pdf,'下载 PDF'):'');
+    show('fmOut',fmSummary('规范化结果',[['改写段落',j.modified],['待确认（未改）',j.uncertain],['剩余问题',j.issues],
+        ['页数',j.pdf&&j.pdf.pages>=0?j.pdf.pages:'—']],actions,j.pdf?preview(j.pdf):'')
+      +fmReport(j.report,false));
+    logTask('格式规范化',j.pdf||j.docx);
+    toast('已改写 '+j.modified+' 段'+(j.uncertain?'，'+j.uncertain+' 段待确认':''));
+  }catch(e){show('fmOut','');toast(e.message,false)}
+}
+async function fmBatch(){
+  if(!FM.files.length){toast('请先上传文档（可多选）',false);return}
+  busy('fmOut','批量处理 '+FM.files.length+' 份…');
+  const pdf=document.getElementById('fmPdf').checked;
+  const q=fmQuery().replace(/&overrides=[^&]*/,'');      // 人工认定按段落序号，只对单份有意义
+  try{const j=await api('/api/format/batch?ids='+FM.files.map(b=>b.id).join(',')+q+(pdf?'&pdf=1':''),{method:'POST'});
+    const rows=j.items.map(it=>'<tr class="border-t border-slate-100"><td class="px-3 py-2">'+esc(it.name)+'</td>'
+      +(it.ok?'<td class="px-3 py-2 text-emerald-600">成功</td><td class="px-3 py-2">'+it.modified+'</td><td class="px-3 py-2">'
+        +(it.uncertain?'<span class="text-amber-600">'+it.uncertain+'</span>':'0')+'</td><td class="px-3 py-2">'+it.issues+'</td>'
+       :'<td class="px-3 py-2 text-rose-600">失败</td><td colspan="3" class="px-3 py-2 text-rose-600">'+esc(it.error)+'</td>')+'</tr>').join('');
+    const dl='<a href="/api/result/'+j.zip.id+'?download=1" download="'+esc(j.zip.name)+'" class="bg-primary text-white px-3 py-1.5 rounded-md text-xs hover:opacity-90 transition cursor-pointer flex items-center gap-1"><i data-lucide="download" class="w-3.5 h-3.5"></i>下载全部（zip）</a>';
+    show('fmOut',fmSummary('批量规范化',[['成功',j.ok+' / '+j.total],['体积',fmt(j.zip.size)],['耗时',j.zip.ms+' ms']],dl)
+      +'<div class="bg-white rounded-lg border border-slate-200 overflow-hidden"><table class="w-full text-sm"><thead class="bg-slate-50 text-xs text-slate-500">'
+      +'<tr><th class="text-left px-3 py-2">文件</th><th class="text-left px-3 py-2">结果</th><th class="text-left px-3 py-2">改写段落</th><th class="text-left px-3 py-2">待确认</th><th class="text-left px-3 py-2">剩余问题</th></tr></thead><tbody>'
+      +rows+'</tbody></table><div class="px-3 py-2 text-xs text-slate-400 border-t border-slate-100">有待确认段落的文件，可在左侧选中后单独「规范化」、确认后重新处理。zip 内附汇总.csv。</div></div>');
+    logTask('格式规范化·批量',j.zip);
+    toast('批量完成：成功 '+j.ok+' / '+j.total);
+  }catch(e){show('fmOut','');toast(e.message,false)}
+}
+function fmSummary(title,stats,actions,extra){
+  return '<div class="bg-white rounded-lg border border-slate-200">'
+    +'<div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">'
+    +'<span class="font-medium text-sm flex items-center gap-2"><i data-lucide="file-check-2" class="w-4 h-4 text-emerald-600"></i>'+title+'</span>'
+    +'<div class="flex gap-2">'+(actions||'')+'</div></div>'
+    +'<div class="grid grid-cols-'+stats.length+' divide-x divide-slate-100 border-b border-slate-100">'
+    +stats.map(s=>'<div class="p-3 text-center"><div class="text-xs text-slate-400">'+s[0]+'</div><div class="text-lg font-semibold">'+s[1]+'</div></div>').join('')
+    +'</div>'+(extra||'')+'</div>';
+}
+/** 报告：待确认段落（可逐段认定）+ 不合规项 + 页面问题与说明 */
+function fmReport(rep,checkMode){
+  const unc=rep.items.filter(it=>it.uncertain);
+  const bad=rep.items.filter(it=>!it.uncertain&&it.issues&&it.issues.length);
+  const opts=v=>{const all=[['','保持不改'],['TITLE','文档标题'],['HEADING:1','1 级标题'],['HEADING:2','2 级标题'],['HEADING:3','3 级标题'],
+      ['HEADING:4','4 级标题'],['BODY','正文'],['SIGNATURE','落款'],['CAPTION','题注'],['CODE','代码（不处理）']];
+    return all.map(o=>'<option value="'+o[0]+'"'+(o[0]===(v||'')?' selected':'')+'>'+o[1]+'</option>').join('')};
+  let h='';
+  if(unc.length){
+    h+='<div class="bg-white rounded-lg border border-amber-200"><div class="px-4 py-3 border-b border-amber-100 flex items-center justify-between">'
+      +'<span class="font-medium text-sm text-amber-700 flex items-center gap-2"><i data-lucide="circle-help" class="w-4 h-4"></i>待确认段落 '+unc.length+' 处（判断不准，未改动）</span>'
+      +'<button onclick="fmNormalize()" class="bg-amber-500 text-white px-3 py-1.5 rounded-md text-xs hover:opacity-90 cursor-pointer">按确认结果重新处理</button></div>'
+      +'<div class="max-h-80 overflow-auto divide-y divide-slate-100">'
+      +unc.map(it=>'<div class="px-4 py-2 flex items-center gap-3 text-sm"><span class="text-xs text-slate-400 w-10 shrink-0">#'+it.index+'</span>'
+        +'<span class="flex-1 truncate" title="'+esc(it.text)+'">'+esc(it.text)+'</span>'
+        +'<span class="text-xs text-slate-400 shrink-0">猜：'+fmRoleName(it)+'</span>'
+        +'<select onchange="FM.ov['+it.index+']=this.value" class="border border-slate-300 rounded px-1.5 py-1 text-xs shrink-0">'+opts(FM.ov[it.index])+'</select></div>').join('')
+      +'</div></div>';
+  }
+  if(bad.length){
+    h+='<div class="bg-white rounded-lg border border-slate-200"><div class="px-4 py-3 border-b border-slate-100 font-medium text-sm flex items-center gap-2">'
+      +'<i data-lucide="list-x" class="w-4 h-4 text-rose-500"></i>'+(checkMode?'不合规段落':'改完仍不合规')+' '+bad.length+' 段</div>'
+      +'<div class="max-h-96 overflow-auto divide-y divide-slate-100">'
+      +bad.slice(0,300).map(it=>'<div class="px-4 py-2 text-sm"><div class="flex items-center gap-2"><span class="text-xs text-slate-400">#'+it.index+'</span>'
+        +'<span class="text-xs px-1.5 rounded bg-slate-100 text-slate-600">'+fmRoleName(it)+'</span><span class="truncate">'+esc(it.text)+'</span></div>'
+        +'<div class="text-xs text-rose-600 mt-1 pl-8">'+it.issues.map(x=>esc(x.property)+'：应为 '+esc(x.expected)+'，实为 '+esc(x.actual)).join('；')+'</div></div>').join('')
+      +(bad.length>300?'<div class="px-4 py-2 text-xs text-slate-400">仅列前 300 段</div>':'')+'</div></div>';
+  }
+  const doc=(rep.documentIssues||[]).map(x=>esc(x.property)+'：应为 '+esc(x.expected)+'，实为 '+esc(x.actual));
+  const notes=(rep.notes||[]).map(esc);
+  if(doc.length||notes.length){
+    h+='<div class="bg-white rounded-lg border border-slate-200 px-4 py-3 text-xs space-y-1">'
+      +doc.map(d=>'<div class="text-rose-600">页面 · '+d+'</div>').join('')+notes.map(n=>'<div class="text-slate-500">说明 · '+n+'</div>').join('')+'</div>';
+  }
+  if(!h)h='<div class="bg-white rounded-lg border border-emerald-200 px-4 py-3 text-sm text-emerald-700">全部段落都符合规范。</div>';
+  return h;
+}
+fmLoadPresets();
 
 // —— Words ——
 async function wordsRun(){

@@ -50,6 +50,8 @@ Officia 对外只暴露 **10 个门面类**（`OfficiaWords` / `OfficiaCells` / 
 | `.pptx` | PDF | `OfficiaSlides.toPdf(byte[])` | `officia-slides` |
 | 多个 `.docx` / `.doc` | **一个可编辑 docx**（样式、编号、页眉页脚都保留） | `OfficiaWords.merge(List<byte[]>)`；要 PDF 用 `mergeToPdf` | `officia-words` |
 | `.doc` | `.docx` | `OfficiaWords.toDocx(byte[])` | `officia-words` |
+| `.docx` / `.doc` + 格式规范 | **格式统一后的 docx**（标题 / 正文 / 表格 / 落款 / 页面 / 页码） | `OfficiaWords.normalize(doc, FormatSpec.preset("gongwen"))`；只查不改用 `checkFormat`，要 PDF 用 `normalizeToPdf` | `officia-words` |
+| 排好版的范文 `.docx` / `.doc` | 格式规范（JSON） | `OfficiaWords.extractFormatSpec(doc).toJson()` | `officia-words` |
 | 多个 PDF | 一个 PDF | `OfficiaPdf.merge(List<byte[]>)` | `officia-pdf` |
 | 一个 PDF | 多个单页 PDF | `OfficiaPdf.split(byte[])` | `officia-pdf` |
 | PDF | 纯文本 | `OfficiaPdf.extractText(byte[])` | `officia-pdf` |

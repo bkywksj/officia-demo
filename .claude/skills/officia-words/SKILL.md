@@ -3,7 +3,8 @@ name: officia-words
 description: |
   用 OfficiaWords 把 Word 转成 PDF（以及 OFD、一页一张图片）：docx / doc（自动识别）、四种入参形态、流式转换省内存、
   取页数与耗时、ConvertOptions 配置（纸张 / 字体目录 / 字体嵌入 / 图像降采样 / 超时）。
-  也包含 Markdown → docx / PDF（Markdown 是 Words 的一种输入格式）、多份 Word 合并为一份、doc 转 docx。
+  也包含 Markdown → docx / PDF（Markdown 是 Words 的一种输入格式）、多份 Word 合并为一份、doc 转 docx、
+  按格式规范检查与统一文档格式（公文排版）。
 
   触发场景：
   - Word 转 PDF、docx 转 PDF、doc 转 PDF
@@ -13,8 +14,9 @@ description: |
   - 要改纸张大小、指定字体目录
   - .doc 老格式能不能转、有什么限制
   - 多个 Word 合并成一个、doc 转 docx
+  - 统一文档格式、公文排版、检查格式是否符合规范、从范文提取格式
 
-  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积、Markdown、md、markdownToDocx、markdownToPdf、md转word、md转docx、md转pdf、转图片、toImages、一页一张、文档预览、在线预览、PNG、DPI、ImageRenderOptions、OFD、转OFD、toOfd、Word转OFD、合并Word、Word合并、合并文档、merge、mergeToPdf、MergeOptions、toDocx、doc转docx
+  触发词：Word、docx、doc、转PDF、word转换、文档转换、toPdf、流式、页数、耗时、ConvertOptions、纸张、A4、图像降采样、maxImageDpi、PDF体积、Markdown、md、markdownToDocx、markdownToPdf、md转word、md转docx、md转pdf、转图片、toImages、一页一张、文档预览、在线预览、PNG、DPI、ImageRenderOptions、OFD、转OFD、toOfd、Word转OFD、合并Word、Word合并、合并文档、merge、mergeToPdf、MergeOptions、toDocx、doc转docx、格式规范化、格式检查、统一格式、公文格式、GB/T 9704、normalize、checkFormat、FormatSpec、extractFormatSpec、排版规范
 disable-model-invocation: false
 allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 ---
@@ -23,12 +25,13 @@ allowed-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
 
 ## 概述
 
-`OfficiaWords` 是 Word 处理的唯一入口，三类能力：
+`OfficiaWords` 是 Word 处理的唯一入口，五类能力：
 
 1. **转换**：`toPdf` / `convert` —— docx、doc 都走同一入口，**自动识别格式**（本技能）
 2. **Markdown 输入**：`markdownToDocx` / `markdownToPdf` —— Markdown 是 Words 的一种输入格式，不是独立模块（本技能）
 3. **多份合并 / 转 docx**：`merge` / `mergeToPdf` / `toDocx`（本技能）
-4. **模板填充 / 邮件合并**：`fillTemplate*` —— 见 `officia-template`
+4. **格式检查 / 规范化**：`checkFormat` / `normalize` / `extractFormatSpec`（本技能）
+5. **模板填充 / 邮件合并**：`fillTemplate*` —— 见 `officia-template`
 
 底层链路 `WordParser → DocModel(IR) → LayoutEngine → PdfRenderer` 已被门面完全屏蔽，你只管调静态方法。
 
@@ -316,6 +319,97 @@ byte[] toDocx(byte[] doc)      // 另有 File / InputStream 重载
 | 只有一份 | 返回它的 docx 形式（doc 会转成 docx） |
 | 授权 | `merge` / `toDocx` 出 docx，**不限页不加水印**；`mergeToPdf` 与 `toPdf` 同一门控口径 |
 | 异常 | 列表为空、某份为空或不是 Word → `OfficiaException`，消息里点明「第 N 份」 |
+
+## 文档格式规范化：检查 / 统一格式 / 从范文提取规范（officia 1.1.8 起）
+
+按一份**格式规范**统一 Word 文档：各级标题、正文、表格、题注、落款的字体字号、加粗、对齐、首行缩进、
+段前段后、行距，以及纸张、页边距、页码。输入 docx / doc，输出 docx（或直接出 PDF）。
+
+```java
+import plus.ruoyi.officia.words.FormatReport;
+import plus.ruoyi.officia.words.FormatResult;
+import plus.ruoyi.officia.words.FormatSpec;
+import plus.ruoyi.officia.words.OfficiaWords;
+
+FormatSpec spec = FormatSpec.preset("gongwen");                 // 内置：党政机关公文（GB/T 9704—2012）
+
+FormatReport report = OfficiaWords.checkFormat(docBytes, spec);  // 只查不改
+for (FormatReport.Item it : report.getItems()) {
+    for (FormatReport.Issue is : it.getIssues()) {
+        System.out.println("第 " + it.getIndex() + " 段（" + it.getRole() + "）" + is);   // 字号：应为 三号，实为 小四
+    }
+}
+
+byte[] fixed = OfficiaWords.normalize(docBytes, spec);           // 改好的 docx
+byte[] pdf   = OfficiaWords.normalizeToPdf(docBytes, spec);      // 改好后直接出 PDF
+```
+
+### 规范从哪来
+
+| 来源 | 写法 |
+|---|---|
+| 内置预设 | `FormatSpec.preset("gongwen")`；`FormatSpec.presetIds()` 列出全部（目前只有 `gongwen`） |
+| JSON | `FormatSpec.fromJson(String / byte[])`；`spec.toJson()` 反向输出，格式为 `officia-format-spec/1` |
+| 范文反推 | `OfficiaWords.extractFormatSpec(byte[] / File / InputStream)`——结果是起点不是定论，建议 `toJson()` 存下让人过目 |
+| 代码里拼 | `new FormatSpec().page(...).title(...).heading(1, ...).body(...).signature(...).caption(...).toc(...).table(...).headingPattern(1, "^[一二三四五六七八九十]+、")` |
+
+`ParagraphFormat` 链式：`eastAsiaFont` / `asciiFont` / `size("三号")` 或 `sizePt(16)` / `bold` / `align(Align.CENTER…)` /
+`firstLineChars` / `rightIndentChars` / `spaceBeforePt` / `spaceAfterPt` / `exactLine(pt)` · `atLeastLine(pt)` · `multipleLine(倍数)`。
+**规范里没写的项不检查也不改。**
+页码 `PageNumberFormat`：`template("— {page} —")`（`{total}` 是总页数）、字体字号、`position(CENTER / LEFT / RIGHT / OUTSIDE)`、`sideIndentChars`。
+
+### 全部方法（核实自 `OfficiaWords` 源码）
+
+```java
+FormatReport checkFormat(byte[] doc, FormatSpec spec)                        // 另有 File / InputStream 重载
+FormatReport checkFormat(byte[] doc, FormatSpec spec, FormatOptions options)
+byte[]       normalize(byte[] doc, FormatSpec spec)                          // 另有 File / InputStream 重载
+byte[]       normalize(byte[] doc, FormatSpec spec, FormatOptions options)
+FormatResult normalizeWithReport(byte[] doc, FormatSpec spec, FormatOptions options)   // getDocx / getReport / getModifiedParagraphs / getRemovedParagraphs
+byte[]       normalizeToPdf(byte[] doc, FormatSpec spec)
+byte[]       normalizeToPdf(byte[] doc, FormatSpec spec, FormatOptions options, ConvertOptions convertOptions)
+FormatSpec   extractFormatSpec(byte[] sampleDoc)                             // 另有 File / InputStream 重载
+```
+
+`FormatReport`：`getItems()`（逐段：`getIndex` / `getText` / `getRole` / `getLevel` / `getConfidence` / `isUncertain` / `getIssues`）、
+`getDocumentIssues()`（页面、页码）、`getNotes()`、`getIssueCount()`、`getUncertainCount()`、`isCompliant()`、`toJson()`（可直接回给前端）。
+
+### 存疑段落：先确认再处理
+
+每段判断角色（文档标题 / 第几级标题 / 正文 / 表格内 / 题注 / 目录 / 落款……）并带置信度，低于门槛（默认 0.6）的是**存疑**：
+检查时不查、规范化时**不改**。让用户确认后回填再调一次，服务端不用存状态：
+
+```java
+FormatOptions opts = FormatOptions.defaults()
+        .override(12, ParagraphRole.HEADING, 2)    // 序号取自报告里的 getIndex()，始终是原文档序号
+        .override(30, ParagraphRole.BODY, 0);
+FormatResult r = OfficiaWords.normalizeWithReport(docBytes, spec, opts);
+```
+
+| `FormatOptions` | 默认 | 说明 |
+|---|---|---|
+| `minConfidence(double)` | `0.6` | 存疑门槛 |
+| `override(index, role, level)` | 无 | 人工认定角色；HEADING 的 level 为 1～9，其余填 0 |
+| `removeEmptyParagraphs(boolean)` | `false` | 删拿空行当段距的空段（表格里的、带分页符 / 图片的保留） |
+| `keepEmphasis(boolean)` | `true` | 正文不加粗时只去整段加粗，个别加粗的词句保留 |
+| `clearColors(boolean)` | `true` | 清文字颜色、突出显示、底纹（网页粘贴的污染） |
+| `updateStyles(boolean)` | `true` | 另建「规范-正文」「规范-标题 1」等样式挂到改过的段落上 |
+
+### 诚实边界（务必如实转告用户）
+
+| 项 | 状态 |
+|---|---|
+| 存疑段落、代码段 | ⚠️ 不改，报告里列出 |
+| 红头（发文机关标志） | 识别出来，不当标题、不清红色 |
+| 文本框里的文字 | ⚠️ 不查不改，报告 notes 里注明 |
+| 页脚里除页码外还有别的内容 | ⚠️ 页脚不动，报告里注明；只有页码的页脚按模板重写，没有就新建 |
+| 外侧页码（`OUTSIDE`） | 会打开文档的「奇偶页不同」，并让双页沿用单页页眉 |
+| 横向页面的节 | ⚠️ 不改页边距 |
+| 字符间距 | ⚠️ 不清理 |
+| 原有样式的定义 | 不改，只新建「规范-」样式 |
+| 范文提取 | ⚠️ 只出现一两次的角色（如落款）样本少，需人工核对 |
+| 授权 | `checkFormat` / `normalize` / `normalizeWithReport` / `extractFormatSpec` **不限页不加水印**；`normalizeToPdf` 与 `toPdf` 同一门控口径 |
+| 异常 | 文档为空 / 不是 Word / 规范为空 → `OfficiaException`；Strict 格式的 docx 报不支持；`extractFormatSpec` 认不出任何段落（如字全在文本框里）也抛 |
 
 ## `.doc`（老二进制格式）的真实状态
 
